@@ -199,6 +199,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       kcal: {
+        required: true,
+        requiredMessage: 'Calorias são obrigatórias.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -208,6 +210,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       prot: {
+        required: true,
+        requiredMessage: 'Proteína é obrigatória.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -217,6 +221,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       carb: {
+        required: true,
+        requiredMessage: 'Carboidrato é obrigatório.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -226,6 +232,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       fat: {
+        required: true,
+        requiredMessage: 'Gordura é obrigatória.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -256,10 +264,10 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
           category,
           unit,
           referenceAmount: parseNumberInput(form.referenceAmount),
-          kcal: parseNumberInput(form.kcal) ?? 0,
-          prot: parseNumberInput(form.prot) ?? 0,
-          carb: parseNumberInput(form.carb) ?? 0,
-          fat: parseNumberInput(form.fat) ?? 0,
+          kcal: parseNumberInput(form.kcal)!,
+          prot: parseNumberInput(form.prot)!,
+          carb: parseNumberInput(form.carb)!,
+          fat: parseNumberInput(form.fat)!,
           fiber: parseNumberInput(form.fiber),
           prep: prep || null,
         },
@@ -830,6 +838,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       kcal: {
+        required: true,
+        requiredMessage: 'Calorias são obrigatórias.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -839,6 +849,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       prot: {
+        required: true,
+        requiredMessage: 'Proteína é obrigatória.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -848,6 +860,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       carb: {
+        required: true,
+        requiredMessage: 'Carboidrato é obrigatório.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -857,6 +871,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       fat: {
+        required: true,
+        requiredMessage: 'Gordura é obrigatória.',
         custom: (v) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -885,10 +901,10 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         category,
         unit,
         referenceAmount: parseNumberInput(form.referenceAmount),
-        kcal: parseNumberInput(form.kcal) ?? 0,
-        prot: parseNumberInput(form.prot) ?? 0,
-        carb: parseNumberInput(form.carb) ?? 0,
-        fat: parseNumberInput(form.fat) ?? 0,
+        kcal: parseNumberInput(form.kcal)!,
+        prot: parseNumberInput(form.prot)!,
+        carb: parseNumberInput(form.carb)!,
+        fat: parseNumberInput(form.fat)!,
         fiber: parseNumberInput(form.fiber),
         prep: prep || null,
         portionLabel: portionLabel || null,

@@ -3,59 +3,35 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
+      interval: monthly
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "frontend"
     ignore:
-      - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "vitest"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@vitejs/plugin-react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "eslint-plugin-react-hooks"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "vite"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@playwright/test"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: gradle
     directory: /backend
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
+      interval: monthly
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "backend"
     ignore:
-      - dependency-name: "org.springframework.boot"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "io.jsonwebtoken:jjwt-api"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "io.jsonwebtoken:jjwt-impl"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "io.jsonwebtoken:jjwt-jackson"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "ci"
     ignore:
-      - dependency-name: "actions/checkout"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "actions/setup-node"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "actions/upload-artifact"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

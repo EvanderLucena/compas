@@ -4,6 +4,8 @@ import { completeOnboarding, getCurrentUser } from '../api/auth';
 import { createPatient } from '../api/patients';
 import type { AuthUser } from '../types';
 import { useNavigate } from 'react-router';
+import { useToastStore } from '../stores/toastStore';
+import { resolveMutationErrorMessage } from '../stores/patientStore';
 
 const TOTAL_STEPS = 6;
 const STEP_LABELS = [
@@ -112,46 +114,24 @@ export function OnboardingView() {
           ),
         );
       }
-      try {
-        await completeOnboarding();
-      } catch {
-        // Non-blocking: proceed even if server completeOnboarding fails
-      }
-
-      try {
-        const user = await getCurrentUser();
-        useAuthStore.setState({
-          user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role as AuthUser['role'],
-            onboardingCompleted: true,
-          },
-        });
-      } catch {
-        const currentUser = useAuthStore.getState().user;
-        if (currentUser) {
-          useAuthStore.setState({
-            user: {
-              ...currentUser,
-              onboardingCompleted: true,
-            },
-          });
-        }
-      }
+      await completeOnboarding();
+      const user = await getCurrentUser();
+      useAuthStore.setState({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role as AuthUser['role'],
+          onboardingCompleted: true,
+        },
+      });
       navigate('/home');
-    } catch {
-      const currentUser = useAuthStore.getState().user;
-      if (currentUser) {
-        useAuthStore.setState({
-          user: {
-            ...currentUser,
-            onboardingCompleted: true,
-          },
-        });
-      }
-      navigate('/home');
+    } catch (err) {
+      useToastStore
+        .getState()
+        .showError(
+          resolveMutationErrorMessage(err, 'Erro ao concluir onboarding — tente novamente'),
+        );
     }
   };
 
