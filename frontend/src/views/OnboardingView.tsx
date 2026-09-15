@@ -103,7 +103,7 @@ export function OnboardingView() {
   const goHome = async () => {
     try {
       if (patients.length > 0) {
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           patients.map((patient) =>
             createPatient({
               name: patient.name,
@@ -113,6 +113,14 @@ export function OnboardingView() {
             }),
           ),
         );
+        const failures = results.filter((r) => r.status === 'rejected');
+        if (failures.length > 0) {
+          useToastStore
+            .getState()
+            .showError(
+              `${failures.length} paciente(s) não puderam ser cadastrados, mas você pode adicioná-los pelo painel.`,
+            );
+        }
       }
       await completeOnboarding();
       const user = await getCurrentUser();
@@ -130,8 +138,15 @@ export function OnboardingView() {
       useToastStore
         .getState()
         .showError(
-          resolveMutationErrorMessage(err, 'Erro ao concluir onboarding — tente novamente'),
+          resolveMutationErrorMessage(err, 'Erro ao sincronizar onboarding. Redirecionando...'),
         );
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser) {
+        useAuthStore.setState({
+          user: { ...currentUser, onboardingCompleted: true },
+        });
+      }
+      navigate('/home');
     }
   };
 

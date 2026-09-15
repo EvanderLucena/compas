@@ -283,6 +283,8 @@ public class PatientService {
         if (raw == null || raw.isBlank()) {
             return null;
         }
-        return phoneNormalizationService.normalize(raw).orElse(raw);
+        return phoneNormalizationService.normalize(raw)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Número de WhatsApp inválido"));
     }
 }

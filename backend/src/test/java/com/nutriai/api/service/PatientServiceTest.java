@@ -390,4 +390,28 @@ class PatientServiceTest {
         assertNotNull(resp);
         assertEquals("11988887766", resp.whatsapp());
     }
+
+    @Test
+    void createPatient_throwsWhenPhoneNumberInvalid() {
+        CreatePatientRequest req = new CreatePatientRequest(
+                "Carlos Silva",
+                null,
+                "M",
+                null,
+                "invalid-phone",
+                "HIPERTROFIA",
+                null,
+                true
+        );
+
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(phoneNormalizationService.normalize("invalid-phone")).thenReturn(Optional.empty());
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> patientService.createPatient(nutritionistId, req)
+        );
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("Número de WhatsApp inválido", ex.getReason());
+    }
 }
