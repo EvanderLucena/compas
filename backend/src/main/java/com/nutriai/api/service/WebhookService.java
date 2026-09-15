@@ -144,16 +144,20 @@ public class WebhookService {
                 .processed(false)
                 .build();
 
+        // For unknown senders, check 24h debounce window before persisting current message
+        boolean alreadyNotified = false;
+        if (patientOpt.isEmpty()) {
+            alreadyNotified = whatsAppMessageRepository
+                    .existsBySenderPhoneNormalizedAndPatientIdIsNullAndCreatedAtAfter(
+                            normalizedPhone, LocalDateTime.now().minusHours(24));
+        }
+
         WhatsAppMessage saved = whatsAppMessageRepository.save(message);
         log.info("Saved WhatsAppMessage id={}, patientId={}, type={}",
                 saved.getId(), saved.getPatientId(), messageType);
 
         // Unknown number: mark processed, notify once per 24h window, no enqueue per D-16
         if (patientOpt.isEmpty()) {
-            boolean alreadyNotified = whatsAppMessageRepository
-                    .existsBySenderPhoneNormalizedAndPatientIdIsNullAndCreatedAtAfter(
-                            normalizedPhone, LocalDateTime.now().minusHours(24));
-
             saved.setProcessed(true);
             saved.setProcessedAt(LocalDateTime.now());
             whatsAppMessageRepository.save(saved);

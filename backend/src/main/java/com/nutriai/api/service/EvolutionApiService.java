@@ -3,6 +3,7 @@ package com.nutriai.api.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -147,6 +148,11 @@ public class EvolutionApiService {
             }
 
             if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+                if (!isSafeMediaUrl(mediaUrl)) {
+                    log.warn("Media URL rejected by SSRF filter: {}", truncate(mediaUrl, 80));
+                    return Optional.empty();
+                }
+
                 HttpRequest.Builder builder = HttpRequest.newBuilder()
                         .uri(URI.create(mediaUrl))
                         .GET()
@@ -172,6 +178,60 @@ public class EvolutionApiService {
     }
 
     /**
+     * Validate that a media URL is safe to fetch (SSRF prevention).
+     */
+    boolean isSafeMediaUrl(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return false;
+        }
+        try {
+            URI uri = URI.create(mediaUrl);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                return false;
+            }
+
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
+                return false;
+            }
+
+            // Always allow the configured Evolution API host
+            String apiHost = URI.create(apiUrl).getHost();
+            if (apiHost != null && apiHost.equalsIgnoreCase(host)) {
+                return true;
+            }
+
+            // Block cloud metadata hostnames
+            String lowerHost = host.toLowerCase();
+            if (lowerHost.equals("metadata.google.internal")
+                    || lowerHost.equals("169.254.169.254")
+                    || lowerHost.endsWith(".internal")) {
+                log.warn("Blocked media download request to metadata host: {}", host);
+                return false;
+            }
+
+            // Check resolved IP addresses for private, loopback, or link-local ranges
+            InetAddress[] addresses = InetAddress.getAllByName(host);
+            for (InetAddress addr : addresses) {
+                if (addr.isLoopbackAddress()
+                        || addr.isSiteLocalAddress()
+                        || addr.isLinkLocalAddress()
+                        || addr.isAnyLocalAddress()) {
+                    log.warn("Blocked SSRF attempt to non-public address {} for host {}",
+                            addr.getHostAddress(), host);
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (Exception e) {
+            log.warn("Invalid or unresolvable media URL {}: {}", truncate(mediaUrl, 80), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Fetch media as a Base64 Data URI (e.g. data:image/jpeg;base64,...).
      *
      * @param mediaUrl        the media URL or data URI
@@ -192,7 +252,9 @@ public class EvolutionApiService {
     }
 
     private String escapeJson(String s) {
-        if (s == null) return "";
+        if (s == null) {
+            return "";
+        }
         StringBuilder escaped = new StringBuilder(s.length());
         for (char ch : s.toCharArray()) {
             switch (ch) {
@@ -216,12 +278,16 @@ public class EvolutionApiService {
     }
 
     private String maskPhone(String phone) {
-        if (phone == null || phone.length() < 4) return "***";
+        if (phone == null || phone.length() < 4) {
+            return "***";
+        }
         return phone.substring(0, 2) + "***" + phone.substring(phone.length() - 2);
     }
 
     private String truncate(String s, int maxLen) {
-        if (s == null) return "null";
+        if (s == null) {
+            return "null";
+        }
         return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
     }
 }
