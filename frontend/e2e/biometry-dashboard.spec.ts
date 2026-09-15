@@ -442,10 +442,11 @@ test.describe('Biometry — History Episodes', () => {
   });
 
   test('E2E-BIO-10: Recent evaluations appear in dashboard after biometry', async ({ request }) => {
+    const today = new Date().toISOString().slice(0, 10);
     const createResp = await request.post(`${API_BASE}/patients/${patientId}/biometry`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       data: {
-        assessmentDate: '2026-04-24',
+        assessmentDate: today,
         weight: 72.5,
         bodyFatPercent: 28.3,
       },
@@ -468,7 +469,7 @@ test.describe('Biometry — History Episodes', () => {
     expect(ev.initials).toBe('PH');
     expect(ev).toHaveProperty('status');
     expect(ev).toHaveProperty('assessmentDate');
-    expect(ev.assessmentDate).toBe('2026-04-24');
+    expect(ev.assessmentDate).toBe(today);
     expect(ev).toHaveProperty('weight');
     expect(ev.weight).toBe(72.5);
     expect(ev).toHaveProperty('bodyFatPercent');
