@@ -7,6 +7,12 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:nutriai}
     password: ${SPRING_DATASOURCE_PASSWORD:changeme}
 
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:nutriai-redis-dev-password}
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -34,8 +40,8 @@ nutriai:
       same-site: Lax    # Lax for dev (cross-port), Strict for production
 
   llm:
-    base-url: ${NUTRIAI_LLM_BASE_URL:https://api.ollama.com/v1}
-    model: ${NUTRIAI_LLM_MODEL:glm4}
+    base-url: ${NUTRIAI_LLM_BASE_URL:https://ollama.com/v1}
+    model: ${NUTRIAI_LLM_MODEL:deepseek-v4.1-flash}
     api-key: ${NUTRIAI_LLM_API_KEY:}
     timeout-seconds: ${NUTRIAI_LLM_TIMEOUT:30}
 
@@ -48,8 +54,8 @@ nutriai:
     timeout-seconds: ${NUTRIAI_WHISPER_TIMEOUT:30}
 
   evolution:
-    api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
-    api-key: ${EVOLUTION_API_KEY:changeme}
+    api-url: ${EVOLUTION_API_URL:http://localhost:8081}
+    api-key: ${EVOLUTION_API_KEY:91724295-7b0c-4b26-a15b-1bba0c541fcd}
 
   whatsapp:
     central-number: ${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}

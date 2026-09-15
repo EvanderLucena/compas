@@ -38,6 +38,8 @@ public class WebhookController {
             @RequestBody String rawBody,
             HttpServletRequest request) {
 
+        LOG.info("Received WhatsApp webhook payload: {}", rawBody);
+
         WhatsAppWebhookDTO payload = parsePayload(rawBody);
         if (payload == null) {
             LOG.warn("Invalid webhook payload from {}", request.getRemoteAddr());

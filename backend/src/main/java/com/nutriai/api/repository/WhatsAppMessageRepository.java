@@ -27,6 +27,11 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
     List<WhatsAppMessage> findByPatientIdAndNutritionistIdOrderByCreatedAtDesc(UUID patientId, UUID nutritionistId);
 
     /**
+     * Find top 6 most recent messages for a patient scoped by nutritionist (for conversation context).
+     */
+    List<WhatsAppMessage> findTop6ByPatientIdAndNutritionistIdOrderByCreatedAtDesc(UUID patientId, UUID nutritionistId);
+
+    /**
      * Find by Evolution API message ID for dedup (D-05).
      */
     Optional<WhatsAppMessage> findByMessageId(String messageId);

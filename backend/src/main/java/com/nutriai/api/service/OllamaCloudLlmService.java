@@ -47,6 +47,7 @@ public class OllamaCloudLlmService implements LlmService {
         this.timeoutSeconds = timeoutSeconds;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
         this.objectMapper = new ObjectMapper();
         this.objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
@@ -94,16 +95,10 @@ public class OllamaCloudLlmService implements LlmService {
                     HttpResponse.BodyHandlers.ofString()
             );
 
-            if (httpResponse.statusCode() >= 500) {
-                log.error("LLM API server error: status={}, body={}", httpResponse.statusCode(),
+            if (httpResponse.statusCode() < 200 || httpResponse.statusCode() >= 300) {
+                log.error("LLM API error: status={}, body={}", httpResponse.statusCode(),
                         truncate(httpResponse.body(), 500));
-                return LlmResponse.failed("LLM API server error: " + httpResponse.statusCode());
-            }
-
-            if (httpResponse.statusCode() >= 400) {
-                log.error("LLM API client error: status={}, body={}", httpResponse.statusCode(),
-                        truncate(httpResponse.body(), 500));
-                return LlmResponse.failed("LLM API client error: " + httpResponse.statusCode());
+                return LlmResponse.failed("LLM API error: " + httpResponse.statusCode());
             }
 
             ChatCompletionResponse response = objectMapper.readValue(

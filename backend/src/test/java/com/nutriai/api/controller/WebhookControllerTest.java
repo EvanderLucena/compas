@@ -47,4 +47,30 @@ class WebhookControllerTest {
         assertEquals(400, response.getStatusCode().value());
         verify(webhookService, never()).processIncoming(any());
     }
+
+    @Test
+    void receiveWebhook_evolutionGoPascalCase_returns200AndParsesCorrectly() {
+        WebhookController controller = new WebhookController(webhookService, objectMapper);
+        String rawBody = "{\"Event\":\"Message\",\"Data\":{\"Info\":{\"Sender\":\"5511999999999@s.whatsapp.net\","
+                + "\"ID\":\"msg-pascal-123\"},\"Message\":{\"ExtendedTextMessage\":{\"Text\":\"Oi nutri\"}}},"
+                + "\"InstanceId\":\"inst-1\"}";
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(webhookService.processIncoming(any(WhatsAppWebhookDTO.class))).thenReturn(Optional.of(mock()));
+
+        ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
+
+        assertEquals(200, response.getStatusCode().value());
+        org.mockito.ArgumentCaptor<WhatsAppWebhookDTO> captor =
+                org.mockito.ArgumentCaptor.forClass(WhatsAppWebhookDTO.class);
+        verify(webhookService).processIncoming(captor.capture());
+        WhatsAppWebhookDTO captured = captor.getValue();
+        assertEquals("Message", captured.getEvent());
+        assertNotNull(captured.getData());
+        assertNotNull(captured.getData().getInfo());
+        assertEquals("msg-pascal-123", captured.getData().getInfo().getId());
+        assertEquals("5511999999999@s.whatsapp.net", captured.getData().getInfo().getSender());
+        assertNotNull(captured.getData().getMessage());
+        assertNotNull(captured.getData().getMessage().getExtendedTextMessage());
+        assertEquals("Oi nutri", captured.getData().getMessage().getExtendedTextMessage().getText());
+    }
 }

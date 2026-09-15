@@ -38,4 +38,12 @@ public interface MealExtractionRepository extends JpaRepository<MealExtraction, 
             UUID nutritionistId,
             LocalDateTime start,
             LocalDateTime end);
+
+    /**
+     * Find the most recent extraction for a patient within a time cutoff (for meal consolidation/deduplication).
+     */
+    Optional<MealExtraction> findFirstByPatientIdAndNutritionistIdAndExtractedAtAfterOrderByExtractedAtDesc(
+            UUID patientId,
+            UUID nutritionistId,
+            LocalDateTime after);
 }

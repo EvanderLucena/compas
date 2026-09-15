@@ -18,7 +18,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -185,5 +187,122 @@ class ExtractionServiceTest {
 
         // Event still emitted
         verify(episodeHistoryEventRepository).save(any(EpisodeHistoryEvent.class));
+    }
+
+    @Test
+    void extractAndSave_recentExtractionWithSameMealLabel_consolidatesInsteadOfDuplicating() {
+        UUID existingExtractionId = UUID.randomUUID();
+        MealExtraction existingExtraction = MealExtraction.builder()
+                .id(existingExtractionId)
+                .messageId(UUID.randomUUID())
+                .nutritionistId(nutritionistId)
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .extractionRaw("jantei um xtudo")
+                .mealLabel("jantar")
+                .totalKcal(new BigDecimal("650"))
+                .totalProt(new BigDecimal("30"))
+                .totalCarb(new BigDecimal("50"))
+                .totalFat(new BigDecimal("35"))
+                .extractedAt(LocalDateTime.now().minusMinutes(5))
+                .build();
+
+        when(mealExtractionRepository.findFirstByPatientIdAndNutritionistIdAndExtractedAtAfterOrderByExtractedAtDesc(
+                eq(patientId), eq(nutritionistId), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(existingExtraction));
+
+        when(mealExtractionRepository.save(existingExtraction)).thenReturn(existingExtraction);
+
+        EpisodeHistoryEvent existingEvent = EpisodeHistoryEvent.builder()
+                .id(UUID.randomUUID())
+                .episodeId(episodeId)
+                .nutritionistId(nutritionistId)
+                .eventType("MEAL_EXTRACTION")
+                .sourceRef(existingExtractionId.toString())
+                .title("Jantar extraído via WhatsApp")
+                .description("1 itens: xtudo")
+                .build();
+        when(episodeHistoryEventRepository.findBySourceRefAndNutritionistId(
+                eq(existingExtractionId.toString()), eq(nutritionistId)))
+                .thenReturn(Optional.of(existingEvent));
+        when(episodeHistoryEventRepository.save(any(EpisodeHistoryEvent.class))).thenAnswer(i -> i.getArgument(0));
+
+        ExtractionResult enrichedResult = new ExtractionResult(
+                "jantar",
+                List.of(
+                        new ExtractionItemResult("hambúrguer artesanal", 150.0, 320, 24, 0, 24),
+                        new ExtractionItemResult("pão brioche", 70.0, 200, 5, 38, 3),
+                        new ExtractionItemResult("queijo prato", 30.0, 110, 7, 0.5, 9)
+                ),
+                "Foto do x-tudo"
+        );
+
+        MealExtraction result = extractionService.extractAndSave(
+                messageId, patientId, nutritionistId, episodeId, enrichedResult);
+
+        assertNotNull(result);
+        assertEquals(existingExtractionId, result.getId());
+        assertEquals("jantar", result.getMealLabel());
+        assertEquals(0, result.getTotalKcal().compareTo(new BigDecimal("630")));
+
+        // Old items must be deleted and replaced
+        verify(extractionItemRepository).deleteAllByExtractionId(existingExtractionId);
+        verify(extractionItemRepository, times(3)).save(any(ExtractionItem.class));
+
+        // Existing event must be updated with new description and totals
+        verify(episodeHistoryEventRepository).save(existingEvent);
+        assertTrue(existingEvent.getDescription().contains("3 itens"));
+    }
+
+    @Test
+    void extractAndSave_recentExtractionWithDifferentMealLabel_createsNewExtraction() {
+        UUID existingExtractionId = UUID.randomUUID();
+        MealExtraction existingExtraction = MealExtraction.builder()
+                .id(existingExtractionId)
+                .messageId(UUID.randomUUID())
+                .nutritionistId(nutritionistId)
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .extractionRaw("almocei arroz e feijao")
+                .mealLabel("almoço")
+                .totalKcal(new BigDecimal("400"))
+                .extractedAt(LocalDateTime.now().minusMinutes(20))
+                .build();
+
+        when(mealExtractionRepository.findFirstByPatientIdAndNutritionistIdAndExtractedAtAfterOrderByExtractedAtDesc(
+                eq(patientId), eq(nutritionistId), any(LocalDateTime.class)))
+                .thenReturn(Optional.of(existingExtraction));
+
+        ExtractionResult dinnerResult = new ExtractionResult(
+                "jantar",
+                List.of(new ExtractionItemResult("sopa", 300.0, 150, 6, 20, 4)),
+                "jantei sopa"
+        );
+
+        MealExtraction newExtraction = MealExtraction.builder()
+                .id(UUID.randomUUID())
+                .messageId(messageId)
+                .nutritionistId(nutritionistId)
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .mealLabel("jantar")
+                .totalKcal(new BigDecimal("150"))
+                .totalProt(new BigDecimal("6"))
+                .totalCarb(new BigDecimal("20"))
+                .totalFat(new BigDecimal("4"))
+                .build();
+        when(mealExtractionRepository.save(argThat(m -> m.getId() == null))).thenReturn(newExtraction);
+        when(extractionItemRepository.save(any(ExtractionItem.class))).thenAnswer(i -> i.getArgument(0));
+        when(episodeHistoryEventRepository.save(any(EpisodeHistoryEvent.class))).thenAnswer(i -> i.getArgument(0));
+
+        MealExtraction result = extractionService.extractAndSave(
+                messageId, patientId, nutritionistId, episodeId, dinnerResult);
+
+        assertNotNull(result);
+        assertNotEquals(existingExtractionId, result.getId());
+        assertEquals("jantar", result.getMealLabel());
+
+        // Did not delete old items
+        verify(extractionItemRepository, never()).deleteAllByExtractionId(existingExtractionId);
     }
 }

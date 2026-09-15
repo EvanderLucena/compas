@@ -70,12 +70,15 @@ services:
     environment:
       SERVER_PORT: 8080
       CLIENT_NAME: nutriai
-      GLOBAL_API_KEY: ${EVOLUTION_API_KEY:-changeme}
+      GLOBAL_API_KEY: ${EVOLUTION_API_KEY:-nutriai-dev-key-2026}
+      POSTGRES_AUTH_DB: ${POSTGRES_AUTH_DB:-postgresql://nutriai:changeme@postgres:5432/evogo_auth?sslmode=disable}
+      POSTGRES_USERS_DB: ${POSTGRES_USERS_DB:-postgresql://nutriai:changeme@postgres:5432/evogo_users?sslmode=disable}
       DATABASE_SAVE_MESSAGES: "false"
       WADEBUG: INFO
       LOGTYPE: console
-      WEBHOOK_URL: ${EVOLUTION_WEBHOOK_URL:-}
+      WEBHOOK_URL: ${EVOLUTION_WEBHOOK_URL:-http://192.168.3.5:8085/api/v1/webhooks/whatsapp}
       WEBHOOK_FILES: "false"
+      TZ: America/Sao_Paulo
     ports:
       - "${EVOLUTION_PORT:-8081}:8080"
     volumes:

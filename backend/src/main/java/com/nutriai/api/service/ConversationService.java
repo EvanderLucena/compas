@@ -182,7 +182,7 @@ public class ConversationService {
             responseType = "CONVERSATION";
         }
 
-        LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage, imageUrl, 0.3, 1000);
+        LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage, imageUrl, 0.3, 500);
         LlmResponse llmResponse = llmService.chat(llmRequest);
 
         if (!llmResponse.success()) {
@@ -221,10 +221,15 @@ public class ConversationService {
         whatsAppResponseRepository.save(waResponse);
 
         // 8. Send response via EvolutionApiService
-        // Note: instance name is fixed per deployment and configured in EvolutionApiService
+        // Strip markdown JSON extraction blocks so the patient receives only friendly conversational text
+        String textToSend = cleanMessageForWhatsApp(responseContent);
+        if (textToSend.isBlank()) {
+            textToSend = responseContent;
+        }
+
         boolean sent = evolutionApiService.sendMessage(
                 message.getSenderPhoneNormalized(),
-                responseContent
+                textToSend
         );
 
         if (sent) {
@@ -255,10 +260,10 @@ public class ConversationService {
             Você é um assistente de nutrição humana. O paciente {{patientName}} está enviando a primeira mensagem.
             Nutricionista: {{nutritionistName}}
 
-            Gere uma saudação amigável e contextual como:
-            "Oi {{patientName}}! Sou o assistente virtual da nutri {{nutritionistName}}. Tô aqui pra te ajudar com as refeições, tirar dúvidas sobre o plano, e acompanhar como você tá se sentindo."
+            Gere uma saudação amigável, pontual e natural de WhatsApp como:
+            "Oi {{patientName}}! Sou o assistente virtual da nutri {{nutritionistName}}. Tô aqui pra te acompanhar e tirar dúvidas do plano. Como você tá hoje?"
 
-            Seja natural e acolhedor. Responda apenas com a mensagem de saudação.
+            Seja breve, acolhedor e direto (máximo 2 frases). Responda apenas com a mensagem de saudação.
             """.replace("{{patientName}}", escape(patientName))
                .replace("{{nutritionistName}}", escape(nutritionistName));
     }
@@ -270,8 +275,8 @@ public class ConversationService {
         return """
             Você é um assistente de nutrição humana, empático e não julgador.
 
-            Responda com um acknowledgment amigável. Exemplo:
-            "Recebi sua {{tipo}}! Vou registrar o que você me contou."
+            Responda com um acknowledgment amigável, curto e natural de WhatsApp (1 a 2 frases). Exemplo:
+            "Recebi seu áudio! Vou registrar o que você me contou."
 
             Seja breve e acolhedor. Responda apenas com a mensagem de acknowledgment.
             """.replace("{{tipo}}", escape(tipo));
@@ -283,24 +288,31 @@ public class ConversationService {
     String buildClassifyingPrompt(Patient patient, Nutritionist nutritionist, WhatsAppMessage message) {
         String patientContext = buildPatientContext(patient);
         String planContext = buildPlanContext(patient, nutritionist);
+        String conversationContext = buildRecentConversationContext(
+                patient, nutritionist, message != null ? message.getId() : null);
 
         return """
-            Você é um assistente de nutrição humana, empático e não julgador. Seu papel é auxiliar o paciente de forma amigável, praticando redução de danos.
+            Você é um assistente de nutrição humana, empático e não julgador. Seu papel é auxiliar o paciente de forma amigável, pontual e orgânica pelo WhatsApp.
 
-            REGRAS IMPORTANTES:
-            - NUNCA reprove o paciente por comer algo fora do plano
-            - Foque em porções, preparações mais leves, e alternativas saudáveis
-            - Seja acolhedor e encorajador
-            - Responda em português brasileiro
+            REGRAS DE COMUNICAÇÃO (MUITO IMPORTANTE):
+            - Seja PONTUAL, DIRETO e ORGÂNICO, como uma conversa real de WhatsApp.
+            - Responda em no MÁXIMO 2 a 3 frases curtas e calorosas.
+            - NUNCA envie textões, palestras explicativas ou lições de moral.
+            - NUNCA use listas com marcadores (- ou •) ou tópicos, a menos que o paciente pergunte e peça sugestões.
+            - NUNCA reprove o paciente por comer algo fora do plano.
+            - Se o paciente relatou uma refeição: confirme o registro com simpatia e dê uma palavra rápida de incentivo (máximo 2 a 3 frases).
+            - Se o paciente estiver complementando ou detalhando uma refeição já mencionada no histórico recente, consolide todos os alimentos da refeição no JSON e use o mesmo mealLabel.
+            - Responda em português brasileiro.
 
             CONTEXTO DO PACIENTE:
             {{patientContext}}
 
             CONTEXTO COMPLETO DO PLANO ALIMENTAR:
             {{planContext}}
+            {{conversationContext}}
 
             Se o paciente está relatando uma refeição (o que comeu), extraia os alimentos mencionados com macros estimados.
-            Responda em formato JSON no campo de extração. Também envie uma resposta empática ao paciente.
+            Responda em formato JSON no campo de extração. Também envie uma resposta empática, curta e objetiva ao paciente.
 
             Formato de resposta JSON (DENTRO de ```json```):
             ```json
@@ -313,11 +325,12 @@ public class ConversationService {
             }
             ```
 
-            Se o paciente está perguntando sobre o plano alimentar, responda à dúvida de forma clara e amigável usando o contexto do plano.
+            Se o paciente está perguntando sobre o plano alimentar, responda à dúvida de forma clara, direta e amigável (em até 3 frases).
 
             Se for uma saudação ou mensagem genérica, responda de forma amigável e breve.
             """.replace("{{patientContext}}", escape(patientContext))
-               .replace("{{planContext}}", escape(planContext));
+               .replace("{{planContext}}", escape(planContext))
+               .replace("{{conversationContext}}", escape(conversationContext));
     }
 
     /**
@@ -419,26 +432,29 @@ public class ConversationService {
     String buildClassifyingPromptWithImageAck(Patient patient, Nutritionist nutritionist, WhatsAppMessage message) {
         String patientContext = buildPatientContext(patient);
         String planContext = buildPlanContext(patient, nutritionist);
+        String conversationContext = buildRecentConversationContext(
+                patient, nutritionist, message != null ? message.getId() : null);
 
         return """
-            Você é um assistente de nutrição humana, empático e não julgador. Seu papel é auxiliar o paciente de forma amigável, praticando redução de danos.
+            Você é um assistente de nutrição humana, empático e não julgador. Seu papel é auxiliar o paciente de forma amigável, pontual e orgânica pelo WhatsApp.
 
-            REGRAS IMPORTANTES:
-            - NUNCA reprove o paciente por comer algo fora do plano
-            - Foque em porções, preparações mais leves, e alternativas saudáveis
-            - Seja acolhedor e encorajador
-            - Responda em português brasileiro
-
-            O paciente enviou uma FOTO com legenda. Primeiro, reconheça que recebeu a foto:
-            "Recebi sua foto! Vou registrar o que você me contou."
+            REGRAS DE COMUNICAÇÃO (MUITO IMPORTANTE):
+            - Seja PONTUAL, DIRETO e ORGÂNICO, como uma mensagem real de WhatsApp.
+            - Responda em no MÁXIMO 2 frases curtas e calorosas.
+            - NUNCA envie textões, palestras explicativas ou lições de moral.
+            - NUNCA use listas com marcadores (- ou •) ou tópicos.
+            - NUNCA reprove o paciente por comer algo fora do plano.
+            - Confirme que recebeu a foto e o relato de forma leve e acolhedora.
+            - Responda em português brasileiro.
 
             CONTEXTO DO PACIENTE:
             {{patientContext}}
 
             CONTEXTO COMPLETO DO PLANO ALIMENTAR:
             {{planContext}}
+            {{conversationContext}}
 
-            Agora, extraia os alimentos mencionados na legenda com macros estimados. Responda em formato JSON no campo de extração. Também envie uma resposta empática ao paciente.
+            Extraia os alimentos mencionados na legenda com macros estimados. Responda em formato JSON no campo de extração. Também envie uma resposta empática, curta e objetiva ao paciente.
 
             Formato de resposta JSON (DENTRO de ```json```):
             ```json
@@ -450,7 +466,8 @@ public class ConversationService {
             }
             ```
             """.replace("{{patientContext}}", escape(patientContext))
-               .replace("{{planContext}}", escape(planContext));
+               .replace("{{planContext}}", escape(planContext))
+               .replace("{{conversationContext}}", escape(conversationContext));
     }
 
     /**
@@ -459,31 +476,33 @@ public class ConversationService {
     String buildPlateVisionPrompt(Patient patient, Nutritionist nutritionist, WhatsAppMessage message) {
         String patientContext = buildPatientContext(patient);
         String planContext = buildPlanContext(patient, nutritionist);
+        String conversationContext = buildRecentConversationContext(
+                patient, nutritionist, message != null ? message.getId() : null);
 
         return """
             Você é um assistente de nutrição humana, empático e não julgador.
-            Seu papel é auxiliar o paciente de forma amigável, praticando redução de danos.
+            Seu papel é auxiliar o paciente de forma amigável, pontual e orgânica pelo WhatsApp.
 
-            REGRAS IMPORTANTES:
-            - NUNCA reprove o paciente por comer algo fora do plano
-            - Foque em porções, preparações mais leves, e alternativas saudáveis
-            - Seja acolhedor e encorajador
-            - Responda em português brasileiro
-
-            O paciente enviou uma FOTO da sua refeição / prato de comida.
-            1. Analise visualmente os alimentos no prato e estime as quantidades em gramas.
-            2. Compare com as opções e metas do plano alimentar do paciente.
-            3. Dê um retorno acolhedor e positivo (reconheça as escolhas, equilíbrio de cores e porções).
-            4. Se o paciente incluiu alguma legenda, utilize-a para refinar a identificação.
+            REGRAS DE COMUNICAÇÃO (MUITO IMPORTANTE):
+            - Seja PONTUAL, DIRETO e ORGÂNICO, como uma mensagem real de WhatsApp.
+            - Responda em no MÁXIMO 2 frases curtas e calorosas (ex.: "Prato bonito! Almoço registrado com sucesso. Segue firme! 💪").
+            - NUNCA envie textões, análises longas ou palestras explicativas.
+            - NUNCA use listas com marcadores (- ou •) ou tópicos.
+            - NUNCA reprove o paciente por comer algo fora do plano.
+            - O paciente enviou uma FOTO da sua refeição / prato de comida.
+            - Se o paciente já mencionou ou começou a relatar esta refeição nas mensagens recentes (veja o histórico recente), use essa informação para identificar os alimentos com máxima precisão, use o mesmo mealLabel (ex.: 'jantar', 'almoço') e consolide os alimentos no JSON.
+            - Analise visualmente os alimentos no prato e estime as quantidades em gramas.
+            - Responda em português brasileiro.
 
             CONTEXTO DO PACIENTE:
             {{patientContext}}
 
             CONTEXTO COMPLETO DO PLANO ALIMENTAR:
             {{planContext}}
+            {{conversationContext}}
 
             Extraia os alimentos identificados na foto com macros estimados.
-            Responda em formato JSON no campo de extração. Também envie uma resposta empática ao paciente.
+            Responda em formato JSON no campo de extração. Também envie uma resposta empática, curta e objetiva ao paciente.
 
             Formato de resposta JSON (DENTRO de ```json```):
             ```json
@@ -496,7 +515,50 @@ public class ConversationService {
             }
             ```
             """.replace("{{patientContext}}", escape(patientContext))
-               .replace("{{planContext}}", escape(planContext));
+               .replace("{{planContext}}", escape(planContext))
+               .replace("{{conversationContext}}", escape(conversationContext));
+    }
+
+    private String buildRecentConversationContext(Patient patient, Nutritionist nutritionist, UUID currentMessageId) {
+        if (patient == null || patient.getId() == null || nutritionist == null || nutritionist.getId() == null) {
+            return "";
+        }
+        try {
+            List<WhatsAppMessage> recentMsgs = whatsAppMessageRepository
+                    .findTop6ByPatientIdAndNutritionistIdOrderByCreatedAtDesc(patient.getId(), nutritionist.getId())
+                    .stream()
+                    .filter(m -> currentMessageId == null || !currentMessageId.equals(m.getId()))
+                    .limit(5)
+                    .sorted(java.util.Comparator.comparing(WhatsAppMessage::getCreatedAt))
+                    .toList();
+
+            if (recentMsgs.isEmpty()) {
+                return "";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("\nHISTÓRICO RECENTE DA CONVERSA:\n");
+            for (WhatsAppMessage m : recentMsgs) {
+                String content = m.getMessageContent();
+                if (content == null || content.isBlank()) {
+                    content = "[" + m.getMessageType() + "]";
+                }
+                sb.append("- Paciente: ").append(content).append("\n");
+
+                List<WhatsAppResponse> responses = whatsAppResponseRepository
+                        .findByMessageIdAndNutritionistId(m.getId(), nutritionist.getId());
+                for (WhatsAppResponse r : responses) {
+                    String cleaned = cleanMessageForWhatsApp(r.getResponseContent());
+                    if (!cleaned.isBlank()) {
+                        sb.append("- NutriAI: ").append(cleaned).append("\n");
+                    }
+                }
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("Could not build conversation context for patient {}: {}", patient.getId(), e.getMessage());
+            return "";
+        }
     }
 
     private String escape(String input) {
@@ -505,6 +567,16 @@ public class ConversationService {
         }
         // Replace curly braces to prevent accidental placeholder injection
         return input.replace("{", "\\{").replace("}", "\\}");
+    }
+
+    static String cleanMessageForWhatsApp(String content) {
+        if (content == null) {
+            return "";
+        }
+        String cleaned = content.replaceAll("```json[\\s\\S]*?```", "").trim();
+        cleaned = cleaned.replaceAll("```[\\s\\S]*?```", "").trim();
+        cleaned = cleaned.replaceAll("\\{[^{}]*\"mealLabel\"[^{}]*\\}", "").trim();
+        return cleaned;
     }
 
     private void markProcessed(WhatsAppMessage message) {
