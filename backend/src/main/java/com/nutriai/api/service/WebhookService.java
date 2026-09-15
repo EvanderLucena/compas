@@ -164,7 +164,9 @@ public class WebhookService {
             log.info("Unknown phone {}, marked processed without enqueue", normalizedPhone);
 
             if (unknownResponseEnabled && !alreadyNotified) {
-                evolutionApiService.sendMessage(normalizedPhone, unknownResponseTemplate);
+                String responseText = unknownResponseTemplate != null
+                        ? unknownResponseTemplate.replace("\\n", "\n") : "";
+                evolutionApiService.sendMessage(normalizedPhone, responseText);
                 log.info("Sent unknown patient notice to phone ending {}", maskedSuffix(normalizedPhone));
             } else if (unknownResponseEnabled) {
                 log.debug("Unknown patient notice debounced for phone ending {}", maskedSuffix(normalizedPhone));

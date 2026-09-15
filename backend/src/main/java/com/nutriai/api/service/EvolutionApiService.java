@@ -3,7 +3,6 @@ package com.nutriai.api.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,6 +18,7 @@ import java.util.Optional;
 public class EvolutionApiService {
 
     private static final Logger log = LoggerFactory.getLogger(EvolutionApiService.class);
+    private static final int MAX_MEDIA_SIZE_BYTES = 10 * 1024 * 1024; // 10MB max media payload
 
     private final String apiUrl;
     private final String apiKey;
@@ -143,13 +143,19 @@ public class EvolutionApiService {
                 int commaIndex = mediaUrl.indexOf(',');
                 if (commaIndex != -1) {
                     String base64Data = mediaUrl.substring(commaIndex + 1);
-                    return Optional.of(Base64.getDecoder().decode(base64Data.trim()));
+                    byte[] decoded = Base64.getDecoder().decode(base64Data.trim());
+                    if (decoded.length > MAX_MEDIA_SIZE_BYTES) {
+                        log.warn("Data URI media exceeds maximum size limit ({} > {} bytes)",
+                                decoded.length, MAX_MEDIA_SIZE_BYTES);
+                        return Optional.empty();
+                    }
+                    return Optional.of(decoded);
                 }
             }
 
             if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
                 if (!isSafeMediaUrl(mediaUrl)) {
-                    log.warn("Media URL rejected by SSRF filter: {}", truncate(mediaUrl, 80));
+                    log.warn("Media URL rejected by host allowlist: {}", truncate(mediaUrl, 80));
                     return Optional.empty();
                 }
 
@@ -165,7 +171,13 @@ public class EvolutionApiService {
                 HttpResponse<byte[]> response = httpClient.send(
                         builder.build(), HttpResponse.BodyHandlers.ofByteArray());
                 if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                    return Optional.of(response.body());
+                    byte[] body = response.body();
+                    if (body.length > MAX_MEDIA_SIZE_BYTES) {
+                        log.warn("Media payload exceeds maximum size limit ({} > {} bytes)",
+                                body.length, MAX_MEDIA_SIZE_BYTES);
+                        return Optional.empty();
+                    }
+                    return Optional.of(body);
                 }
                 log.warn("Failed to download media: status={}, url={}",
                         response.statusCode(), truncate(mediaUrl, 80));
@@ -178,55 +190,36 @@ public class EvolutionApiService {
     }
 
     /**
-     * Validate that a media URL is safe to fetch (SSRF prevention).
+     * Validate that a media URL originates strictly from the configured Evolution API host.
+     * Prevents SSRF and DNS rebinding / TOCTOU attacks.
      */
     boolean isSafeMediaUrl(String mediaUrl) {
         if (mediaUrl == null || mediaUrl.isBlank()) {
             return false;
         }
         try {
-            URI uri = URI.create(mediaUrl);
-            String scheme = uri.getScheme();
+            URI mediaUri = URI.create(mediaUrl);
+            String scheme = mediaUri.getScheme();
             if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
                 return false;
             }
 
-            String host = uri.getHost();
+            String host = mediaUri.getHost();
             if (host == null || host.isBlank()) {
                 return false;
             }
 
-            // Always allow the configured Evolution API host
+            // Only allow media originating from the configured Evolution API instance host
             String apiHost = URI.create(apiUrl).getHost();
             if (apiHost != null && apiHost.equalsIgnoreCase(host)) {
                 return true;
             }
 
-            // Block cloud metadata hostnames
-            String lowerHost = host.toLowerCase();
-            if (lowerHost.equals("metadata.google.internal")
-                    || lowerHost.equals("169.254.169.254")
-                    || lowerHost.endsWith(".internal")) {
-                log.warn("Blocked media download request to metadata host: {}", host);
-                return false;
-            }
-
-            // Check resolved IP addresses for private, loopback, or link-local ranges
-            InetAddress[] addresses = InetAddress.getAllByName(host);
-            for (InetAddress addr : addresses) {
-                if (addr.isLoopbackAddress()
-                        || addr.isSiteLocalAddress()
-                        || addr.isLinkLocalAddress()
-                        || addr.isAnyLocalAddress()) {
-                    log.warn("Blocked SSRF attempt to non-public address {} for host {}",
-                            addr.getHostAddress(), host);
-                    return false;
-                }
-            }
-
-            return true;
+            log.warn("Blocked media download: host {} does not match configured Evolution API host {}",
+                    host, apiHost);
+            return false;
         } catch (Exception e) {
-            log.warn("Invalid or unresolvable media URL {}: {}", truncate(mediaUrl, 80), e.getMessage());
+            log.warn("Invalid media URL {}: {}", truncate(mediaUrl, 80), e.getMessage());
             return false;
         }
     }
