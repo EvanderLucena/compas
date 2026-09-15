@@ -42,6 +42,7 @@ class ConversationServiceTest {
     @Mock MealFoodRepository mealFoodRepository;
     @Mock PlanExtraRepository planExtraRepository;
     @Mock NutritionistRepository nutritionistRepository;
+    @Mock AudioTranscriptionService audioTranscriptionService;
 
     @InjectMocks
     ConversationService conversationService;
@@ -340,6 +341,143 @@ class ConversationServiceTest {
         verify(extractionService).extractAndSave(any(), eq(patientId), eq(nutritionistId),
                 eq(episodeId), any());
         verify(evolutionApiService).sendMessage(anyString(), anyString());
+    }
+
+    @Test
+    void processMessage_audioMessage_transcribesAndProcessesMealReport() {
+        when(whatsAppMessageRepository.findById(audioMessage.getId())).thenReturn(Optional.of(audioMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        byte[] fakeAudio = new byte[]{1, 2, 3, 4};
+        when(evolutionApiService.downloadMedia("https://media.url/audio.ogg")).thenReturn(Optional.of(fakeAudio));
+        when(audioTranscriptionService.transcribe(fakeAudio, "audio.ogg"))
+                .thenReturn(Optional.of("Almocei frango grelhado e salada"));
+
+        ExtractionResult extraction = new ExtractionResult(
+                "almoço",
+                List.of(
+                        new ExtractionItemResult("frango grelhado", 150.0, 240, 40, 0, 8),
+                        new ExtractionItemResult("salada", 100.0, 30, 1, 5, 0.5)
+                ),
+                "Almocei frango grelhado e salada"
+        );
+        LlmResponse llmResponse = new LlmResponse(
+                "Excelente escolha no almoço! Proteínas ótimas.",
+                LlmIntent.MEAL_REPORT,
+                extraction,
+                true,
+                null
+        );
+        when(llmService.chat(any(LlmRequest.class))).thenReturn(llmResponse);
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(extractionService.extractAndSave(any(), eq(patientId), eq(nutritionistId),
+                eq(episodeId), any())).thenReturn(MealExtraction.builder().id(UUID.randomUUID()).build());
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+        when(mealPlanRepository.findByEpisodeIdAndNutritionistId(episodeId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        conversationService.processMessage(audioMessage.getId());
+
+        assertEquals("Almocei frango grelhado e salada", audioMessage.getMessageContent());
+        verify(audioTranscriptionService).transcribe(fakeAudio, "audio.ogg");
+        verify(extractionService).extractAndSave(any(), eq(patientId), eq(nutritionistId), eq(episodeId), any());
+        verify(evolutionApiService).sendMessage(eq("11999998888"), anyString());
+    }
+
+    @Test
+    void processMessage_audioMessage_transcriptionFails_fallsBackToAcknowledgment() {
+        when(whatsAppMessageRepository.findById(audioMessage.getId())).thenReturn(Optional.of(audioMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(evolutionApiService.downloadMedia("https://media.url/audio.ogg")).thenReturn(Optional.of(new byte[]{1}));
+        when(audioTranscriptionService.transcribe(any(byte[].class), eq("audio.ogg")))
+                .thenReturn(Optional.empty());
+
+        LlmResponse ackResponse = new LlmResponse(
+                "Recebi seu áudio! Vou registrar o que você me contou.",
+                LlmIntent.MISCELLANEOUS,
+                null,
+                true,
+                null
+        );
+        when(llmService.chat(any(LlmRequest.class))).thenReturn(ackResponse);
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(audioMessage.getId());
+
+        ArgumentCaptor<LlmRequest> captor = ArgumentCaptor.forClass(LlmRequest.class);
+        verify(llmService).chat(captor.capture());
+        assertTrue(captor.getValue().systemPrompt().contains("áudio"));
+        verify(extractionService, never()).extractAndSave(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void processMessage_imageMessage_analyzesPlateWithVisionAndExtractsMeal() {
+        WhatsAppMessage plateMsg = WhatsAppMessage.builder()
+                .id(UUID.randomUUID())
+                .messageId("msg-plate-vision")
+                .instanceId("inst-1")
+                .senderPhone("5511999998888@s.whatsapp.net")
+                .senderPhoneNormalized("11999998888")
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .messageType("image")
+                .mediaUrl("https://media.url/plate.jpg")
+                .processed(false)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(whatsAppMessageRepository.findById(plateMsg.getId())).thenReturn(Optional.of(plateMsg));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(evolutionApiService.getMediaAsBase64DataUri("https://media.url/plate.jpg", "image/jpeg"))
+                .thenReturn(Optional.of("data:image/jpeg;base64,mockImageData123"));
+
+        ExtractionResult extraction = new ExtractionResult(
+                "almoço",
+                List.of(
+                        new ExtractionItemResult("arroz branco", 150.0, 192, 3.7, 42.1, 0.3),
+                        new ExtractionItemResult("frango grelhado", 120.0, 191, 38.4, 0.0, 3.6)
+                ),
+                "Foto da refeição enviada pelo paciente"
+        );
+        LlmResponse llmResponse = new LlmResponse(
+                "Prato muito equilibrado! Ótima quantidade de proteínas.",
+                LlmIntent.MEAL_REPORT,
+                extraction,
+                true,
+                null
+        );
+        when(llmService.chat(any(LlmRequest.class))).thenReturn(llmResponse);
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(extractionService.extractAndSave(any(), eq(patientId), eq(nutritionistId),
+                eq(episodeId), any())).thenReturn(MealExtraction.builder().id(UUID.randomUUID()).build());
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+        when(mealPlanRepository.findByEpisodeIdAndNutritionistId(episodeId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        conversationService.processMessage(plateMsg.getId());
+
+        ArgumentCaptor<LlmRequest> captor = ArgumentCaptor.forClass(LlmRequest.class);
+        verify(llmService).chat(captor.capture());
+        assertEquals("data:image/jpeg;base64,mockImageData123", captor.getValue().imageUrl());
+        assertTrue(captor.getValue().systemPrompt().contains("prato de comida"));
+        verify(extractionService).extractAndSave(any(), eq(patientId), eq(nutritionistId), eq(episodeId), any());
+        verify(evolutionApiService).sendMessage(eq("11999998888"), anyString());
     }
 
     @Test

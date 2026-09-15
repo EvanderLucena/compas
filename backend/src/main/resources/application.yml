@@ -39,6 +39,14 @@ nutriai:
     api-key: ${NUTRIAI_LLM_API_KEY:}
     timeout-seconds: ${NUTRIAI_LLM_TIMEOUT:30}
 
+  whisper:
+    base-url: ${NUTRIAI_WHISPER_BASE_URL:https://api.openai.com/v1}
+    model: ${NUTRIAI_WHISPER_MODEL:whisper-1}
+    api-key: ${NUTRIAI_WHISPER_API_KEY:}
+    language: ${NUTRIAI_WHISPER_LANGUAGE:pt}
+    enabled: ${NUTRIAI_WHISPER_ENABLED:true}
+    timeout-seconds: ${NUTRIAI_WHISPER_TIMEOUT:30}
+
   evolution:
     api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
     api-key: ${EVOLUTION_API_KEY:changeme}

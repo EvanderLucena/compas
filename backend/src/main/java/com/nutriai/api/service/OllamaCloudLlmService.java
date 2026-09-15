@@ -30,7 +30,8 @@ public class OllamaCloudLlmService implements LlmService {
     private static final Logger log = LoggerFactory.getLogger(OllamaCloudLlmService.class);
 
     private static final Pattern JSON_BLOCK_PATTERN = Pattern.compile("```json\\s*\\n(.*?)\\n```", Pattern.DOTALL);
-    private static final Pattern JSON_OBJECT_PATTERN = Pattern.compile("\\{[^{}]*\"mealLabel\"[^{}]*\\}", Pattern.DOTALL);
+    private static final Pattern JSON_OBJECT_PATTERN =
+            Pattern.compile("\\{[^{}]*\"mealLabel\"[^{}]*\\}", Pattern.DOTALL);
 
     private final String baseUrl;
     private final String model;
@@ -54,11 +55,23 @@ public class OllamaCloudLlmService implements LlmService {
     @Override
     public LlmResponse chat(LlmRequest request) {
         try {
+            Object userContent;
+            if (request.imageUrl() != null && !request.imageUrl().isBlank()) {
+                userContent = List.of(
+                        java.util.Map.of("type", "text", "text",
+                                request.userMessage() != null ? request.userMessage() : ""),
+                        java.util.Map.of("type", "image_url", "image_url",
+                                java.util.Map.of("url", request.imageUrl()))
+                );
+            } else {
+                userContent = request.userMessage();
+            }
+
             ChatCompletionRequest apiRequest = new ChatCompletionRequest(
                     model,
                     List.of(
                             new ChatMessage("system", request.systemPrompt()),
-                            new ChatMessage("user", request.userMessage())
+                            new ChatMessage("user", userContent)
                     ),
                     request.temperature(),
                     request.maxTokens()
@@ -176,7 +189,8 @@ public class OllamaCloudLlmService implements LlmService {
                 lowerMessage.contains("jantei") || lowerMessage.contains("cafe") ||
                 lowerMessage.contains("lanche") || lowerMessage.contains("ceia") ||
                 lowerMessage.contains("refeicao") || lowerMessage.contains("refeição") ||
-                lowerMessage.contains("almoço") || lowerMessage.contains("café")) {
+                lowerMessage.contains("almoço") || lowerMessage.contains("café") ||
+                lowerMessage.contains("prato") || lowerMessage.contains("foto")) {
             return LlmIntent.MEAL_REPORT;
         }
 
@@ -237,7 +251,9 @@ public class OllamaCloudLlmService implements LlmService {
     }
 
     private String truncate(String s, int maxLen) {
-        if (s == null) return "null";
+        if (s == null) {
+            return "null";
+        }
         return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
     }
 
@@ -250,7 +266,7 @@ public class OllamaCloudLlmService implements LlmService {
             int max_tokens
     ) {}
 
-    record ChatMessage(String role, String content) {}
+    record ChatMessage(String role, Object content) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record ChatCompletionResponse(
@@ -258,5 +274,8 @@ public class OllamaCloudLlmService implements LlmService {
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record Choice(ChatMessage message) {}
+    record Choice(ResponseMessage message) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ResponseMessage(String content) {}
 }

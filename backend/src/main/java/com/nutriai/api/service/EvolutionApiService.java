@@ -8,6 +8,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.Optional;
 
 /**
  * Sends WhatsApp messages via Evolution Go API.
@@ -122,6 +124,71 @@ public class EvolutionApiService {
             log.error("Evolution API retry failed: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Download or extract binary media bytes from a media URL or data URI.
+     *
+     * @param mediaUrl the media URL or data URI (base64)
+     * @return Optional containing the downloaded bytes, or empty if download failed
+     */
+    public Optional<byte[]> downloadMedia(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return Optional.empty();
+        }
+
+        try {
+            if (mediaUrl.startsWith("data:")) {
+                int commaIndex = mediaUrl.indexOf(',');
+                if (commaIndex != -1) {
+                    String base64Data = mediaUrl.substring(commaIndex + 1);
+                    return Optional.of(Base64.getDecoder().decode(base64Data.trim()));
+                }
+            }
+
+            if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+                HttpRequest.Builder builder = HttpRequest.newBuilder()
+                        .uri(URI.create(mediaUrl))
+                        .GET()
+                        .timeout(Duration.ofSeconds(15));
+
+                if (apiKey != null && !apiKey.isBlank() && mediaUrl.startsWith(apiUrl)) {
+                    builder.header("apikey", apiKey);
+                }
+
+                HttpResponse<byte[]> response = httpClient.send(
+                        builder.build(), HttpResponse.BodyHandlers.ofByteArray());
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    return Optional.of(response.body());
+                }
+                log.warn("Failed to download media: status={}, url={}",
+                        response.statusCode(), truncate(mediaUrl, 80));
+            }
+        } catch (Exception e) {
+            log.warn("Error downloading media from {}: {}", truncate(mediaUrl, 80), e.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Fetch media as a Base64 Data URI (e.g. data:image/jpeg;base64,...).
+     *
+     * @param mediaUrl        the media URL or data URI
+     * @param defaultMimeType default MIME type if data URI doesn't specify one
+     * @return Optional containing the Base64 data URI, or empty if download failed
+     */
+    public Optional<String> getMediaAsBase64DataUri(String mediaUrl, String defaultMimeType) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return Optional.empty();
+        }
+        if (mediaUrl.startsWith("data:")) {
+            return Optional.of(mediaUrl);
+        }
+        return downloadMedia(mediaUrl).map(bytes -> {
+            String mime = defaultMimeType != null ? defaultMimeType : "image/jpeg";
+            return "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
+        });
     }
 
     private String escapeJson(String s) {

@@ -38,6 +38,7 @@ public class ConversationService {
     private final MealFoodRepository mealFoodRepository;
     private final PlanExtraRepository planExtraRepository;
     private final NutritionistRepository nutritionistRepository;
+    private final AudioTranscriptionService audioTranscriptionService;
 
     public ConversationService(
             LlmService llmService,
@@ -52,7 +53,8 @@ public class ConversationService {
             MealOptionRepository mealOptionRepository,
             MealFoodRepository mealFoodRepository,
             PlanExtraRepository planExtraRepository,
-            NutritionistRepository nutritionistRepository) {
+            NutritionistRepository nutritionistRepository,
+            AudioTranscriptionService audioTranscriptionService) {
         this.llmService = llmService;
         this.extractionService = extractionService;
         this.evolutionApiService = evolutionApiService;
@@ -66,6 +68,7 @@ public class ConversationService {
         this.mealFoodRepository = mealFoodRepository;
         this.planExtraRepository = planExtraRepository;
         this.nutritionistRepository = nutritionistRepository;
+        this.audioTranscriptionService = audioTranscriptionService;
     }
 
     /**
@@ -119,32 +122,67 @@ public class ConversationService {
         // 5. Build the appropriate system prompt and call LLM
         String systemPrompt;
         String responseType;
+        String userMessage = message.getMessageContent() != null ? message.getMessageContent() : "";
+        String imageUrl = null;
 
         if (isFirstMessage) {
             // First interaction → greeting prompt (D-17)
             systemPrompt = buildGreetingPrompt(patient.getName(), nutritionist.getName());
             responseType = "GREETING";
         } else if ("audio".equals(message.getMessageType())) {
-            // Audio → acknowledgment prompt (D-05)
-            systemPrompt = buildAcknowledgmentPrompt("áudio");
-            responseType = "ACKNOWLEDGMENT";
-        } else if ("image".equals(message.getMessageType()) && (message.getMessageContent() == null || message.getMessageContent().isBlank())) {
-            // Image without caption → acknowledgment prompt (D-05)
-            systemPrompt = buildAcknowledgmentPrompt("foto");
-            responseType = "ACKNOWLEDGMENT";
+            // Check if audio has already been transcribed or can be transcribed via Whisper
+            Optional<String> transcribedOpt = Optional.empty();
+            if (message.getMessageContent() != null && !message.getMessageContent().isBlank()) {
+                transcribedOpt = Optional.of(message.getMessageContent());
+            } else if (message.getMediaUrl() != null && !message.getMediaUrl().isBlank()) {
+                Optional<byte[]> audioBytes = evolutionApiService.downloadMedia(message.getMediaUrl());
+                if (audioBytes.isPresent()) {
+                    transcribedOpt = audioTranscriptionService.transcribe(audioBytes.get(), "audio.ogg");
+                    transcribedOpt.ifPresent(text -> {
+                        message.setMessageContent(text);
+                        whatsAppMessageRepository.save(message);
+                    });
+                }
+            }
+
+            if (transcribedOpt.isPresent() && !transcribedOpt.get().isBlank()) {
+                userMessage = transcribedOpt.get();
+                systemPrompt = buildClassifyingPrompt(patient, nutritionist, message);
+                responseType = "CONVERSATION";
+            } else {
+                // Audio without transcription available → acknowledgment prompt (D-05)
+                systemPrompt = buildAcknowledgmentPrompt("áudio");
+                responseType = "ACKNOWLEDGMENT";
+            }
         } else if ("image".equals(message.getMessageType())) {
-            // Image with caption → classify and extract from caption (D-05)
-            // Send acknowledgment for the image + classify the caption text
-            systemPrompt = buildClassifyingPromptWithImageAck(patient, nutritionist, message);
-            responseType = "CONVERSATION";
+            Optional<String> imageUriOpt = Optional.empty();
+            if (message.getMediaUrl() != null && !message.getMediaUrl().isBlank()) {
+                imageUriOpt = evolutionApiService.getMediaAsBase64DataUri(message.getMediaUrl(), "image/jpeg");
+            }
+
+            if (imageUriOpt.isPresent()) {
+                imageUrl = imageUriOpt.get();
+                systemPrompt = buildPlateVisionPrompt(patient, nutritionist, message);
+                responseType = "CONVERSATION";
+                if (userMessage.isBlank()) {
+                    userMessage = "Foto da refeição enviada pelo paciente";
+                }
+            } else if (message.getMessageContent() != null && !message.getMessageContent().isBlank()) {
+                // Image with caption but no image URL → classify from caption (D-05)
+                systemPrompt = buildClassifyingPromptWithImageAck(patient, nutritionist, message);
+                responseType = "CONVERSATION";
+            } else {
+                // Image without caption and without image URL → acknowledgment prompt (D-05)
+                systemPrompt = buildAcknowledgmentPrompt("foto");
+                responseType = "ACKNOWLEDGMENT";
+            }
         } else {
             // Text message → classify and respond
             systemPrompt = buildClassifyingPrompt(patient, nutritionist, message);
             responseType = "CONVERSATION";
         }
 
-        String userMessage = message.getMessageContent() != null ? message.getMessageContent() : "";
-        LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage);
+        LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage, imageUrl, 0.3, 1000);
         LlmResponse llmResponse = llmService.chat(llmRequest);
 
         if (!llmResponse.success()) {
@@ -408,6 +446,52 @@ public class ConversationService {
               "mealLabel": "almoço",
               "items": [
                 {"name": "arroz integral", "grams": 150, "kcal": 170, "prot": 3.2, "carb": 35, "fat": 1.5}
+              ]
+            }
+            ```
+            """.replace("{{patientContext}}", escape(patientContext))
+               .replace("{{planContext}}", escape(planContext));
+    }
+
+    /**
+     * Build a multimodal plate vision prompt comparing against patient's active plan.
+     */
+    String buildPlateVisionPrompt(Patient patient, Nutritionist nutritionist, WhatsAppMessage message) {
+        String patientContext = buildPatientContext(patient);
+        String planContext = buildPlanContext(patient, nutritionist);
+
+        return """
+            Você é um assistente de nutrição humana, empático e não julgador.
+            Seu papel é auxiliar o paciente de forma amigável, praticando redução de danos.
+
+            REGRAS IMPORTANTES:
+            - NUNCA reprove o paciente por comer algo fora do plano
+            - Foque em porções, preparações mais leves, e alternativas saudáveis
+            - Seja acolhedor e encorajador
+            - Responda em português brasileiro
+
+            O paciente enviou uma FOTO da sua refeição / prato de comida.
+            1. Analise visualmente os alimentos no prato e estime as quantidades em gramas.
+            2. Compare com as opções e metas do plano alimentar do paciente.
+            3. Dê um retorno acolhedor e positivo (reconheça as escolhas, equilíbrio de cores e porções).
+            4. Se o paciente incluiu alguma legenda, utilize-a para refinar a identificação.
+
+            CONTEXTO DO PACIENTE:
+            {{patientContext}}
+
+            CONTEXTO COMPLETO DO PLANO ALIMENTAR:
+            {{planContext}}
+
+            Extraia os alimentos identificados na foto com macros estimados.
+            Responda em formato JSON no campo de extração. Também envie uma resposta empática ao paciente.
+
+            Formato de resposta JSON (DENTRO de ```json```):
+            ```json
+            {
+              "mealLabel": "almoço",
+              "items": [
+                {"name": "arroz branco", "grams": 150, "kcal": 192, "prot": 3.7, "carb": 42.1, "fat": 0.3},
+                {"name": "frango grelhado", "grams": 120, "kcal": 191, "prot": 38.4, "carb": 0, "fat": 3.6}
               ]
             }
             ```
