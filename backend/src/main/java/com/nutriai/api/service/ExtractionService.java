@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -78,7 +79,52 @@ public class ExtractionService {
             }
         }
 
-        // 2. Create and persist MealExtraction
+        // 2. Check for recent extraction within 45 minutes to consolidate/deduplicate
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(45);
+        Optional<MealExtraction> recentOpt = mealExtractionRepository
+                .findFirstByPatientIdAndNutritionistIdAndExtractedAtAfterOrderByExtractedAtDesc(
+                        patientId, nutritionistId, cutoff);
+
+        if (recentOpt.isPresent() && isSameMeal(recentOpt.get().getMealLabel(), extractionResult.mealLabel())) {
+            MealExtraction existing = recentOpt.get();
+            log.info("Consolidating into existing MealExtraction id={}, patientId={}, existingLabel={}, newLabel={}",
+                    existing.getId(), patientId, existing.getMealLabel(), extractionResult.mealLabel());
+
+            existing.setMessageId(messageId);
+            existing.setExtractionRaw(extractionResult.extractionRaw());
+            if (extractionResult.mealLabel() != null && !isGenericLabel(normalizeLabel(extractionResult.mealLabel()))) {
+                existing.setMealLabel(extractionResult.mealLabel());
+            }
+            existing.setTotalKcal(totalKcal);
+            existing.setTotalProt(totalProt);
+            existing.setTotalCarb(totalCarb);
+            existing.setTotalFat(totalFat);
+            existing.setExtractedAt(LocalDateTime.now());
+            MealExtraction saved = mealExtractionRepository.save(existing);
+
+            extractionItemRepository.deleteAllByExtractionId(saved.getId());
+            if (items != null) {
+                for (int i = 0; i < items.size(); i++) {
+                    ExtractionItemResult itemResult = items.get(i);
+                    ExtractionItem item = ExtractionItem.builder()
+                            .extractionId(saved.getId())
+                            .name(itemResult.name())
+                            .kcal(BigDecimal.valueOf(itemResult.kcal()))
+                            .prot(BigDecimal.valueOf(itemResult.prot()))
+                            .carb(BigDecimal.valueOf(itemResult.carb()))
+                            .fat(BigDecimal.valueOf(itemResult.fat()))
+                            .grams(itemResult.grams() != null ? BigDecimal.valueOf(itemResult.grams()) : null)
+                            .sortOrder(i)
+                            .build();
+                    extractionItemRepository.save(item);
+                }
+            }
+
+            updateOrEmitHistoryEvent(saved, extractionResult, nutritionistId, episodeId);
+            return saved;
+        }
+
+        // 3. Create and persist new MealExtraction
         MealExtraction extraction = MealExtraction.builder()
                 .messageId(messageId)
                 .nutritionistId(nutritionistId)
@@ -97,7 +143,7 @@ public class ExtractionService {
         log.info("Saved MealExtraction id={}, patientId={}, mealLabel={}, totalKcal={}",
                 saved.getId(), patientId, extractionResult.mealLabel(), totalKcal);
 
-        // 3. Persist ExtractionItems
+        // 4. Persist ExtractionItems
         if (items != null) {
             for (int i = 0; i < items.size(); i++) {
                 ExtractionItemResult itemResult = items.get(i);
@@ -115,10 +161,69 @@ public class ExtractionService {
             }
         }
 
-        // 4. Emit EpisodeHistoryEvent per D-13
+        // 5. Emit EpisodeHistoryEvent per D-13
         emitHistoryEvent(saved, extractionResult, nutritionistId, episodeId);
 
         return saved;
+    }
+
+    private void updateOrEmitHistoryEvent(
+            MealExtraction extraction,
+            ExtractionResult extractionResult,
+            UUID nutritionistId,
+            UUID episodeId) {
+
+        Optional<EpisodeHistoryEvent> existingEventOpt = episodeHistoryEventRepository
+                .findBySourceRefAndNutritionistId(extraction.getId().toString(), nutritionistId);
+
+        String mealLabel = extraction.getMealLabel();
+        if (mealLabel == null || mealLabel.isBlank()) {
+            mealLabel = "Refeição";
+        }
+        String capitalizedLabel = mealLabel.substring(0, 1).toUpperCase() + mealLabel.substring(1);
+        String title = capitalizedLabel + " extraído via WhatsApp";
+        String description = buildDescription(extractionResult);
+        String metadataJson = buildMetadataJson(extractionResult, extraction);
+
+        if (existingEventOpt.isPresent()) {
+            EpisodeHistoryEvent event = existingEventOpt.get();
+            event.setTitle(title);
+            event.setDescription(description);
+            event.setMetadataJson(metadataJson);
+            event.setEventAt(extraction.getExtractedAt());
+            episodeHistoryEventRepository.save(event);
+            log.info("Updated existing MEAL_EXTRACTION event for extraction {}", extraction.getId());
+        } else {
+            emitHistoryEvent(extraction, extractionResult, nutritionistId, episodeId);
+        }
+    }
+
+    private boolean isSameMeal(String existingLabel, String newLabel) {
+        if (existingLabel == null || newLabel == null) {
+            return true;
+        }
+        String cleanOld = normalizeLabel(existingLabel);
+        String cleanNew = normalizeLabel(newLabel);
+        if (cleanOld.equals(cleanNew)) {
+            return true;
+        }
+        if (isGenericLabel(cleanOld) || isGenericLabel(cleanNew)) {
+            return true;
+        }
+        return cleanOld.contains(cleanNew) || cleanNew.contains(cleanOld);
+    }
+
+    private String normalizeLabel(String label) {
+        if (label == null) {
+            return "";
+        }
+        String normalized = java.text.Normalizer.normalize(label.toLowerCase().trim(), java.text.Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "");
+    }
+
+    private boolean isGenericLabel(String label) {
+        return label.isEmpty() || "refeicao".equals(label) || "comida".equals(label)
+                || "prato".equals(label) || "alimento".equals(label);
     }
 
     /**

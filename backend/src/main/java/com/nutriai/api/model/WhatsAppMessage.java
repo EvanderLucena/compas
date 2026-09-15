@@ -59,7 +59,7 @@ public class WhatsAppMessage {
     @Column(name = "message_content", columnDefinition = "TEXT")
     private String messageContent;
 
-    @Column(name = "media_url", length = 500)
+    @Column(name = "media_url", columnDefinition = "TEXT")
     private String mediaUrl;
 
     @NotNull

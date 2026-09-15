@@ -1,5 +1,7 @@
 package com.nutriai.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,6 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -24,11 +27,17 @@ public class EvolutionApiService {
     private final String apiKey;
     private final String instanceName;
     private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
 
     public EvolutionApiService(String apiUrl, String apiKey, String instanceName) {
+        this(apiUrl, apiKey, instanceName, new ObjectMapper());
+    }
+
+    public EvolutionApiService(String apiUrl, String apiKey, String instanceName, ObjectMapper objectMapper) {
         this.apiUrl = apiUrl;
         this.apiKey = apiKey;
         this.instanceName = instanceName;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -43,11 +52,11 @@ public class EvolutionApiService {
      */
     public boolean sendMessage(String phone, String text) {
         try {
-            String endpoint = apiUrl + "/message/sendText/" + instanceName;
-            // Evolution Go payload uses nested textMessage object
+            String targetPhone = formatTargetPhone(phone);
+            String endpoint = apiUrl + "/send/text";
             String payload = String.format(
-                    "{\"number\":\"%s\",\"textMessage\":{\"text\":\"%s\"}}",
-                    escapeJson(phone),
+                    "{\"number\":\"%s\",\"text\":\"%s\"}",
+                    escapeJson(targetPhone),
                     escapeJson(text)
             );
 
@@ -62,8 +71,8 @@ public class EvolutionApiService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                log.info("Message sent via Evolution API: instance={}, phone={}, status={}",
-                        instanceName, maskPhone(phone), response.statusCode());
+                log.info("Message sent via Evolution API: phone={}, status={}",
+                        maskPhone(targetPhone), response.statusCode());
                 return true;
             }
 
@@ -74,7 +83,7 @@ public class EvolutionApiService {
 
                 HttpResponse<String> retryResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 if (retryResponse.statusCode() >= 200 && retryResponse.statusCode() < 300) {
-                    log.info("Message sent on retry: instance={}, phone={}", instanceName, maskPhone(phone));
+                    log.info("Message sent on retry: phone={}", maskPhone(targetPhone));
                     return true;
                 }
                 log.error("Evolution API retry failed: status={}", retryResponse.statusCode());
@@ -100,10 +109,11 @@ public class EvolutionApiService {
 
     private boolean retrySendOnce(String phone, String text) {
         try {
-            String endpoint = apiUrl + "/message/sendText/" + instanceName;
+            String targetPhone = formatTargetPhone(phone);
+            String endpoint = apiUrl + "/send/text";
             String payload = String.format(
-                    "{\"number\":\"%s\",\"textMessage\":{\"text\":\"%s\"}}",
-                    escapeJson(phone),
+                    "{\"number\":\"%s\",\"text\":\"%s\"}",
+                    escapeJson(targetPhone),
                     escapeJson(text)
             );
 
@@ -211,8 +221,14 @@ public class EvolutionApiService {
 
             // Only allow media originating from the configured Evolution API instance host
             String apiHost = URI.create(apiUrl).getHost();
-            if (apiHost != null && apiHost.equalsIgnoreCase(host)) {
-                return true;
+            if (apiHost != null) {
+                if (apiHost.equalsIgnoreCase(host)) {
+                    return true;
+                }
+                if (("localhost".equalsIgnoreCase(apiHost) || "127.0.0.1".equals(apiHost))
+                        && ("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host))) {
+                    return true;
+                }
             }
 
             log.warn("Blocked media download: host {} does not match configured Evolution API host {}",
@@ -252,6 +268,53 @@ public class EvolutionApiService {
         });
     }
 
+    /**
+     * Download and decrypt media from an Evolution API WhatsApp message payload.
+     * Uses Evolution Go's /message/downloadmedia endpoint.
+     *
+     * @param messageContent the message content object (e.g. MessageContent)
+     * @return Optional containing the Data URL (e.g. data:audio/ogg;base64,...), or empty
+     */
+    public Optional<String> downloadMediaDataUrl(Object messageContent) {
+        if (messageContent == null) {
+            return Optional.empty();
+        }
+        try {
+            Map<String, Object> requestPayload = Map.of("message", messageContent);
+            String jsonPayload = objectMapper.writeValueAsString(requestPayload);
+
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(apiUrl + "/message/downloadmedia"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .timeout(Duration.ofSeconds(30));
+
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(
+                    builder.build(), HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                JsonNode root = objectMapper.readTree(response.body());
+                JsonNode dataNode = root.path("data");
+                if (!dataNode.isMissingNode() && dataNode.has("base64")) {
+                    String base64 = dataNode.path("base64").asText();
+                    if (base64 != null && !base64.isBlank()) {
+                        return Optional.of(base64);
+                    }
+                }
+            } else {
+                log.warn("Evolution API /message/downloadmedia failed: status={}, body={}",
+                        response.statusCode(), truncate(response.body(), 200));
+            }
+        } catch (Exception e) {
+            log.warn("Error calling /message/downloadmedia: {}", e.getMessage());
+        }
+        return Optional.empty();
+    }
+
     private String escapeJson(String s) {
         if (s == null) {
             return "";
@@ -276,6 +339,25 @@ public class EvolutionApiService {
             }
         }
         return escaped.toString();
+    }
+
+    /**
+     * Formats phone number ensuring full international format for Brazilian numbers.
+     * Brazilian numbers without country code have 10 (landline) or 11 (mobile) digits.
+     * Numbers that already include 55 country code have 12 or 13 digits.
+     */
+    public static String formatTargetPhone(String rawPhone) {
+        if (rawPhone == null) {
+            return "";
+        }
+        String digits = rawPhone.replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            return "";
+        }
+        if (digits.length() <= 11) {
+            return "55" + digits;
+        }
+        return digits;
     }
 
     private String maskPhone(String phone) {

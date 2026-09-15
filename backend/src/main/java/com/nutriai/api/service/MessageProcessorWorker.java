@@ -52,8 +52,16 @@ public class MessageProcessorWorker {
         UUID messageId = messageIdOpt.get();
         Optional<WhatsAppMessage> msgOpt = whatsAppMessageRepository.findById(messageId);
         if (msgOpt.isEmpty()) {
-            log.warn("Message {} not found in DB, dropping from queue", messageId);
-            return;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            msgOpt = whatsAppMessageRepository.findById(messageId);
+            if (msgOpt.isEmpty()) {
+                log.warn("Message {} not found in DB, dropping from queue", messageId);
+                return;
+            }
         }
 
         WhatsAppMessage message = msgOpt.get();

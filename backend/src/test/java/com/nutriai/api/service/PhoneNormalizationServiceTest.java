@@ -54,4 +54,26 @@ class PhoneNormalizationServiceTest {
         Optional<String> result = service.normalize("551133445566");
         assertEquals(Optional.of("1133445566"), result);
     }
+
+    @Test
+    void normalize_ddd55WithoutCountryCode_preservesDDD55() {
+        // Rio Grande do Sul DDD 55: 11 digits (mobile)
+        Optional<String> result = service.normalize("55999887766");
+        assertEquals(Optional.of("55999887766"), result);
+
+        // DDD 55 landline: 10 digits
+        Optional<String> landline = service.normalize("5533445566");
+        assertEquals(Optional.of("5533445566"), landline);
+    }
+
+    @Test
+    void normalize_ddd55WithCountryCode_stripsCountryCodeAndPreservesDDD55() {
+        // +55 55 99988-7766 (13 digits with country code)
+        Optional<String> result = service.normalize("+5555999887766");
+        assertEquals(Optional.of("55999887766"), result);
+
+        // +55 55 3344-5566 (12 digits with country code)
+        Optional<String> landline = service.normalize("+555533445566");
+        assertEquals(Optional.of("5533445566"), landline);
+    }
 }

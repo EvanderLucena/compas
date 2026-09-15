@@ -336,4 +336,86 @@ class WebhookServiceTest {
         dto.setData(data);
         return dto;
     }
+
+    private WhatsAppWebhookDTO createExtendedTextWebhook(String phone, String msgId, String text) {
+        WhatsAppWebhookDTO dto = new WhatsAppWebhookDTO();
+        dto.setInstanceId("inst-1");
+        dto.setEvent("Message");
+        WhatsAppWebhookDTO.MessageData data = new WhatsAppWebhookDTO.MessageData();
+        WhatsAppWebhookDTO.WhatsAppInfo info = new WhatsAppWebhookDTO.WhatsAppInfo();
+        info.setSender(phone + "@s.whatsapp.net");
+        info.setId(msgId);
+        info.setFromMe(false);
+        info.setType("text");
+        data.setInfo(info);
+        WhatsAppWebhookDTO.MessageContent msg = new WhatsAppWebhookDTO.MessageContent();
+        WhatsAppWebhookDTO.ExtendedTextMessage extMsg = new WhatsAppWebhookDTO.ExtendedTextMessage();
+        extMsg.setText(text);
+        msg.setExtendedTextMessage(extMsg);
+        data.setMessage(msg);
+        dto.setData(data);
+        return dto;
+    }
+
+    @Test
+    void processIncoming_extendedTextMessage_savesContentAndEnqueues() {
+        WhatsAppWebhookDTO dto = createExtendedTextWebhook("55119999887766", "msg-ext", "Oi com extended text");
+        when(phoneNormalizationService.normalize("55119999887766")).thenReturn(Optional.of("119999887766"));
+        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766"))
+                .thenReturn(List.of(nutritionistId));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId))
+                .thenReturn(Optional.of(patient));
+        when(whatsAppMessageRepository.findByMessageId("msg-ext")).thenReturn(Optional.empty());
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
+            WhatsAppMessage m = i.getArgument(0);
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
+            return m;
+        });
+
+        Optional<?> result = webhookService.processIncoming(dto);
+
+        assertTrue(result.isPresent());
+        verify(messageQueueService).enqueue(any(UUID.class));
+    }
+
+    @Test
+    void processIncoming_senderIsLid_resolvesPhoneFromChatOrSenderAlt() {
+        WhatsAppWebhookDTO dto = new WhatsAppWebhookDTO();
+        dto.setInstanceId("inst-1");
+        dto.setEvent("Message");
+        WhatsAppWebhookDTO.MessageData data = new WhatsAppWebhookDTO.MessageData();
+        WhatsAppWebhookDTO.WhatsAppInfo info = new WhatsAppWebhookDTO.WhatsAppInfo();
+        info.setSender("20504241016882@lid");
+        info.setSenderAlt("55119999887766@s.whatsapp.net");
+        info.setChat("55119999887766@s.whatsapp.net");
+        info.setId("msg-lid-1");
+        info.setFromMe(false);
+        info.setType("text");
+        data.setInfo(info);
+        WhatsAppWebhookDTO.MessageContent msg = new WhatsAppWebhookDTO.MessageContent();
+        msg.setConversation("Mensagem de LID");
+        data.setMessage(msg);
+        dto.setData(data);
+
+        when(phoneNormalizationService.normalize("55119999887766")).thenReturn(Optional.of("119999887766"));
+        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766"))
+                .thenReturn(List.of(nutritionistId));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId))
+                .thenReturn(Optional.of(patient));
+        when(whatsAppMessageRepository.findByMessageId("msg-lid-1")).thenReturn(Optional.empty());
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
+            WhatsAppMessage m = i.getArgument(0);
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
+            return m;
+        });
+
+        Optional<?> result = webhookService.processIncoming(dto);
+
+        assertTrue(result.isPresent());
+        verify(messageQueueService).enqueue(any(UUID.class));
+    }
 }

@@ -14,4 +14,9 @@ public interface WhatsAppResponseRepository extends JpaRepository<WhatsAppRespon
      * Find responses for a patient scoped by nutritionist (tenant isolation, D-14).
      */
     List<WhatsAppResponse> findByPatientIdAndNutritionistIdOrderByCreatedAtDesc(UUID patientId, UUID nutritionistId);
+
+    /**
+     * Find responses for a specific message scoped by nutritionist (tenant isolation).
+     */
+    List<WhatsAppResponse> findByMessageIdAndNutritionistId(UUID messageId, UUID nutritionistId);
 }

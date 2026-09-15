@@ -69,12 +69,14 @@ public class WebhookService {
     @Transactional
     public Optional<WebhookMessageDTO> processIncoming(WhatsAppWebhookDTO payload) {
         if (payload == null || payload.getData() == null || payload.getData().getInfo() == null) {
-            log.warn("Received invalid webhook payload");
+            log.warn("Received invalid webhook payload: payload={}, data={}",
+                    payload != null ? payload.getEvent() : "null",
+                    payload != null ? payload.getData() : "null");
             return Optional.empty();
         }
 
         // Only process incoming messages
-        if (!"Message".equals(payload.getEvent())) {
+        if (!"Message".equalsIgnoreCase(payload.getEvent())) {
             log.debug("Ignoring non-Message event: {}", payload.getEvent());
             return Optional.empty();
         }
@@ -85,7 +87,7 @@ public class WebhookService {
             return Optional.empty();
         }
 
-        String rawPhone = extractPhoneFromJid(payload.getData().getInfo().getSender());
+        String rawPhone = resolveSenderPhone(payload.getData().getInfo());
         String evolutionMessageId = payload.getData().getInfo().getId();
         String instanceId = payload.getInstanceId();
 
@@ -130,6 +132,16 @@ public class WebhookService {
         String messageType = determineMessageType(payload);
         String messageContent = extractContent(payload);
         String mediaUrl = extractMediaUrl(payload);
+
+        // For audio and image messages, decrypt media directly via Evolution Go /message/downloadmedia
+        if (("audio".equals(messageType) || "image".equals(messageType))
+                && payload.getData() != null && payload.getData().getMessage() != null) {
+            Optional<String> downloaded = evolutionApiService.downloadMediaDataUrl(payload.getData().getMessage());
+            if (downloaded.isPresent()) {
+                mediaUrl = downloaded.get();
+                log.info("Decrypted {} media successfully via Evolution Go", messageType);
+            }
+        }
 
         WhatsAppMessage message = WhatsAppMessage.builder()
                 .messageId(evolutionMessageId)
@@ -176,17 +188,53 @@ public class WebhookService {
                     saved.getId(), normalizedPhone, null, null, messageContent, messageType));
         }
 
-        // Enqueue for async AI processing
-        messageQueueService.enqueue(saved.getId());
-        log.info("Enqueued message {} for async processing", saved.getId());
+        // Enqueue for async AI processing after transaction commits
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            messageQueueService.enqueue(saved.getId());
+                            log.info("Enqueued message {} for async processing", saved.getId());
+                        }
+                    }
+            );
+        } else {
+            messageQueueService.enqueue(saved.getId());
+            log.info("Enqueued message {} for async processing", saved.getId());
+        }
 
         return Optional.of(new WebhookMessageDTO(
                 saved.getId(), normalizedPhone, saved.getPatientId(), saved.getNutritionistId(),
                 messageContent, messageType));
     }
 
+    private String resolveSenderPhone(WhatsAppWebhookDTO.WhatsAppInfo info) {
+        if (info == null) {
+            return null;
+        }
+        String senderPhone = extractPhoneFromJid(info.getSender());
+        if (senderPhone == null || isLid(info.getSender())) {
+            String altPhone = extractPhoneFromJid(info.getSenderAlt());
+            if (altPhone != null && !isLid(info.getSenderAlt())) {
+                return altPhone;
+            }
+            String chatPhone = extractPhoneFromJid(info.getChat());
+            if (chatPhone != null && !isLid(info.getChat())) {
+                return chatPhone;
+            }
+        }
+        return senderPhone;
+    }
+
+    private boolean isLid(String jid) {
+        return jid != null && (jid.endsWith("@lid") || jid.contains("@lid"));
+    }
+
     private String extractPhoneFromJid(String sender) {
-        if (sender == null) return null;
+        if (sender == null) {
+            return null;
+        }
         int atIndex = sender.indexOf('@');
         if (atIndex > 0) {
             return sender.substring(0, atIndex);
@@ -195,19 +243,43 @@ public class WebhookService {
     }
 
     private String determineMessageType(WhatsAppWebhookDTO payload) {
-        if (payload.getData() == null || payload.getData().getInfo() == null) return "text";
+        if (payload.getData() == null || payload.getData().getInfo() == null) {
+            return "text";
+        }
         String mediaType = payload.getData().getInfo().getMediaType();
-        if ("audio".equalsIgnoreCase(mediaType)) return "audio";
-        if ("image".equalsIgnoreCase(mediaType)) return "image";
-        if ("video".equalsIgnoreCase(mediaType)) return "video";
-        if ("document".equalsIgnoreCase(mediaType)) return "document";
+        if ("audio".equalsIgnoreCase(mediaType)) {
+            return "audio";
+        }
+        if ("image".equalsIgnoreCase(mediaType)) {
+            return "image";
+        }
+        if ("video".equalsIgnoreCase(mediaType)) {
+            return "video";
+        }
+        if ("document".equalsIgnoreCase(mediaType)) {
+            return "document";
+        }
+        if (payload.getData().getMessage() != null) {
+            if (payload.getData().getMessage().getAudioMessage() != null) {
+                return "audio";
+            }
+            if (payload.getData().getMessage().getImageMessage() != null) {
+                return "image";
+            }
+        }
         return "text";
     }
 
     private String extractContent(WhatsAppWebhookDTO payload) {
-        if (payload.getData().getMessage() == null) return null;
+        if (payload.getData().getMessage() == null) {
+            return null;
+        }
         if (payload.getData().getMessage().getConversation() != null) {
             return payload.getData().getMessage().getConversation();
+        }
+        if (payload.getData().getMessage().getExtendedTextMessage() != null
+                && payload.getData().getMessage().getExtendedTextMessage().getText() != null) {
+            return payload.getData().getMessage().getExtendedTextMessage().getText();
         }
         if (payload.getData().getMessage().getImageMessage() != null
                 && payload.getData().getMessage().getImageMessage().getCaption() != null) {
@@ -217,12 +289,28 @@ public class WebhookService {
     }
 
     private String extractMediaUrl(WhatsAppWebhookDTO payload) {
-        if (payload.getData().getMessage() == null) return null;
+        if (payload.getData().getMessage() == null) {
+            return null;
+        }
         if (payload.getData().getMessage().getImageMessage() != null) {
-            return payload.getData().getMessage().getImageMessage().getUrl();
+            var img = payload.getData().getMessage().getImageMessage();
+            if (img.getUrl() != null && !img.getUrl().isBlank()) {
+                return img.getUrl();
+            }
+            if (img.getBase64() != null && !img.getBase64().isBlank()) {
+                String mime = img.getMimeType() != null ? img.getMimeType() : "image/jpeg";
+                return "data:" + mime + ";base64," + img.getBase64();
+            }
         }
         if (payload.getData().getMessage().getAudioMessage() != null) {
-            return payload.getData().getMessage().getAudioMessage().getUrl();
+            var audio = payload.getData().getMessage().getAudioMessage();
+            if (audio.getUrl() != null && !audio.getUrl().isBlank()) {
+                return audio.getUrl();
+            }
+            if (audio.getBase64() != null && !audio.getBase64().isBlank()) {
+                String mime = audio.getMimeType() != null ? audio.getMimeType() : "audio/ogg";
+                return "data:" + mime + ";base64," + audio.getBase64();
+            }
         }
         return null;
     }
