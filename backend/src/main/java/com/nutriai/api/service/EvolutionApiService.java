@@ -52,7 +52,7 @@ public class EvolutionApiService {
      */
     public boolean sendMessage(String phone, String text) {
         try {
-            String targetPhone = phone.startsWith("55") ? phone : "55" + phone;
+            String targetPhone = formatTargetPhone(phone);
             String endpoint = apiUrl + "/send/text";
             String payload = String.format(
                     "{\"number\":\"%s\",\"text\":\"%s\"}",
@@ -109,7 +109,7 @@ public class EvolutionApiService {
 
     private boolean retrySendOnce(String phone, String text) {
         try {
-            String targetPhone = phone.startsWith("55") ? phone : "55" + phone;
+            String targetPhone = formatTargetPhone(phone);
             String endpoint = apiUrl + "/send/text";
             String payload = String.format(
                     "{\"number\":\"%s\",\"text\":\"%s\"}",
@@ -339,6 +339,25 @@ public class EvolutionApiService {
             }
         }
         return escaped.toString();
+    }
+
+    /**
+     * Formats phone number ensuring full international format for Brazilian numbers.
+     * Brazilian numbers without country code have 10 (landline) or 11 (mobile) digits.
+     * Numbers that already include 55 country code have 12 or 13 digits.
+     */
+    public static String formatTargetPhone(String rawPhone) {
+        if (rawPhone == null) {
+            return "";
+        }
+        String digits = rawPhone.replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            return "";
+        }
+        if (digits.length() <= 11) {
+            return "55" + digits;
+        }
+        return digits;
     }
 
     private String maskPhone(String phone) {

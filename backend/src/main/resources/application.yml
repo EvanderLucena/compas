@@ -11,7 +11,7 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
-      password: ${SPRING_DATA_REDIS_PASSWORD:nutriai-redis-dev-password}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
 
   jpa:
     hibernate:
@@ -54,8 +54,8 @@ nutriai:
     timeout-seconds: ${NUTRIAI_WHISPER_TIMEOUT:30}
 
   evolution:
-    api-url: ${EVOLUTION_API_URL:http://localhost:8081}
-    api-key: ${EVOLUTION_API_KEY:91724295-7b0c-4b26-a15b-1bba0c541fcd}
+    api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
+    api-key: ${EVOLUTION_API_KEY:}
 
   whatsapp:
     central-number: ${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}

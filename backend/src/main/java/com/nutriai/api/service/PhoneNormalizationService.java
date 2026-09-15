@@ -28,8 +28,9 @@ public class PhoneNormalizationService {
 
         String digits = NON_DIGITS.matcher(rawPhone).replaceAll("");
 
-        // Strip leading 55 if present (country code)
-        if (digits.startsWith("55") && digits.length() > MIN_LENGTH) {
+        // Strip leading 55 if present as country code (12 or 13 digits: 55 + DDD + number).
+        // If digits has <= 11 chars, a leading "55" is DDD 55 (RS), not country code.
+        if (digits.startsWith("55") && digits.length() > MAX_LENGTH) {
             digits = digits.substring(2);
         }
 
