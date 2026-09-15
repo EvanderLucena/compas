@@ -28,7 +28,6 @@ export interface EditPatientModalProps {
 
 // eslint-disable-next-line max-lines-per-function, complexity
 export function EditPatientModal({ patient, open, onClose }: EditPatientModalProps) {
-  if (open === false) return null;
   const updateMutation = useUpdatePatient();
   const [sex, setSex] = useState(patient.sex || 'F');
   const [objective, setObjective] = useState<ObjectiveOption>(
@@ -138,6 +137,8 @@ export function EditPatientModal({ patient, open, onClose }: EditPatientModalPro
   });
 
   const canSubmit = form.name.trim().length >= 2 && !updateMutation.isPending;
+
+  if (open === false) return null;
 
   return (
     <div
