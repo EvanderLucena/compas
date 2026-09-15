@@ -23,6 +23,7 @@ interface NewPatientModalProps {
   open: boolean;
   onClose: () => void;
   isSubmitting?: boolean;
+  errorMessage?: string | null;
   onSave?: (data: {
     name: string;
     objective: ObjectiveOption;
@@ -39,6 +40,7 @@ export function NewPatientModal({
   onClose,
   onSave,
   isSubmitting = false,
+  errorMessage,
 }: NewPatientModalProps) {
   const {
     values: form,
@@ -124,6 +126,21 @@ export function NewPatientModal({
   return (
     <Modal open={open} onClose={handleClose} title="Novo paciente">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {errorMessage && (
+          <div
+            role="alert"
+            style={{
+              padding: '10px 12px',
+              background: 'rgba(239,68,68,0.1)',
+              border: '1px solid var(--coral)',
+              borderRadius: 6,
+              color: 'var(--coral)',
+              fontSize: 13,
+            }}
+          >
+            {errorMessage}
+          </div>
+        )}
         <Input
           label="Nome completo"
           placeholder="ex: Ana Beatriz Lima"

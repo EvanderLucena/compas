@@ -115,12 +115,18 @@ export function OnboardingView() {
             }),
           ),
         );
-        const failures = results.filter((r) => r.status === 'rejected');
-        if (failures.length > 0) {
+        const remainingPatients: OnboardPatient[] = [];
+        results.forEach((r, idx) => {
+          if (r.status === 'rejected') {
+            remainingPatients.push(patients[idx]);
+          }
+        });
+        setPatients(remainingPatients);
+        if (remainingPatients.length > 0) {
           useToastStore
             .getState()
             .showError(
-              `${failures.length} paciente(s) não puderam ser cadastrados, mas você pode adicioná-los pelo painel.`,
+              `${remainingPatients.length} paciente(s) não puderam ser cadastrados, mas você pode adicioná-los pelo painel.`,
             );
         }
       }

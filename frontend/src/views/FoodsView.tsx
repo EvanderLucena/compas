@@ -164,6 +164,7 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
   );
   const [unit, setUnit] = useState<FoodUnit>(food.unit);
   const [prep, setPrep] = useState(food.prep);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const updateFood = useUpdateFood();
 
   const {
@@ -201,6 +202,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
       kcal: {
         required: true,
         requiredMessage: 'Calorias são obrigatórias.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -211,6 +214,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
       prot: {
         required: true,
         requiredMessage: 'Proteína é obrigatória.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -221,6 +226,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
       carb: {
         required: true,
         requiredMessage: 'Carboidrato é obrigatório.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -231,6 +238,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
       fat: {
         required: true,
         requiredMessage: 'Gordura é obrigatória.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -251,12 +260,16 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
   );
 
   const handleSave = () => {
+    setSubmitError(null);
     if (!validateAll()) return;
     const kcal = parseNumberInput(form.kcal);
     const prot = parseNumberInput(form.prot);
     const carb = parseNumberInput(form.carb);
     const fat = parseNumberInput(form.fat);
-    if (kcal == null || prot == null || carb == null || fat == null) return;
+    if (kcal == null || prot == null || carb == null || fat == null) {
+      setSubmitError('Preencha todos os campos obrigatórios de macronutrientes.');
+      return;
+    }
     updateFood.mutate(
       {
         id: food.id,
@@ -275,15 +288,17 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
       },
       {
         onSuccess: () => {
+          setSubmitError(null);
           useToastStore.getState().showSuccess('Alimento atualizado com sucesso');
           onClose();
         },
         onError: (error) => {
-          useToastStore
-            .getState()
-            .showError(
-              resolveMutationErrorMessage(error, 'Erro ao atualizar alimento — tente novamente'),
-            );
+          const msg = resolveMutationErrorMessage(
+            error,
+            'Erro ao atualizar alimento — tente novamente',
+          );
+          setSubmitError(msg);
+          useToastStore.getState().showError(msg);
         },
       },
     );
@@ -336,6 +351,21 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
           </button>
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {submitError && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid var(--coral)',
+                borderRadius: 6,
+                color: 'var(--coral)',
+                fontSize: 13,
+              }}
+            >
+              {submitError}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label className="eyebrow" htmlFor="edit-catalog-name">
               Nome
@@ -501,10 +531,26 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
           <button
             className="btn btn-primary"
             onClick={handleSave}
-            disabled={!form.name.trim() || !form.referenceAmount.trim() || updateFood.isPending}
+            disabled={
+              !form.name.trim() ||
+              !form.referenceAmount.trim() ||
+              !form.kcal.trim() ||
+              !form.prot.trim() ||
+              !form.carb.trim() ||
+              !form.fat.trim() ||
+              updateFood.isPending
+            }
             style={{
               opacity:
-                form.name.trim() && form.referenceAmount.trim() && !updateFood.isPending ? 1 : 0.45,
+                form.name.trim() &&
+                form.referenceAmount.trim() &&
+                form.kcal.trim() &&
+                form.prot.trim() &&
+                form.carb.trim() &&
+                form.fat.trim() &&
+                !updateFood.isPending
+                  ? 1
+                  : 0.45,
             }}
           >
             <IconCheck size={13} /> {updateFood.isPending ? 'Salvando...' : 'Salvar'}
@@ -803,6 +849,7 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
   const [unit, setUnit] = useState<FoodUnit>('GRAMAS');
   const [prep, setPrep] = useState('');
   const [portionLabel, setPortionLabel] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const createFood = useCreateFood();
 
   const {
@@ -840,6 +887,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       kcal: {
         required: true,
         requiredMessage: 'Calorias são obrigatórias.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -850,6 +899,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       prot: {
         required: true,
         requiredMessage: 'Proteína é obrigatória.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -860,6 +911,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       carb: {
         required: true,
         requiredMessage: 'Carboidrato é obrigatório.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -870,6 +923,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       fat: {
         required: true,
         requiredMessage: 'Gordura é obrigatória.',
+        min: 0,
+        minMessage: 'Valor não pode ser negativo.',
         custom: (v) => {
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
@@ -890,12 +945,16 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
   );
 
   const handleCreate = () => {
+    setSubmitError(null);
     if (!validateAll()) return;
     const kcal = parseNumberInput(form.kcal);
     const prot = parseNumberInput(form.prot);
     const carb = parseNumberInput(form.carb);
     const fat = parseNumberInput(form.fat);
-    if (kcal == null || prot == null || carb == null || fat == null) return;
+    if (kcal == null || prot == null || carb == null || fat == null) {
+      setSubmitError('Preencha todos os campos obrigatórios de macronutrientes.');
+      return;
+    }
     createFood.mutate(
       {
         name: form.name.trim(),
@@ -912,15 +971,17 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       },
       {
         onSuccess: () => {
+          setSubmitError(null);
           useToastStore.getState().showSuccess('Alimento cadastrado com sucesso');
           onClose();
         },
         onError: (error) => {
-          useToastStore
-            .getState()
-            .showError(
-              resolveMutationErrorMessage(error, 'Erro ao cadastrar alimento — tente novamente'),
-            );
+          const msg = resolveMutationErrorMessage(
+            error,
+            'Erro ao cadastrar alimento — tente novamente',
+          );
+          setSubmitError(msg);
+          useToastStore.getState().showError(msg);
         },
       },
     );
@@ -980,6 +1041,21 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         <div
           style={{ padding: '18px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}
         >
+          {submitError && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid var(--coral)',
+                borderRadius: 6,
+                color: 'var(--coral)',
+                fontSize: 13,
+              }}
+            >
+              {submitError}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label className="eyebrow" htmlFor="create-food-name">
               Nome do alimento
@@ -1163,10 +1239,26 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
             data-testid="newfood-submit"
             className="btn btn-primary"
             onClick={handleCreate}
-            disabled={!form.name.trim() || !form.referenceAmount.trim() || createFood.isPending}
+            disabled={
+              !form.name.trim() ||
+              !form.referenceAmount.trim() ||
+              !form.kcal.trim() ||
+              !form.prot.trim() ||
+              !form.carb.trim() ||
+              !form.fat.trim() ||
+              createFood.isPending
+            }
             style={{
               opacity:
-                form.name.trim() && form.referenceAmount.trim() && !createFood.isPending ? 1 : 0.45,
+                form.name.trim() &&
+                form.referenceAmount.trim() &&
+                form.kcal.trim() &&
+                form.prot.trim() &&
+                form.carb.trim() &&
+                form.fat.trim() &&
+                !createFood.isPending
+                  ? 1
+                  : 0.45,
             }}
           >
             <IconCheck size={13} /> {createFood.isPending ? 'Salvando...' : 'Salvar no catálogo'}

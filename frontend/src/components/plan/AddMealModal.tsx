@@ -4,6 +4,8 @@ import { IconPlus, IconX } from '../icons';
 interface AddMealModalProps {
   onClose: () => void;
   onAdd: (data: { label: string; time: string }) => void;
+  isSubmitting?: boolean;
+  error?: string | null;
 }
 
 interface MealForm {
@@ -125,7 +127,7 @@ function MealTimeInput({
   );
 }
 
-export function AddMealModal({ onClose, onAdd }: AddMealModalProps) {
+export function AddMealModal({ onClose, onAdd, isSubmitting = false, error }: AddMealModalProps) {
   const form = useMealForm();
 
   const handleSave = () => {
@@ -169,6 +171,21 @@ export function AddMealModal({ onClose, onAdd }: AddMealModalProps) {
           </button>
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid var(--coral)',
+                borderRadius: 6,
+                color: 'var(--coral)',
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <MealLabelInput
               value={form.label}
@@ -200,11 +217,11 @@ export function AddMealModal({ onClose, onAdd }: AddMealModalProps) {
           <button
             data-testid="btn-add-meal"
             className="btn btn-primary"
-            disabled={!form.label.trim() || !form.time}
+            disabled={!form.label.trim() || !form.time || isSubmitting}
             onClick={handleSave}
-            style={{ opacity: form.label.trim() && form.time ? 1 : 0.45 }}
+            style={{ opacity: form.label.trim() && form.time && !isSubmitting ? 1 : 0.45 }}
           >
-            <IconPlus size={13} /> Criar refeição
+            <IconPlus size={13} /> {isSubmitting ? 'Criando...' : 'Criar refeição'}
           </button>
         </div>
       </div>

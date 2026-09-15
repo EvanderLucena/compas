@@ -8,9 +8,11 @@ import { IconSearch, IconPlus, IconX } from '../icons';
 interface AddFoodModalProps {
   onClose: () => void;
   onAdd: (item: { foodId: string; referenceAmount: number }) => void;
+  isSubmitting?: boolean;
+  error?: string | null;
 }
 
-export function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
+export function AddFoodModal({ onClose, onAdd, isSubmitting = false, error }: AddFoodModalProps) {
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Food | null>(null);
   const [referenceAmount, setReferenceAmount] = useState('');
@@ -132,6 +134,21 @@ export function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
           </button>
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid var(--coral)',
+                borderRadius: 6,
+                color: 'var(--coral)',
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
           <div className="search" style={{ margin: 0 }}>
             <IconSearch size={13} />
             <input
@@ -342,11 +359,11 @@ export function AddFoodModal({ onClose, onAdd }: AddFoodModalProps) {
           </button>
           <button
             className="btn btn-primary"
-            disabled={!selected || !referenceAmount}
+            disabled={!selected || !referenceAmount || isSubmitting}
             onClick={handleAdd}
-            style={{ opacity: selected && referenceAmount ? 1 : 0.45 }}
+            style={{ opacity: selected && referenceAmount && !isSubmitting ? 1 : 0.45 }}
           >
-            <IconPlus size={13} /> Adicionar
+            <IconPlus size={13} /> {isSubmitting ? 'Adicionando...' : 'Adicionar'}
           </button>
         </div>
       </div>
