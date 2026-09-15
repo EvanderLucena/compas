@@ -26,6 +26,8 @@ import {
   IconTrash,
 } from '../components/icons';
 import { useValidation } from '../hooks/useValidation';
+import { useToastStore } from '../stores/toastStore';
+import { resolveMutationErrorMessage } from '../stores/patientStore';
 
 function MiniMacro({
   label,
@@ -246,22 +248,36 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
 
   const handleSave = () => {
     if (!validateAll()) return;
-    updateFood.mutate({
-      id: food.id,
-      data: {
-        name: form.name.trim(),
-        category,
-        unit,
-        referenceAmount: parseNumberInput(form.referenceAmount),
-        kcal: parseNumberInput(form.kcal),
-        prot: parseNumberInput(form.prot),
-        carb: parseNumberInput(form.carb),
-        fat: parseNumberInput(form.fat),
-        fiber: parseNumberInput(form.fiber),
-        prep: prep || null,
+    updateFood.mutate(
+      {
+        id: food.id,
+        data: {
+          name: form.name.trim(),
+          category,
+          unit,
+          referenceAmount: parseNumberInput(form.referenceAmount),
+          kcal: parseNumberInput(form.kcal) ?? 0,
+          prot: parseNumberInput(form.prot) ?? 0,
+          carb: parseNumberInput(form.carb) ?? 0,
+          fat: parseNumberInput(form.fat) ?? 0,
+          fiber: parseNumberInput(form.fiber),
+          prep: prep || null,
+        },
       },
-    });
-    onClose();
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Alimento atualizado com sucesso');
+          onClose();
+        },
+        onError: (error) => {
+          useToastStore
+            .getState()
+            .showError(
+              resolveMutationErrorMessage(error, 'Erro ao atualizar alimento — tente novamente'),
+            );
+        },
+      },
+    );
   };
 
   const fieldStyle = (hasError: boolean, mono = false): React.CSSProperties => ({
@@ -476,10 +492,13 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
           <button
             className="btn btn-primary"
             onClick={handleSave}
-            disabled={!form.name.trim() || !form.referenceAmount.trim()}
-            style={{ opacity: form.name.trim() && form.referenceAmount.trim() ? 1 : 0.45 }}
+            disabled={!form.name.trim() || !form.referenceAmount.trim() || updateFood.isPending}
+            style={{
+              opacity:
+                form.name.trim() && form.referenceAmount.trim() && !updateFood.isPending ? 1 : 0.45,
+            }}
           >
-            <IconCheck size={13} /> Salvar
+            <IconCheck size={13} /> {updateFood.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </div>
@@ -860,20 +879,34 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
 
   const handleCreate = () => {
     if (!validateAll()) return;
-    createFood.mutate({
-      name: form.name.trim(),
-      category,
-      unit,
-      referenceAmount: parseNumberInput(form.referenceAmount),
-      kcal: parseNumberInput(form.kcal),
-      prot: parseNumberInput(form.prot),
-      carb: parseNumberInput(form.carb),
-      fat: parseNumberInput(form.fat),
-      fiber: parseNumberInput(form.fiber),
-      prep: prep || null,
-      portionLabel: portionLabel || null,
-    });
-    onClose();
+    createFood.mutate(
+      {
+        name: form.name.trim(),
+        category,
+        unit,
+        referenceAmount: parseNumberInput(form.referenceAmount),
+        kcal: parseNumberInput(form.kcal) ?? 0,
+        prot: parseNumberInput(form.prot) ?? 0,
+        carb: parseNumberInput(form.carb) ?? 0,
+        fat: parseNumberInput(form.fat) ?? 0,
+        fiber: parseNumberInput(form.fiber),
+        prep: prep || null,
+        portionLabel: portionLabel || null,
+      },
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Alimento cadastrado com sucesso');
+          onClose();
+        },
+        onError: (error) => {
+          useToastStore
+            .getState()
+            .showError(
+              resolveMutationErrorMessage(error, 'Erro ao cadastrar alimento — tente novamente'),
+            );
+        },
+      },
+    );
   };
 
   const fieldStyle = (hasError: boolean, mono = false): React.CSSProperties => ({
@@ -1113,10 +1146,13 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
             data-testid="newfood-submit"
             className="btn btn-primary"
             onClick={handleCreate}
-            disabled={!form.name.trim() || !form.referenceAmount.trim()}
-            style={{ opacity: form.name.trim() && form.referenceAmount.trim() ? 1 : 0.45 }}
+            disabled={!form.name.trim() || !form.referenceAmount.trim() || createFood.isPending}
+            style={{
+              opacity:
+                form.name.trim() && form.referenceAmount.trim() && !createFood.isPending ? 1 : 0.45,
+            }}
           >
-            <IconCheck size={13} /> Salvar no catálogo
+            <IconCheck size={13} /> {createFood.isPending ? 'Salvando...' : 'Salvar no catálogo'}
           </button>
         </div>
       </div>

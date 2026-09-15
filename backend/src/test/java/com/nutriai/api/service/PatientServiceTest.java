@@ -41,6 +41,9 @@ class PatientServiceTest {
     @Mock
     private EpisodeHistoryEventRepository historyEventRepository;
 
+    @Mock
+    private PhoneNormalizationService phoneNormalizationService;
+
     @InjectMocks
     private PatientService patientService;
 
@@ -327,5 +330,64 @@ class PatientServiceTest {
                 e.getEventType().equals("EPISODE_OPENED") &&
                         e.getTitle().equals("Período iniciado") &&
                         "{\"objective\":\"EMAGRECIMENTO\"}".equals(e.getMetadataJson())));
+    }
+
+    @Test
+    void createPatient_normalizesPhoneNumber() {
+        CreatePatientRequest req = new CreatePatientRequest(
+                "Carlos Silva",
+                null,
+                "M",
+                null,
+                "(11) 99999-8877",
+                "HIPERTROFIA",
+                null,
+                true
+        );
+
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(phoneNormalizationService.normalize("(11) 99999-8877")).thenReturn(Optional.of("11999998877"));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> {
+            Patient p = inv.getArgument(0);
+            p.setId(UUID.randomUUID());
+            return p;
+        });
+        when(episodeRepository.save(any(Episode.class))).thenAnswer(inv -> {
+            Episode ep = inv.getArgument(0);
+            ep.setId(UUID.randomUUID());
+            return ep;
+        });
+
+        PatientResponse resp = patientService.createPatient(nutritionistId, req);
+
+        assertNotNull(resp);
+        verify(patientRepository).save(argThat(p -> "11999998877".equals(p.getWhatsapp())));
+    }
+
+    @Test
+    void updatePatient_normalizesPhoneNumber() {
+        UpdatePatientRequest req = new UpdatePatientRequest(
+                null,
+                null,
+                null,
+                null,
+                "+55 11 98888-7766",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        when(patientRepository.findByIdAndNutritionistId(samplePatient.getId(), nutritionistId))
+                .thenReturn(Optional.of(samplePatient));
+        when(phoneNormalizationService.normalize("+55 11 98888-7766")).thenReturn(Optional.of("11988887766"));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PatientResponse resp = patientService.updatePatient(samplePatient.getId(), nutritionistId, req);
+
+        assertNotNull(resp);
+        assertEquals("11988887766", resp.whatsapp());
     }
 }

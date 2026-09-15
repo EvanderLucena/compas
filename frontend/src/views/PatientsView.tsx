@@ -6,7 +6,9 @@ import {
   useCreatePatient,
   useDeactivatePatient,
   useReactivatePatient,
+  resolveMutationErrorMessage,
 } from '../stores/patientStore';
+import { useToastStore } from '../stores/toastStore';
 import { IconSearch, IconPlus, IconFilter, IconArchive } from '../components/icons';
 import {
   PatientTable,
@@ -412,10 +414,20 @@ export function PatientsView() {
       <NewPatientModal
         open={newPatientModalOpen}
         onClose={() => setNewPatientModalOpen(false)}
+        isSubmitting={createMutation.isPending}
         onSave={(data) => {
           createMutation.mutate(data, {
-            onSuccess: () => setNewPatientModalOpen(false),
-            onError: () => {},
+            onSuccess: () => {
+              useToastStore.getState().showSuccess('Paciente cadastrado com sucesso');
+              setNewPatientModalOpen(false);
+            },
+            onError: (err) => {
+              useToastStore
+                .getState()
+                .showError(
+                  resolveMutationErrorMessage(err, 'Erro ao cadastrar paciente — tente novamente'),
+                );
+            },
           });
         }}
       />

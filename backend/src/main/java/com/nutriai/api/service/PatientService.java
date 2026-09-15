@@ -37,17 +37,20 @@ public class PatientService {
     private final NutritionistRepository nutritionistRepository;
     private final MealPlanService mealPlanService;
     private final EpisodeHistoryEventRepository historyEventRepository;
+    private final PhoneNormalizationService phoneNormalizationService;
 
     public PatientService(PatientRepository patientRepository,
                            EpisodeRepository episodeRepository,
                            NutritionistRepository nutritionistRepository,
                            MealPlanService mealPlanService,
-                           EpisodeHistoryEventRepository historyEventRepository) {
+                           EpisodeHistoryEventRepository historyEventRepository,
+                           PhoneNormalizationService phoneNormalizationService) {
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
         this.nutritionistRepository = nutritionistRepository;
         this.mealPlanService = mealPlanService;
         this.historyEventRepository = historyEventRepository;
+        this.phoneNormalizationService = phoneNormalizationService;
     }
 
     @Transactional
@@ -65,7 +68,7 @@ public class PatientService {
                 .age(computeAge(req.birthDate()))
                 .sex(req.sex())
                 .heightCm(req.heightCm())
-                .whatsapp(req.whatsapp())
+                .whatsapp(normalizePhone(req.whatsapp()))
                 .objective(objective)
                 .weight(req.weight())
                 .build();
@@ -141,7 +144,7 @@ public class PatientService {
         }
         if (req.sex() != null) patient.setSex(req.sex());
         if (req.heightCm() != null) patient.setHeightCm(req.heightCm());
-        if (req.whatsapp() != null) patient.setWhatsapp(req.whatsapp());
+        if (req.whatsapp() != null) patient.setWhatsapp(normalizePhone(req.whatsapp()));
         if (req.objective() != null) patient.setObjective(parseObjective(req.objective()));
         if (req.status() != null) patient.setStatus(parseStatus(req.status()));
         if (req.weight() != null) patient.setWeight(req.weight());
@@ -274,5 +277,12 @@ public class PatientService {
                     HttpStatus.BAD_REQUEST,
                     "Status inválido. Valores permitidos: " + Arrays.toString(PatientStatus.values()));
         }
+    }
+
+    private String normalizePhone(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return phoneNormalizationService.normalize(raw).orElse(raw);
     }
 }

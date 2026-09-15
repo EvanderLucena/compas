@@ -101,7 +101,7 @@ export function OnboardingView() {
   const goHome = async () => {
     try {
       if (patients.length > 0) {
-        await Promise.all(
+        await Promise.allSettled(
           patients.map((patient) =>
             createPatient({
               name: patient.name,
@@ -112,21 +112,45 @@ export function OnboardingView() {
           ),
         );
       }
-      await completeOnboarding();
-      // Update user in store
-      const user = await getCurrentUser();
-      useAuthStore.setState({
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role as AuthUser['role'],
-          onboardingCompleted: true,
-        },
-      });
+      try {
+        await completeOnboarding();
+      } catch {
+        // Non-blocking: proceed even if server completeOnboarding fails
+      }
+
+      try {
+        const user = await getCurrentUser();
+        useAuthStore.setState({
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role as AuthUser['role'],
+            onboardingCompleted: true,
+          },
+        });
+      } catch {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          useAuthStore.setState({
+            user: {
+              ...currentUser,
+              onboardingCompleted: true,
+            },
+          });
+        }
+      }
       navigate('/home');
     } catch {
-      // Even if onboarding API fails, still navigate home
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser) {
+        useAuthStore.setState({
+          user: {
+            ...currentUser,
+            onboardingCompleted: true,
+          },
+        });
+      }
       navigate('/home');
     }
   };
