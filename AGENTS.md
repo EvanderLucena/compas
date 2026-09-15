@@ -101,8 +101,8 @@ A configuracao do reviewer (`.github/workflows/ai-review.yml` + `.github/scripts
 
 | Var | Valor | Por que esse valor |
 |---|---|---|
-| `AI_REVIEW_PRIMARY_MODEL` | `glm-5.1:cloud` | Tag canonica do GLM-5.1 no Ollama Cloud (verificada em ollama.com/library/glm-5.1). Usar `glm-5.1` sem `:cloud` causa timeouts intermitentes. |
-| `AI_REVIEW_FALLBACK_MODEL` | `gpt-oss:120b` | Modelo **distinto** do primary. Alucina mais que o glm, mas o segundo passe (`self_critique_findings`) filtra alucinacoes. |
+| `AI_REVIEW_PRIMARY_MODEL` | `deepseek-v4.1-flash:cloud` | Modelo ultra-rápido no Ollama Cloud (~1s vs 30-180s do glm), menor custo de tokens e excelente capacidade analítica para code review. |
+| `AI_REVIEW_FALLBACK_MODEL` | `gpt-oss:120b` | Modelo **distinto** do primary. Alucina mais, mas o segundo passe (`self_critique_findings`) filtra alucinacoes. |
 | `AI_REVIEW_CHUNK_LINES` | `1500` | Chunks maiores (>= 4000) estouram `PROVIDER_MAX_TIME` no glm-5.1. |
 | `AI_REVIEW_MAX_CHUNKS` | `8` | Acomoda PRs ate ~12k linhas com chunks de 1500. |
 | `AI_REVIEW_MAX_PARALLEL` | `2` | Tier Pro do Ollama Cloud permite **3 modelos concorrentes**. Mantemos em 2 para deixar 1 slot livre ao usuario (OpenCode/CLI). Subir para 3 funciona se o usuario nao estiver usando Ollama em paralelo, mas e' arriscado. NUNCA passar de 3. |
@@ -136,7 +136,7 @@ Casos cobertos por testes em `.github/scripts/test-ai-review-filter.sh` — rode
 **Quando dispara.** Apenas quando o filter heuristico deixa pelo menos 1 finding `CRITICAL` ou `HIGH`. Se sobrou so MEDIUM/LOW, pula (nao vale a chamada extra).
 
 **Como funciona.**
-1. Monta um request ao primary model (`glm-5.1:cloud`) com:
+1. Monta um request ao primary model (`deepseek-v4.1-flash:cloud`) com:
    - System prompt strict KEEP/DROP, regra "quando em duvida, DROP"
    - User content: o **diff completo** (nao chunked) + lista dos findings restantes
 2. Modelo retorna apenas as linhas a manter, no formato exato.
