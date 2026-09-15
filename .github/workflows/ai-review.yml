@@ -34,17 +34,16 @@ jobs:
     env:
       # CONFIG TRAVADA — ver banner no topo do arquivo. Nao mexa sem instrucao explicita.
       AI_REVIEW_PRIMARY_PROVIDER: ollama
-      # Modelo correto e' glm-5.1:cloud (verificado em ollama.com/library/glm-5.1).
-      # "glm-5.1" puro sem :cloud nao e' tag publica e provoca timeouts intermitentes.
-      AI_REVIEW_PRIMARY_MODEL: glm-5.1:cloud
+      # deepseek-v4.1-flash:cloud no Ollama Cloud e ultra-rapido (~1s vs 30-180s) e muito mais economico em tokens.
+      AI_REVIEW_PRIMARY_MODEL: deepseek-v4.1-flash:cloud
       AI_REVIEW_FALLBACK_PROVIDER: ollama
-      # Fallback distinto do primary; gpt-oss:120b alucina mais que glm, mas o
+      # Fallback distinto do primary; gpt-oss:120b alucina mais, mas o
       # self_critique_findings filtra alucinacoes na maioria dos casos.
       AI_REVIEW_FALLBACK_MODEL: gpt-oss:120b
-      # Chunks pequenos cabem no timeout do glm-5.1; nao subir para 4000 (timeouts).
+      # Chunks pequenos cabem no timeout; nao subir para 4000 (timeouts).
       AI_REVIEW_CHUNK_LINES: 1500
       AI_REVIEW_MAX_CHUNKS: 8
-      # Tier Pro do Ollama Cloud permite 3 modelos concorrentes. Deixamos em 2 para
+      # Tier Pro do Ollama Cloud permite 3 modelos concorrentes. Mantemos em 2 para
       # liberar 1 slot ao usuario (OpenCode/CLI) sem disputar com o reviewer no CI.
       # Subir alem de 2 risca timeouts quando o usuario estiver usando o slot extra.
       AI_REVIEW_MAX_PARALLEL: 2
@@ -67,7 +66,7 @@ jobs:
         id: diff
         shell: bash
         run: |
-          git diff --no-color --unified="${AI_REVIEW_DIFF_CONTEXT}" origin/${{ github.base_ref }}...HEAD -- '*.java' '*.ts' '*.tsx' '*.css' '*.yml' '*.gradle' '*.sql' '*.json' '*.html' > /tmp/pr_diff.txt
+          git diff --no-color --unified="${AI_REVIEW_DIFF_CONTEXT}" origin/${{ github.base_ref }}...HEAD -- '*.java' '*.ts' '*.tsx' '*.css' '*.yml' '*.gradle' '*.sql' '*.json' '*.html' ':!package-lock.json' > /tmp/pr_diff.txt
           echo "lines=$(wc -l < /tmp/pr_diff.txt | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
 
       - name: Build PR file manifest

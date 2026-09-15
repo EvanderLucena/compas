@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-19)
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
-Status: Executing Phase 07
-Last activity: 2026-05-05
+Phase: 07.1
+Plan: 07.1-01 (Ciclo de vida dos modais e tratamento de erros de API)
+Status: Pronto para planejar/executar Fase 07.1
+Last activity: 2026-09-15
 
 Progress: ██████░░░░ 60% (6 of 10 phases)
 

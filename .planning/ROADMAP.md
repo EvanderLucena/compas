@@ -42,6 +42,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 05: Meal Plans & Food Catalog** - Complete meal plan editor with food catalog and macro calculation
 - [x] **Phase 06: Dashboard & Biometry** - Clinical dashboard, biometric recording, and evolution charts
 - [x] **Phase 07: WhatsApp Intelligence** - AI conversations via WhatsApp with meal extraction and timeline (completed 2026-05-05)
+- [ ] **Phase 07.1: Estabilização de CRUDs & Pente Fino (INSERTED)** - Correção de ciclo de vida de modais, normalização de telefone, loop do onboarding e validação de macros
+- [ ] **Phase 07.2: WhatsApp Inteligente & IA Multimodal (INSERTED)** - Número Central NutriAI, áudio com Whisper, visão de prato e Tool Calling
 - [ ] **Phase 08: Billing & Subscriptions** - Stripe checkout, subscription management, patient limit enforcement
 - [ ] **Phase 09: LGPD Compliance** - Consent collection, terms/privacy pages, data export and deletion
 - [ ] **Phase 10: CI/CD & Deployment** - Automated deployment pipeline to production VPS
@@ -193,6 +195,33 @@ Plans:
 - [x] 07-02-PLAN.md — LLM integration, meal extraction, response generation, and Evolution API
 - [x] 07-03-PLAN.md — Frontend wiring, API endpoints, timeline, activation UI, and E2E tests
 **UI hint**: yes
+
+### Phase 07.1: Estabilização de CRUDs & Pente Fino (INSERTED)
+**Goal**: Eliminar falhas silenciosas de cadastro, destravar o onboarding e blindar a persistência de dados clínicos
+**Depends on**: Phase 07
+**Success Criteria** (what must be TRUE):
+  1. Modais de criação e edição (Paciente, Alimento, Refeição) só fecham em caso de sucesso; erros de API mantêm os campos preenchidos e exibem a mensagem da API
+  2. Telefone do paciente é normalizado via PhoneNormalizationService ao ser salvo no banco
+  3. Onboarding não entra em loop infinito quando o cadastro de um paciente falha
+  4. Validações de macros no cadastro de alimentos no frontend batem com os requisitos @NotNull do backend
+  5. Constraint de duplicidade de nomes é relaxada para permitir homônimos
+**Plans**: 3 plans
+- [ ] 07.1-01-PLAN.md — Ciclo de vida dos modais e tratamento de erros de API
+- [ ] 07.1-02-PLAN.md — Normalização de WhatsApp e fix do onboarding
+- [ ] 07.1-03-PLAN.md — Alinhamento de macros de alimentos e constraint de homônimos
+
+### Phase 07.2: WhatsApp Inteligente & IA Multimodal (INSERTED)
+**Goal**: Transformar a IA do WhatsApp em um copiloto clínico empático com audição, visão e canal centralizado
+**Depends on**: Phase 07.1
+**Success Criteria** (what must be TRUE):
+  1. Pacientes conversam com a IA através do Número Central da plataforma (sem exigir chip do nutricionista)
+  2. Áudios enviados por pacientes são transcritos via Whisper e compreendidos pela IA
+  3. Fotos de pratos são analisadas por modelo de visão multimodal com estimativa de macros
+  4. Extração de refeição usa Tool Calling desacoplado da resposta conversacional
+**Plans**: 3 plans
+- [ ] 07.2-01-PLAN.md — Configuração e roteamento do Número Central NutriAI
+- [ ] 07.2-02-PLAN.md — Transcrição de áudio em tempo real com Whisper
+- [ ] 07.2-03-PLAN.md — Visão multimodal de pratos e Tool Calling
 
 ### Phase 08: Billing & Subscriptions
 **Goal**: Nutritionists can subscribe, pay, and have plan limits enforced
