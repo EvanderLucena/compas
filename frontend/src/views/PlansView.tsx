@@ -25,6 +25,7 @@ import {
   useDeleteExtra,
 } from '../stores/planStore';
 import { useToastStore } from '../stores/toastStore';
+import { resolveMutationErrorMessage } from '../stores/patientStore';
 
 function DailyMacro({
   label,
@@ -1070,12 +1071,27 @@ export function PlansView({ patientId }: PlansViewProps) {
         <AddFoodModal
           onClose={() => planUI.setAddFoodModalOpen(false)}
           onAdd={(data) => {
-            addFoodItem.mutate({
-              mealId: activeMeal.id,
-              optionId: activeOpt.id,
-              data: { foodId: data.foodId, referenceAmount: data.referenceAmount },
-            });
-            planUI.setAddFoodModalOpen(false);
+            if (!activeMeal || !activeOpt) return;
+            addFoodItem.mutate(
+              {
+                mealId: activeMeal.id,
+                optionId: activeOpt.id,
+                data: { foodId: data.foodId, referenceAmount: data.referenceAmount },
+              },
+              {
+                onSuccess: () => {
+                  useToastStore.getState().showSuccess('Alimento adicionado à refeição');
+                  planUI.setAddFoodModalOpen(false);
+                },
+                onError: (err) => {
+                  useToastStore
+                    .getState()
+                    .showError(
+                      resolveMutationErrorMessage(err, 'Erro ao adicionar alimento à refeição'),
+                    );
+                },
+              },
+            );
           }}
         />
       )}
@@ -1083,8 +1099,20 @@ export function PlansView({ patientId }: PlansViewProps) {
         <AddMealModal
           onClose={() => planUI.setAddMealModalOpen(false)}
           onAdd={(data) => {
-            addMealSlot.mutate({ label: data.label, time: data.time });
-            planUI.setAddMealModalOpen(false);
+            addMealSlot.mutate(
+              { label: data.label, time: data.time },
+              {
+                onSuccess: () => {
+                  useToastStore.getState().showSuccess('Refeição criada com sucesso');
+                  planUI.setAddMealModalOpen(false);
+                },
+                onError: (err) => {
+                  useToastStore
+                    .getState()
+                    .showError(resolveMutationErrorMessage(err, 'Erro ao criar refeição'));
+                },
+              },
+            );
           }}
         />
       )}

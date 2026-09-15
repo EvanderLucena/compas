@@ -22,18 +22,24 @@ function stripPhone(value: string): string {
 interface NewPatientModalProps {
   open: boolean;
   onClose: () => void;
+  isSubmitting?: boolean;
   onSave?: (data: {
     name: string;
     objective: ObjectiveOption;
     birthDate?: string;
-    sex?: string;
+    sex: 'F' | 'M';
     heightCm?: number;
     whatsapp?: string;
     terms: boolean;
   }) => void;
 }
 
-export function NewPatientModal({ open, onClose, onSave }: NewPatientModalProps) {
+export function NewPatientModal({
+  open,
+  onClose,
+  onSave,
+  isSubmitting = false,
+}: NewPatientModalProps) {
   const {
     values: form,
     errors,
@@ -98,7 +104,7 @@ export function NewPatientModal({ open, onClose, onSave }: NewPatientModalProps)
     if (!terms) return;
     if (!validateAll()) return;
     onSave?.({
-      name: form.name,
+      name: form.name.trim(),
       objective: form.objective as ObjectiveOption,
       ...(form.birthDate ? { birthDate: form.birthDate } : {}),
       sex,
@@ -106,7 +112,6 @@ export function NewPatientModal({ open, onClose, onSave }: NewPatientModalProps)
       ...(stripPhone(form.whatsapp) ? { whatsapp: stripPhone(form.whatsapp) } : {}),
       terms,
     });
-    onClose();
   };
 
   const handleClose = () => {
@@ -281,16 +286,16 @@ export function NewPatientModal({ open, onClose, onSave }: NewPatientModalProps)
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-        <Button variant="ghost" onClick={handleClose}>
+        <Button variant="ghost" onClick={handleClose} disabled={isSubmitting}>
           Cancelar
         </Button>
         <Button
           variant="primary"
           data-testid="newpatient-submit"
-          disabled={!form.name.trim() || !form.objective || !terms}
+          disabled={!form.name.trim() || !form.objective || !terms || isSubmitting}
           onClick={handleSubmit}
         >
-          Cadastrar paciente
+          {isSubmitting ? 'Salvando...' : 'Cadastrar paciente'}
         </Button>
       </div>
     </Modal>

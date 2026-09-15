@@ -26,6 +26,8 @@ import {
   IconTrash,
 } from '../components/icons';
 import { useValidation } from '../hooks/useValidation';
+import { useToastStore } from '../stores/toastStore';
+import { resolveMutationErrorMessage } from '../stores/patientStore';
 
 function MiniMacro({
   label,
@@ -174,11 +176,11 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
     {
       name: food.name,
       referenceAmount: String(food.referenceAmount),
-      kcal: String(food.kcal),
-      prot: String(food.prot),
-      carb: String(food.carb),
-      fat: String(food.fat),
-      fiber: String(food.fiber),
+      kcal: String(food.kcal ?? 0),
+      prot: String(food.prot ?? 0),
+      carb: String(food.carb ?? 0),
+      fat: String(food.fat ?? 0),
+      fiber: String(food.fiber ?? ''),
     } as Record<string, string>,
     {
       name: {
@@ -197,8 +199,9 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       kcal: {
+        required: true,
+        requiredMessage: 'Calorias são obrigatórias.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -206,8 +209,9 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       prot: {
+        required: true,
+        requiredMessage: 'Proteína é obrigatória.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -215,8 +219,9 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       carb: {
+        required: true,
+        requiredMessage: 'Carboidrato é obrigatório.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -224,8 +229,9 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         },
       },
       fat: {
+        required: true,
+        requiredMessage: 'Gordura é obrigatória.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -246,22 +252,41 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
 
   const handleSave = () => {
     if (!validateAll()) return;
-    updateFood.mutate({
-      id: food.id,
-      data: {
-        name: form.name.trim(),
-        category,
-        unit,
-        referenceAmount: parseNumberInput(form.referenceAmount),
-        kcal: parseNumberInput(form.kcal),
-        prot: parseNumberInput(form.prot),
-        carb: parseNumberInput(form.carb),
-        fat: parseNumberInput(form.fat),
-        fiber: parseNumberInput(form.fiber),
-        prep: prep || null,
+    const kcal = parseNumberInput(form.kcal);
+    const prot = parseNumberInput(form.prot);
+    const carb = parseNumberInput(form.carb);
+    const fat = parseNumberInput(form.fat);
+    if (kcal == null || prot == null || carb == null || fat == null) return;
+    updateFood.mutate(
+      {
+        id: food.id,
+        data: {
+          name: form.name.trim(),
+          category,
+          unit,
+          referenceAmount: parseNumberInput(form.referenceAmount),
+          kcal,
+          prot,
+          carb,
+          fat,
+          fiber: parseNumberInput(form.fiber),
+          prep: prep || null,
+        },
       },
-    });
-    onClose();
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Alimento atualizado com sucesso');
+          onClose();
+        },
+        onError: (error) => {
+          useToastStore
+            .getState()
+            .showError(
+              resolveMutationErrorMessage(error, 'Erro ao atualizar alimento — tente novamente'),
+            );
+        },
+      },
+    );
   };
 
   const fieldStyle = (hasError: boolean, mono = false): React.CSSProperties => ({
@@ -476,10 +501,13 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
           <button
             className="btn btn-primary"
             onClick={handleSave}
-            disabled={!form.name.trim() || !form.referenceAmount.trim()}
-            style={{ opacity: form.name.trim() && form.referenceAmount.trim() ? 1 : 0.45 }}
+            disabled={!form.name.trim() || !form.referenceAmount.trim() || updateFood.isPending}
+            style={{
+              opacity:
+                form.name.trim() && form.referenceAmount.trim() && !updateFood.isPending ? 1 : 0.45,
+            }}
           >
-            <IconCheck size={13} /> Salvar
+            <IconCheck size={13} /> {updateFood.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </div>
@@ -786,11 +814,11 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
   } = useValidation(
     {
       name: '',
-      referenceAmount: '',
-      kcal: '',
-      prot: '',
-      carb: '',
-      fat: '',
+      referenceAmount: '100',
+      kcal: '0',
+      prot: '0',
+      carb: '0',
+      fat: '0',
       fiber: '',
     } as Record<string, string>,
     {
@@ -804,15 +832,15 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         required: true,
         requiredMessage: 'Quantidade de referência é obrigatória.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (!n || n <= 0) return 'Referência deve ser maior que zero.';
           return undefined;
         },
       },
       kcal: {
+        required: true,
+        requiredMessage: 'Calorias são obrigatórias.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -820,8 +848,9 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       prot: {
+        required: true,
+        requiredMessage: 'Proteína é obrigatória.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -829,8 +858,9 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       carb: {
+        required: true,
+        requiredMessage: 'Carboidrato é obrigatório.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -838,8 +868,9 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         },
       },
       fat: {
+        required: true,
+        requiredMessage: 'Gordura é obrigatória.',
         custom: (v) => {
-          if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
           if (n == null || !Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
@@ -860,20 +891,39 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
 
   const handleCreate = () => {
     if (!validateAll()) return;
-    createFood.mutate({
-      name: form.name.trim(),
-      category,
-      unit,
-      referenceAmount: parseNumberInput(form.referenceAmount),
-      kcal: parseNumberInput(form.kcal),
-      prot: parseNumberInput(form.prot),
-      carb: parseNumberInput(form.carb),
-      fat: parseNumberInput(form.fat),
-      fiber: parseNumberInput(form.fiber),
-      prep: prep || null,
-      portionLabel: portionLabel || null,
-    });
-    onClose();
+    const kcal = parseNumberInput(form.kcal);
+    const prot = parseNumberInput(form.prot);
+    const carb = parseNumberInput(form.carb);
+    const fat = parseNumberInput(form.fat);
+    if (kcal == null || prot == null || carb == null || fat == null) return;
+    createFood.mutate(
+      {
+        name: form.name.trim(),
+        category,
+        unit,
+        referenceAmount: parseNumberInput(form.referenceAmount),
+        kcal,
+        prot,
+        carb,
+        fat,
+        fiber: parseNumberInput(form.fiber),
+        prep: prep || null,
+        portionLabel: portionLabel || null,
+      },
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Alimento cadastrado com sucesso');
+          onClose();
+        },
+        onError: (error) => {
+          useToastStore
+            .getState()
+            .showError(
+              resolveMutationErrorMessage(error, 'Erro ao cadastrar alimento — tente novamente'),
+            );
+        },
+      },
+    );
   };
 
   const fieldStyle = (hasError: boolean, mono = false): React.CSSProperties => ({
@@ -1113,10 +1163,13 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
             data-testid="newfood-submit"
             className="btn btn-primary"
             onClick={handleCreate}
-            disabled={!form.name.trim() || !form.referenceAmount.trim()}
-            style={{ opacity: form.name.trim() && form.referenceAmount.trim() ? 1 : 0.45 }}
+            disabled={!form.name.trim() || !form.referenceAmount.trim() || createFood.isPending}
+            style={{
+              opacity:
+                form.name.trim() && form.referenceAmount.trim() && !createFood.isPending ? 1 : 0.45,
+            }}
           >
-            <IconCheck size={13} /> Salvar no catálogo
+            <IconCheck size={13} /> {createFood.isPending ? 'Salvando...' : 'Salvar no catálogo'}
           </button>
         </div>
       </div>

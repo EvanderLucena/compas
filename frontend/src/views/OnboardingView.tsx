@@ -4,6 +4,8 @@ import { completeOnboarding, getCurrentUser } from '../api/auth';
 import { createPatient } from '../api/patients';
 import type { AuthUser } from '../types';
 import { useNavigate } from 'react-router';
+import { useToastStore } from '../stores/toastStore';
+import { resolveMutationErrorMessage } from '../stores/patientStore';
 
 const TOTAL_STEPS = 6;
 const STEP_LABELS = [
@@ -96,12 +98,14 @@ export function OnboardingView() {
   const [payment, setPayment] = useState({ name: '', cpf: '', card: '', expiry: '', cvv: '' });
   const [patients, setPatients] = useState<OnboardPatient[]>([]);
   const [patientForm, setPatientForm] = useState({ name: '', whatsapp: '' });
+  const [isFinishing, setIsFinishing] = useState(false);
   const navigate = useNavigate();
 
   const goHome = async () => {
+    setIsFinishing(true);
     try {
       if (patients.length > 0) {
-        await Promise.all(
+        const results = await Promise.allSettled(
           patients.map((patient) =>
             createPatient({
               name: patient.name,
@@ -111,9 +115,16 @@ export function OnboardingView() {
             }),
           ),
         );
+        const failures = results.filter((r) => r.status === 'rejected');
+        if (failures.length > 0) {
+          useToastStore
+            .getState()
+            .showError(
+              `${failures.length} paciente(s) não puderam ser cadastrados, mas você pode adicioná-los pelo painel.`,
+            );
+        }
       }
       await completeOnboarding();
-      // Update user in store
       const user = await getCurrentUser();
       useAuthStore.setState({
         user: {
@@ -125,9 +136,14 @@ export function OnboardingView() {
         },
       });
       navigate('/home');
-    } catch {
-      // Even if onboarding API fails, still navigate home
-      navigate('/home');
+    } catch (err) {
+      useToastStore
+        .getState()
+        .showError(
+          resolveMutationErrorMessage(err, 'Erro ao concluir onboarding — tente novamente'),
+        );
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -793,8 +809,8 @@ export function OnboardingView() {
                 </span>
               </div>
             </div>
-            <button className="btn btn-primary" onClick={goHome}>
-              Ir pro painel →
+            <button className="btn btn-primary" onClick={goHome} disabled={isFinishing}>
+              {isFinishing ? 'Concluindo...' : 'Ir pro painel →'}
             </button>
           </div>
         )}
