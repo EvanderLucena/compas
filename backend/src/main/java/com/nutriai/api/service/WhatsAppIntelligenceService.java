@@ -164,7 +164,11 @@ public class WhatsAppIntelligenceService {
         String targetPhone;
         if (centralNumber != null && !centralNumber.isBlank()) {
             String normalizedCentral = centralNumber.replaceAll("\\D", "");
-            targetPhone = normalizedCentral.startsWith("55") ? normalizedCentral : "55" + normalizedCentral;
+            if (normalizedCentral.length() <= 11) {
+                targetPhone = "55" + normalizedCentral;
+            } else {
+                targetPhone = normalizedCentral;
+            }
         } else {
             targetPhone = "55" + phone;
         }

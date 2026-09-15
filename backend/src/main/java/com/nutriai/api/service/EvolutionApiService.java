@@ -236,6 +236,14 @@ public class EvolutionApiService {
             return Optional.empty();
         }
         if (mediaUrl.startsWith("data:")) {
+            int commaIndex = mediaUrl.indexOf(',');
+            if (commaIndex != -1) {
+                String base64Data = mediaUrl.substring(commaIndex + 1);
+                if (base64Data.length() > MAX_MEDIA_SIZE_BYTES * 4 / 3 + 1024) {
+                    log.warn("Data URI media exceeds maximum size limit ({} chars)", base64Data.length());
+                    return Optional.empty();
+                }
+            }
             return Optional.of(mediaUrl);
         }
         return downloadMedia(mediaUrl).map(bytes -> {
