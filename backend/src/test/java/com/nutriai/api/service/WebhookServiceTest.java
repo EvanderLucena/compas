@@ -1,8 +1,10 @@
 package com.nutriai.api.service;
 
 import com.nutriai.api.dto.whatsapp.WhatsAppWebhookDTO;
+import com.nutriai.api.model.Episode;
 import com.nutriai.api.model.Patient;
 import com.nutriai.api.model.WhatsAppMessage;
+import com.nutriai.api.repository.EpisodeRepository;
 import com.nutriai.api.repository.PatientRepository;
 import com.nutriai.api.repository.WhatsAppMessageRepository;
 
@@ -13,21 +15,29 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WebhookServiceTest {
 
     @Mock WhatsAppMessageRepository whatsAppMessageRepository;
     @Mock PatientRepository patientRepository;
+    @Mock EpisodeRepository episodeRepository;
     @Mock PhoneNormalizationService phoneNormalizationService;
     @Mock MessageQueueService messageQueueService;
+    @Mock EvolutionApiService evolutionApiService;
 
     @InjectMocks
     WebhookService webhookService;
@@ -72,13 +82,39 @@ class WebhookServiceTest {
         when(whatsAppMessageRepository.findByMessageId("msg-456")).thenReturn(Optional.empty());
         when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
             WhatsAppMessage m = i.getArgument(0);
-            if (m.getId() == null) m.setId(UUID.randomUUID());
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
             return m;
         });
 
         Optional<?> result = webhookService.processIncoming(dto);
 
         assertTrue(result.isPresent());
+        verify(evolutionApiService).sendMessage(eq("118888776655"), anyString());
+        verify(messageQueueService, never()).enqueue(any());
+    }
+
+    @Test
+    void processIncoming_unknownPhone_alreadyNotifiedRecently_debouncesNotice() {
+        WhatsAppWebhookDTO dto = createTextWebhook("55118888776655", "msg-456-dup", "Oi novamente");
+        when(phoneNormalizationService.normalize("55118888776655")).thenReturn(Optional.of("118888776655"));
+        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("118888776655")).thenReturn(List.of());
+        when(whatsAppMessageRepository.findByMessageId("msg-456-dup")).thenReturn(Optional.empty());
+        when(whatsAppMessageRepository.existsBySenderPhoneNormalizedAndPatientIdIsNullAndCreatedAtAfter(
+                eq("118888776655"), any(LocalDateTime.class))).thenReturn(true);
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
+            WhatsAppMessage m = i.getArgument(0);
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
+            return m;
+        });
+
+        Optional<?> result = webhookService.processIncoming(dto);
+
+        assertTrue(result.isPresent());
+        verify(evolutionApiService, never()).sendMessage(anyString(), anyString());
         verify(messageQueueService, never()).enqueue(any());
     }
 
@@ -99,12 +135,16 @@ class WebhookServiceTest {
     void processIncoming_audioMessage_savesWithNullContentAndMediaUrl() {
         WhatsAppWebhookDTO dto = createAudioWebhook("55119999887766", "msg-audio", "https://media.url/audio.ogg");
         when(phoneNormalizationService.normalize("55119999887766")).thenReturn(Optional.of("119999887766"));
-        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766")).thenReturn(List.of(nutritionistId));
-        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId)).thenReturn(Optional.of(patient));
+        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766"))
+                .thenReturn(List.of(nutritionistId));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId))
+                .thenReturn(Optional.of(patient));
         when(whatsAppMessageRepository.findByMessageId("msg-audio")).thenReturn(Optional.empty());
         when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
             WhatsAppMessage m = i.getArgument(0);
-            if (m.getId() == null) m.setId(UUID.randomUUID());
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
             return m;
         });
 
@@ -116,14 +156,19 @@ class WebhookServiceTest {
 
     @Test
     void processIncoming_imageMessageWithCaption_savesContentAndMediaUrl() {
-        WhatsAppWebhookDTO dto = createImageWebhook("55119999887766", "msg-img", "https://media.url/img.jpg", "Almoco: arroz e feijao");
+        WhatsAppWebhookDTO dto = createImageWebhook(
+                "55119999887766", "msg-img", "https://media.url/img.jpg", "Almoco: arroz e feijao");
         when(phoneNormalizationService.normalize("55119999887766")).thenReturn(Optional.of("119999887766"));
-        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766")).thenReturn(List.of(nutritionistId));
-        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId)).thenReturn(Optional.of(patient));
+        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766"))
+                .thenReturn(List.of(nutritionistId));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId))
+                .thenReturn(Optional.of(patient));
         when(whatsAppMessageRepository.findByMessageId("msg-img")).thenReturn(Optional.empty());
         when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
             WhatsAppMessage m = i.getArgument(0);
-            if (m.getId() == null) m.setId(UUID.randomUUID());
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
             return m;
         });
 
@@ -139,10 +184,16 @@ class WebhookServiceTest {
         Patient otherPatient = new Patient();
         otherPatient.setId(UUID.randomUUID());
         otherPatient.setNutritionistId(UUID.randomUUID());
+        patient.setActive(false);
+        otherPatient.setActive(false);
 
         when(phoneNormalizationService.normalize("55119999887766")).thenReturn(Optional.of("119999887766"));
         when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766"))
                 .thenReturn(List.of(nutritionistId, otherPatient.getNutritionistId()));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId))
+                .thenReturn(Optional.of(patient));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", otherPatient.getNutritionistId()))
+                .thenReturn(Optional.of(otherPatient));
         when(whatsAppMessageRepository.findByMessageId("msg-amb")).thenReturn(Optional.empty());
         when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
             WhatsAppMessage m = i.getArgument(0);
@@ -156,6 +207,46 @@ class WebhookServiceTest {
 
         assertTrue(result.isPresent());
         verify(messageQueueService, never()).enqueue(any());
+    }
+
+    @Test
+    void processIncoming_ambiguousPhone_resolvesToActiveEpisode() {
+        WhatsAppWebhookDTO dto = createTextWebhook("55119999887766", "msg-amb-active", "Oi");
+        Patient otherPatient = new Patient();
+        otherPatient.setId(UUID.randomUUID());
+        otherPatient.setNutritionistId(UUID.randomUUID());
+        otherPatient.setActive(false);
+
+        patient.setActive(true);
+        Episode episode = Episode.builder()
+                .id(UUID.randomUUID())
+                .patientId(patient.getId())
+                .nutritionistId(nutritionistId)
+                .startDate(LocalDateTime.now())
+                .build();
+
+        when(phoneNormalizationService.normalize("55119999887766")).thenReturn(Optional.of("119999887766"));
+        when(patientRepository.findDistinctNutritionistIdsByWhatsapp("119999887766"))
+                .thenReturn(List.of(nutritionistId, otherPatient.getNutritionistId()));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", nutritionistId))
+                .thenReturn(Optional.of(patient));
+        when(patientRepository.findByWhatsappAndNutritionistId("119999887766", otherPatient.getNutritionistId()))
+                .thenReturn(Optional.of(otherPatient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patient.getId(), nutritionistId)).thenReturn(Optional.of(episode));
+        when(whatsAppMessageRepository.findByMessageId("msg-amb-active")).thenReturn(Optional.empty());
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> {
+            WhatsAppMessage m = i.getArgument(0);
+            if (m.getId() == null) {
+                m.setId(UUID.randomUUID());
+            }
+            return m;
+        });
+
+        Optional<?> result = webhookService.processIncoming(dto);
+
+        assertTrue(result.isPresent());
+        verify(messageQueueService).enqueue(any(UUID.class));
     }
 
     @Test

@@ -43,6 +43,11 @@ nutriai:
     api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
     api-key: ${EVOLUTION_API_KEY:changeme}
 
+  whatsapp:
+    central-number: ${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}
+    unknown-response-enabled: ${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_ENABLED:true}
+    unknown-response-template: ${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_TEMPLATE:Olá! Sou a assistente inteligente da NutriAI 🥗. Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\nPor favor, peça ao seu nutricionista para cadastrar seu número no painel NutriAI para que possamos começar a acompanhar seu plano alimentar!}
+
   webhook:
     # Evolution Go does not support HMAC signatures by default.
     # Security relies on message ID deduplication + phone matching.

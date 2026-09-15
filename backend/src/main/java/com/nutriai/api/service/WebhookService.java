@@ -2,15 +2,19 @@ package com.nutriai.api.service;
 
 import com.nutriai.api.dto.whatsapp.WebhookMessageDTO;
 import com.nutriai.api.dto.whatsapp.WhatsAppWebhookDTO;
+import com.nutriai.api.model.Episode;
 import com.nutriai.api.model.Patient;
 import com.nutriai.api.model.WhatsAppMessage;
+import com.nutriai.api.repository.EpisodeRepository;
 import com.nutriai.api.repository.PatientRepository;
 import com.nutriai.api.repository.WhatsAppMessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,18 +30,36 @@ public class WebhookService {
 
     private final WhatsAppMessageRepository whatsAppMessageRepository;
     private final PatientRepository patientRepository;
+    private final EpisodeRepository episodeRepository;
     private final PhoneNormalizationService phoneNormalizationService;
     private final MessageQueueService messageQueueService;
+    private final EvolutionApiService evolutionApiService;
+
+    @Value("${nutriai.whatsapp.unknown-response-enabled:true}")
+    private boolean unknownResponseEnabled = true;
+
+    @Value("${nutriai.whatsapp.unknown-response-template:Olá! Sou a assistente inteligente da NutriAI 🥗. "
+            + "Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\n"
+            + "Por favor, peça ao seu nutricionista para cadastrar seu número no painel NutriAI "
+            + "para que possamos começar a acompanhar seu plano alimentar!}")
+    private String unknownResponseTemplate = "Olá! Sou a assistente inteligente da NutriAI 🥗. "
+            + "Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\n"
+            + "Por favor, peça ao seu nutricionista para cadastrar seu número no painel NutriAI "
+            + "para que possamos começar a acompanhar seu plano alimentar!";
 
     public WebhookService(
             WhatsAppMessageRepository whatsAppMessageRepository,
             PatientRepository patientRepository,
+            EpisodeRepository episodeRepository,
             PhoneNormalizationService phoneNormalizationService,
-            MessageQueueService messageQueueService) {
+            MessageQueueService messageQueueService,
+            EvolutionApiService evolutionApiService) {
         this.whatsAppMessageRepository = whatsAppMessageRepository;
         this.patientRepository = patientRepository;
+        this.episodeRepository = episodeRepository;
         this.phoneNormalizationService = phoneNormalizationService;
         this.messageQueueService = messageQueueService;
+        this.evolutionApiService = evolutionApiService;
     }
 
     /**
@@ -90,9 +112,13 @@ public class WebhookService {
         List<UUID> matchedNutritionistIds = patientRepository.findDistinctNutritionistIdsByWhatsapp(normalizedPhone);
         Optional<Patient> patientOpt;
         if (matchedNutritionistIds.size() > 1) {
-            log.warn("Ambiguous patient resolution for messageId={} and phone ending {}", evolutionMessageId,
-                    maskedSuffix(normalizedPhone));
-            patientOpt = Optional.empty();
+            log.info("Resolving ambiguous patient for phone ending {} across {} nutritionists",
+                    maskedSuffix(normalizedPhone), matchedNutritionistIds.size());
+            patientOpt = resolveAmbiguousPatient(normalizedPhone, matchedNutritionistIds);
+            if (patientOpt.isEmpty()) {
+                log.warn("Ambiguous patient unresolved for messageId={} and phone ending {}",
+                        evolutionMessageId, maskedSuffix(normalizedPhone));
+            }
         } else if (matchedNutritionistIds.size() == 1) {
             patientOpt = patientRepository.findByWhatsappAndNutritionistId(
                     normalizedPhone, matchedNutritionistIds.get(0));
@@ -119,14 +145,27 @@ public class WebhookService {
                 .build();
 
         WhatsAppMessage saved = whatsAppMessageRepository.save(message);
-        log.info("Saved WhatsAppMessage id={}, patientId={}, type={}", saved.getId(), saved.getPatientId(), messageType);
+        log.info("Saved WhatsAppMessage id={}, patientId={}, type={}",
+                saved.getId(), saved.getPatientId(), messageType);
 
-        // Unknown number: mark processed, no enqueue per D-16
+        // Unknown number: mark processed, notify once per 24h window, no enqueue per D-16
         if (patientOpt.isEmpty()) {
+            boolean alreadyNotified = whatsAppMessageRepository
+                    .existsBySenderPhoneNormalizedAndPatientIdIsNullAndCreatedAtAfter(
+                            normalizedPhone, LocalDateTime.now().minusHours(24));
+
             saved.setProcessed(true);
-            saved.setProcessedAt(java.time.LocalDateTime.now());
+            saved.setProcessedAt(LocalDateTime.now());
             whatsAppMessageRepository.save(saved);
             log.info("Unknown phone {}, marked processed without enqueue", normalizedPhone);
+
+            if (unknownResponseEnabled && !alreadyNotified) {
+                evolutionApiService.sendMessage(normalizedPhone, unknownResponseTemplate);
+                log.info("Sent unknown patient notice to phone ending {}", maskedSuffix(normalizedPhone));
+            } else if (unknownResponseEnabled) {
+                log.debug("Unknown patient notice debounced for phone ending {}", maskedSuffix(normalizedPhone));
+            }
+
             return Optional.of(new WebhookMessageDTO(
                     saved.getId(), normalizedPhone, null, null, messageContent, messageType));
         }
@@ -187,5 +226,32 @@ public class WebhookService {
             return "***";
         }
         return "***" + normalizedPhone.substring(normalizedPhone.length() - 4);
+    }
+
+    private Optional<Patient> resolveAmbiguousPatient(String normalizedPhone, List<UUID> nutritionistIds) {
+        Patient bestMatch = null;
+        LocalDateTime latestEpisodeStart = null;
+
+        for (UUID nutId : nutritionistIds) {
+            Optional<Patient> pOpt = patientRepository.findByWhatsappAndNutritionistId(normalizedPhone, nutId);
+            if (pOpt.isPresent()) {
+                Patient p = pOpt.get();
+                if (Boolean.TRUE.equals(p.getActive())) {
+                    Optional<Episode> activeEpisode = episodeRepository
+                            .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                                    p.getId(), nutId);
+                    if (activeEpisode.isPresent()) {
+                        LocalDateTime start = activeEpisode.get().getStartDate();
+                        if (latestEpisodeStart == null || (start != null && start.isAfter(latestEpisodeStart))) {
+                            latestEpisodeStart = start;
+                            bestMatch = p;
+                        }
+                    } else if (bestMatch == null) {
+                        bestMatch = p;
+                    }
+                }
+            }
+        }
+        return Optional.ofNullable(bestMatch);
     }
 }

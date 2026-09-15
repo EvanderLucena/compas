@@ -55,12 +55,25 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
     /**
      * Check if there are any messages in the last N hours for a nutritionist (D-23 connectivity check).
      */
-    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM WhatsAppMessage m WHERE m.nutritionistId = :nutritionistId AND m.createdAt > :since")
-    boolean existsByNutritionistIdAndCreatedAtAfter(@Param("nutritionistId") UUID nutritionistId, @Param("since") LocalDateTime since);
+    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM WhatsAppMessage m "
+            + "WHERE m.nutritionistId = :nutritionistId AND m.createdAt > :since")
+    boolean existsByNutritionistIdAndCreatedAtAfter(@Param("nutritionistId") UUID nutritionistId,
+                                                   @Param("since") LocalDateTime since);
+
+    /**
+     * Check if an unknown sender (patientId is null) was already received recently (anti-spam debounce).
+     */
+    boolean existsBySenderPhoneNormalizedAndPatientIdIsNullAndCreatedAtAfter(
+            String senderPhoneNormalized,
+            LocalDateTime since
+    );
 
     /**
      * Find failed messages eligible for retry (processed=false, retries < max).
      * Returns paginated results to prevent OOM with large failure volumes.
      */
-    Page<WhatsAppMessage> findByProcessedFalseAndRetryCountLessThanOrderByCreatedAtAsc(int maxRetryCount, Pageable pageable);
+    Page<WhatsAppMessage> findByProcessedFalseAndRetryCountLessThanOrderByCreatedAtAsc(
+            int maxRetryCount,
+            Pageable pageable
+    );
 }

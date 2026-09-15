@@ -15,6 +15,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,9 @@ public class WhatsAppIntelligenceService {
     private final WhatsAppMessageRepository whatsAppMessageRepository;
     private final EpisodeHistoryEventRepository episodeHistoryEventRepository;
     private final ObjectMapper objectMapper;
+
+    @Value("${nutriai.whatsapp.central-number:}")
+    private String centralNumber;
 
     public WhatsAppIntelligenceService(
             MealExtractionRepository mealExtractionRepository,
@@ -157,7 +161,15 @@ public class WhatsAppIntelligenceService {
             phone = phone.substring(2);
         }
 
-        String link = "https://wa.me/55" + phone + "?text=Oi";
+        String targetPhone;
+        if (centralNumber != null && !centralNumber.isBlank()) {
+            String normalizedCentral = centralNumber.replaceAll("\\D", "");
+            targetPhone = normalizedCentral.startsWith("55") ? normalizedCentral : "55" + normalizedCentral;
+        } else {
+            targetPhone = "55" + phone;
+        }
+
+        String link = "https://wa.me/" + targetPhone + "?text=Oi";
         boolean isActivated = whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId);
 
         return new ActivationLinkDTO(link, patient.getWhatsapp(), isActivated);
