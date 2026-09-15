@@ -8,6 +8,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.Optional;
 
 /**
  * Sends WhatsApp messages via Evolution Go API.
@@ -16,6 +18,7 @@ import java.time.Duration;
 public class EvolutionApiService {
 
     private static final Logger log = LoggerFactory.getLogger(EvolutionApiService.class);
+    private static final int MAX_MEDIA_SIZE_BYTES = 10 * 1024 * 1024; // 10MB max media payload
 
     private final String apiUrl;
     private final String apiKey;
@@ -124,8 +127,135 @@ public class EvolutionApiService {
         }
     }
 
+    /**
+     * Download or extract binary media bytes from a media URL or data URI.
+     *
+     * @param mediaUrl the media URL or data URI (base64)
+     * @return Optional containing the downloaded bytes, or empty if download failed
+     */
+    public Optional<byte[]> downloadMedia(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return Optional.empty();
+        }
+
+        try {
+            if (mediaUrl.startsWith("data:")) {
+                int commaIndex = mediaUrl.indexOf(',');
+                if (commaIndex != -1) {
+                    String base64Data = mediaUrl.substring(commaIndex + 1);
+                    byte[] decoded = Base64.getDecoder().decode(base64Data.trim());
+                    if (decoded.length > MAX_MEDIA_SIZE_BYTES) {
+                        log.warn("Data URI media exceeds maximum size limit ({} > {} bytes)",
+                                decoded.length, MAX_MEDIA_SIZE_BYTES);
+                        return Optional.empty();
+                    }
+                    return Optional.of(decoded);
+                }
+            }
+
+            if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+                if (!isSafeMediaUrl(mediaUrl)) {
+                    log.warn("Media URL rejected by host allowlist: {}", truncate(mediaUrl, 80));
+                    return Optional.empty();
+                }
+
+                HttpRequest.Builder builder = HttpRequest.newBuilder()
+                        .uri(URI.create(mediaUrl))
+                        .GET()
+                        .timeout(Duration.ofSeconds(15));
+
+                if (apiKey != null && !apiKey.isBlank() && mediaUrl.startsWith(apiUrl)) {
+                    builder.header("apikey", apiKey);
+                }
+
+                HttpResponse<byte[]> response = httpClient.send(
+                        builder.build(), HttpResponse.BodyHandlers.ofByteArray());
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    byte[] body = response.body();
+                    if (body.length > MAX_MEDIA_SIZE_BYTES) {
+                        log.warn("Media payload exceeds maximum size limit ({} > {} bytes)",
+                                body.length, MAX_MEDIA_SIZE_BYTES);
+                        return Optional.empty();
+                    }
+                    return Optional.of(body);
+                }
+                log.warn("Failed to download media: status={}, url={}",
+                        response.statusCode(), truncate(mediaUrl, 80));
+            }
+        } catch (Exception e) {
+            log.warn("Error downloading media from {}: {}", truncate(mediaUrl, 80), e.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Validate that a media URL originates strictly from the configured Evolution API host.
+     * Prevents SSRF and DNS rebinding / TOCTOU attacks.
+     */
+    boolean isSafeMediaUrl(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return false;
+        }
+        try {
+            URI mediaUri = URI.create(mediaUrl);
+            String scheme = mediaUri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                return false;
+            }
+
+            String host = mediaUri.getHost();
+            if (host == null || host.isBlank()) {
+                return false;
+            }
+
+            // Only allow media originating from the configured Evolution API instance host
+            String apiHost = URI.create(apiUrl).getHost();
+            if (apiHost != null && apiHost.equalsIgnoreCase(host)) {
+                return true;
+            }
+
+            log.warn("Blocked media download: host {} does not match configured Evolution API host {}",
+                    host, apiHost);
+            return false;
+        } catch (Exception e) {
+            log.warn("Invalid media URL {}: {}", truncate(mediaUrl, 80), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Fetch media as a Base64 Data URI (e.g. data:image/jpeg;base64,...).
+     *
+     * @param mediaUrl        the media URL or data URI
+     * @param defaultMimeType default MIME type if data URI doesn't specify one
+     * @return Optional containing the Base64 data URI, or empty if download failed
+     */
+    public Optional<String> getMediaAsBase64DataUri(String mediaUrl, String defaultMimeType) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return Optional.empty();
+        }
+        if (mediaUrl.startsWith("data:")) {
+            int commaIndex = mediaUrl.indexOf(',');
+            if (commaIndex != -1) {
+                String base64Data = mediaUrl.substring(commaIndex + 1);
+                if (base64Data.length() > MAX_MEDIA_SIZE_BYTES * 4 / 3 + 1024) {
+                    log.warn("Data URI media exceeds maximum size limit ({} chars)", base64Data.length());
+                    return Optional.empty();
+                }
+            }
+            return Optional.of(mediaUrl);
+        }
+        return downloadMedia(mediaUrl).map(bytes -> {
+            String mime = defaultMimeType != null ? defaultMimeType : "image/jpeg";
+            return "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
+        });
+    }
+
     private String escapeJson(String s) {
-        if (s == null) return "";
+        if (s == null) {
+            return "";
+        }
         StringBuilder escaped = new StringBuilder(s.length());
         for (char ch : s.toCharArray()) {
             switch (ch) {
@@ -149,12 +279,16 @@ public class EvolutionApiService {
     }
 
     private String maskPhone(String phone) {
-        if (phone == null || phone.length() < 4) return "***";
+        if (phone == null || phone.length() < 4) {
+            return "***";
+        }
         return phone.substring(0, 2) + "***" + phone.substring(phone.length() - 2);
     }
 
     private String truncate(String s, int maxLen) {
-        if (s == null) return "null";
+        if (s == null) {
+            return "null";
+        }
         return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
     }
 }
