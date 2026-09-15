@@ -98,9 +98,11 @@ export function OnboardingView() {
   const [payment, setPayment] = useState({ name: '', cpf: '', card: '', expiry: '', cvv: '' });
   const [patients, setPatients] = useState<OnboardPatient[]>([]);
   const [patientForm, setPatientForm] = useState({ name: '', whatsapp: '' });
+  const [isFinishing, setIsFinishing] = useState(false);
   const navigate = useNavigate();
 
   const goHome = async () => {
+    setIsFinishing(true);
     try {
       if (patients.length > 0) {
         const results = await Promise.allSettled(
@@ -138,15 +140,10 @@ export function OnboardingView() {
       useToastStore
         .getState()
         .showError(
-          resolveMutationErrorMessage(err, 'Erro ao sincronizar onboarding. Redirecionando...'),
+          resolveMutationErrorMessage(err, 'Erro ao concluir onboarding — tente novamente'),
         );
-      const currentUser = useAuthStore.getState().user;
-      if (currentUser) {
-        useAuthStore.setState({
-          user: { ...currentUser, onboardingCompleted: true },
-        });
-      }
-      navigate('/home');
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -812,8 +809,8 @@ export function OnboardingView() {
                 </span>
               </div>
             </div>
-            <button className="btn btn-primary" onClick={goHome}>
-              Ir pro painel →
+            <button className="btn btn-primary" onClick={goHome} disabled={isFinishing}>
+              {isFinishing ? 'Concluindo...' : 'Ir pro painel →'}
             </button>
           </div>
         )}
