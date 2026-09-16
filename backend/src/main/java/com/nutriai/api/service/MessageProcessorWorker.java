@@ -4,6 +4,8 @@ import com.nutriai.api.model.WhatsAppMessage;
 import com.nutriai.api.repository.WhatsAppMessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,10 +15,13 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 /**
- * Async queue worker that processes enqueued messages.
- * Polls Redis every 2 seconds and delegates to ConversationService.
+ * Async queue worker that processes enqueued messages concurrently.
+ * Drains Redis queue using virtual threads with bounded concurrency.
  * Retries failed messages up to 3 times (D-09 + WR-05).
  */
 @Component
@@ -28,28 +33,70 @@ public class MessageProcessorWorker {
     private final MessageQueueService messageQueueService;
     private final ConversationService conversationService;
     private final WhatsAppMessageRepository whatsAppMessageRepository;
+    private final Executor executor;
+    private final Semaphore concurrencySemaphore;
+
+    @Autowired
+    public MessageProcessorWorker(
+            MessageQueueService messageQueueService,
+            ConversationService conversationService,
+            WhatsAppMessageRepository whatsAppMessageRepository,
+            @Value("${nutriai.whatsapp.worker.max-concurrent:5}") int maxConcurrent) {
+        this(
+                messageQueueService,
+                conversationService,
+                whatsAppMessageRepository,
+                Executors.newVirtualThreadPerTaskExecutor(),
+                maxConcurrent
+        );
+    }
 
     public MessageProcessorWorker(
             MessageQueueService messageQueueService,
             ConversationService conversationService,
-            WhatsAppMessageRepository whatsAppMessageRepository) {
+            WhatsAppMessageRepository whatsAppMessageRepository,
+            Executor executor,
+            int maxConcurrent) {
         this.messageQueueService = messageQueueService;
         this.conversationService = conversationService;
         this.whatsAppMessageRepository = whatsAppMessageRepository;
+        this.executor = executor != null ? executor : Executors.newVirtualThreadPerTaskExecutor();
+        this.concurrencySemaphore = new Semaphore(Math.max(1, maxConcurrent));
     }
 
     /**
-     * Poll Redis and process the next message.
-     * Runs every 2 seconds via Spring @Scheduled.
+     * Poll Redis and process pending messages concurrently.
+     * Runs every second via Spring @Scheduled.
      */
-    @Scheduled(fixedDelay = 2000)
+    @Scheduled(fixedDelay = 1000)
     public void processNextMessage() {
-        Optional<UUID> messageIdOpt = messageQueueService.dequeue();
-        if (messageIdOpt.isEmpty()) {
-            return;
-        }
+        while (concurrencySemaphore.tryAcquire()) {
+            Optional<UUID> messageIdOpt = messageQueueService.dequeue();
+            if (messageIdOpt.isEmpty()) {
+                concurrencySemaphore.release();
+                break;
+            }
 
-        UUID messageId = messageIdOpt.get();
+            UUID messageId = messageIdOpt.get();
+            boolean submitted = false;
+            try {
+                executor.execute(() -> {
+                    try {
+                        processSingleMessage(messageId);
+                    } finally {
+                        concurrencySemaphore.release();
+                    }
+                });
+                submitted = true;
+            } finally {
+                if (!submitted) {
+                    concurrencySemaphore.release();
+                }
+            }
+        }
+    }
+
+    public void processSingleMessage(UUID messageId) {
         Optional<WhatsAppMessage> msgOpt = whatsAppMessageRepository.findById(messageId);
         if (msgOpt.isEmpty()) {
             try {

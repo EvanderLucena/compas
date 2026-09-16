@@ -2,6 +2,10 @@ spring:
   application:
     name: nutriai-api
 
+  threads:
+    virtual:
+      enabled: true
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/nutriai}
     username: ${SPRING_DATASOURCE_USERNAME:nutriai}
@@ -68,6 +72,8 @@ nutriai:
     central-number: ${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}
     unknown-response-enabled: ${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_ENABLED:true}
     unknown-response-template: "${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_TEMPLATE:Olá! Sou a assistente inteligente da NutriAI 🥗. Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\nPor favor, peça ao seu nutricionista para cadastrar seu número no painel NutriAI para que possamos começar a acompanhar seu plano alimentar!}"
+    worker:
+      max-concurrent: ${NUTRIAI_WHATSAPP_WORKER_CONCURRENT:5}
 
   webhook:
     # Secret for authenticating inbound webhook requests (X-Webhook-Secret, apikey, or Bearer)

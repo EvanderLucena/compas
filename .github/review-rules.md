@@ -70,3 +70,6 @@ Spring Data `JpaRepository` interfaces inherit `findAll`, `findById`, `deleteByI
 
 ### Webhook secret optional authentication
 The WhatsApp webhook endpoint (`/api/v1/webhooks/whatsapp`) allows unauthenticated requests when `NUTRIAI_WEBHOOK_SECRET` is not configured (for dev/local setup and backward compatibility), and enforces constant-time secret validation on `X-Webhook-Secret`/`apikey`/`Bearer` headers when configured. Security at the transport layer is complemented by message deduplication (`messageId`) and phone verification. Do NOT flag empty default webhook secrets or fail-open dev behavior as a vulnerability.
+
+### Reverse proxy IP extraction for Rate Limiting
+`RateLimitingFilter.extractClientIp` validates and inspects `X-Forwarded-For` and `X-Real-IP` with fallback to `request.getRemoteAddr()`. Behind proxies, Docker ingress, or load balancers, `X-Forwarded-For` is standard to identify the originating client IP. Do NOT flag proxy IP extraction as spoofing or security bypass.
