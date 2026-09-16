@@ -19,6 +19,7 @@ public final class TenantContext {
 
     public static void setTenantId(UUID tenantId) {
         CURRENT_TENANT.set(tenantId);
+        BYPASS_RLS.remove();
     }
 
     public static Optional<UUID> getTenantId() {
@@ -27,6 +28,9 @@ public final class TenantContext {
 
     public static void setBypassRls(boolean bypass) {
         BYPASS_RLS.set(bypass);
+        if (bypass) {
+            CURRENT_TENANT.remove();
+        }
     }
 
     public static boolean isBypassRls() {

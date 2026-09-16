@@ -29,7 +29,12 @@ public class TenantAwareDataSource extends DelegatingDataSource {
         Connection conn = super.getConnection();
         boolean isPostgres = isPostgreSQL(conn);
         if (isPostgres) {
-            applyTenantContext(conn);
+            try {
+                applyTenantContext(conn);
+            } catch (SQLException e) {
+                closeQuietly(conn, e);
+                throw e;
+            }
         }
         return TenantAwareConnection.wrap(conn, isPostgres);
     }
@@ -39,9 +44,23 @@ public class TenantAwareDataSource extends DelegatingDataSource {
         Connection conn = super.getConnection(username, password);
         boolean isPostgres = isPostgreSQL(conn);
         if (isPostgres) {
-            applyTenantContext(conn);
+            try {
+                applyTenantContext(conn);
+            } catch (SQLException e) {
+                closeQuietly(conn, e);
+                throw e;
+            }
         }
         return TenantAwareConnection.wrap(conn, isPostgres);
+    }
+
+    private void closeQuietly(Connection conn, SQLException originalEx) {
+        try {
+            conn.close();
+        } catch (SQLException closeEx) {
+            originalEx.addSuppressed(closeEx);
+            LOG.warn("Failed to close connection after tenant context error: {}", closeEx.getMessage());
+        }
     }
 
     private void applyTenantContext(Connection conn) throws SQLException {

@@ -123,4 +123,27 @@ class TenantContextTest {
         assertEquals(42, result);
         assertFalse(TenantContext.isBypassRls());
     }
+
+    @Test
+    void setTenantId_clearsBypassRls() {
+        TenantContext.setBypassRls(true);
+        assertTrue(TenantContext.isBypassRls());
+
+        UUID tenantId = UUID.randomUUID();
+        TenantContext.setTenantId(tenantId);
+
+        assertEquals(Optional.of(tenantId), TenantContext.getTenantId());
+        assertFalse(TenantContext.isBypassRls());
+    }
+
+    @Test
+    void setBypassRls_true_clearsTenantId() {
+        UUID tenantId = UUID.randomUUID();
+        TenantContext.setTenantId(tenantId);
+        assertEquals(Optional.of(tenantId), TenantContext.getTenantId());
+
+        TenantContext.setBypassRls(true);
+        assertTrue(TenantContext.isBypassRls());
+        assertTrue(TenantContext.getTenantId().isEmpty());
+    }
 }

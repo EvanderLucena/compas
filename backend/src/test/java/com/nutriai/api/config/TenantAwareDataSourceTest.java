@@ -102,7 +102,7 @@ class TenantAwareDataSourceTest {
     }
 
     @Test
-    void getConnection_postgresWhenSetConfigFails_throwsSQLException() throws SQLException {
+    void getConnection_postgresWhenSetConfigFails_throwsSQLExceptionAndClosesConnection() throws SQLException {
         when(targetDataSource.getConnection()).thenReturn(mockConnection);
         when(mockConnection.getMetaData()).thenReturn(mockMetaData);
         when(mockMetaData.getDatabaseProductName()).thenReturn("PostgreSQL");
@@ -110,6 +110,7 @@ class TenantAwareDataSourceTest {
         when(mockPreparedStatement.execute()).thenThrow(new SQLException("connection broken"));
 
         assertThrows(SQLException.class, () -> tenantAwareDataSource.getConnection());
+        verify(mockConnection).close();
     }
 
     @Test
