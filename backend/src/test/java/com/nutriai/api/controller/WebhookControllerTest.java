@@ -27,12 +27,26 @@ class WebhookControllerTest {
 
     @Mock WebhookService webhookService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String VALID_SECRET = "test-webhook-secret-123";
 
     @Test
-    void receiveWebhook_validPayload_returns200() {
+    void receiveWebhook_secretNotConfigured_returns401FailClosed() {
         WebhookController controller = new WebhookController(webhookService, objectMapper, "");
         String rawBody = "{\"event\":\"Message\",\"data\":{\"info\":{\"sender\":\"5511999999999@s.whatsapp.net\",\"id\":\"msg-123\"}},\"instanceId\":\"inst-1\"}";
         HttpServletRequest request = mock(HttpServletRequest.class);
+
+        ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
+
+        assertEquals(401, response.getStatusCode().value());
+        verify(webhookService, never()).processIncoming(any());
+    }
+
+    @Test
+    void receiveWebhook_validPayload_returns200() {
+        WebhookController controller = new WebhookController(webhookService, objectMapper, VALID_SECRET);
+        String rawBody = "{\"event\":\"Message\",\"data\":{\"info\":{\"sender\":\"5511999999999@s.whatsapp.net\",\"id\":\"msg-123\"}},\"instanceId\":\"inst-1\"}";
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("X-Webhook-Secret")).thenReturn(VALID_SECRET);
         when(webhookService.processIncoming(any(WhatsAppWebhookDTO.class))).thenReturn(Optional.of(mock()));
 
         ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
@@ -43,9 +57,10 @@ class WebhookControllerTest {
 
     @Test
     void receiveWebhook_invalidPayload_returns400() {
-        WebhookController controller = new WebhookController(webhookService, objectMapper, "");
+        WebhookController controller = new WebhookController(webhookService, objectMapper, VALID_SECRET);
         String rawBody = "{invalid-json";
         HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("X-Webhook-Secret")).thenReturn(VALID_SECRET);
 
         ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
 
@@ -55,7 +70,7 @@ class WebhookControllerTest {
 
     @Test
     void receiveWebhook_secretConfigured_unauthorizedWhenHeaderMissingOrWrong() {
-        WebhookController controller = new WebhookController(webhookService, objectMapper, "my-secret-key");
+        WebhookController controller = new WebhookController(webhookService, objectMapper, VALID_SECRET);
         String rawBody = "{\"event\":\"Message\",\"data\":{\"info\":{\"sender\":\"5511999999999@s.whatsapp.net\",\"id\":\"msg-123\"}},\"instanceId\":\"inst-1\"}";
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getHeader("X-Webhook-Secret")).thenReturn("wrong-secret");
@@ -69,11 +84,12 @@ class WebhookControllerTest {
     }
 
     @Test
-    void receiveWebhook_secretConfigured_authorizedWithXWebhookSecret() {
-        WebhookController controller = new WebhookController(webhookService, objectMapper, "my-secret-key");
+    void receiveWebhook_secretConfigured_authorizedWithApikey() {
+        WebhookController controller = new WebhookController(webhookService, objectMapper, VALID_SECRET);
         String rawBody = "{\"event\":\"Message\",\"data\":{\"info\":{\"sender\":\"5511999999999@s.whatsapp.net\",\"id\":\"msg-123\"}},\"instanceId\":\"inst-1\"}";
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("X-Webhook-Secret")).thenReturn("my-secret-key");
+        when(request.getHeader("X-Webhook-Secret")).thenReturn(null);
+        when(request.getHeader("apikey")).thenReturn(VALID_SECRET);
         when(webhookService.processIncoming(any(WhatsAppWebhookDTO.class))).thenReturn(Optional.of(mock()));
 
         ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
@@ -83,12 +99,13 @@ class WebhookControllerTest {
     }
 
     @Test
-    void receiveWebhook_secretConfigured_authorizedWithApikey() {
-        WebhookController controller = new WebhookController(webhookService, objectMapper, "my-secret-key");
+    void receiveWebhook_secretConfigured_authorizedWithBearerToken() {
+        WebhookController controller = new WebhookController(webhookService, objectMapper, VALID_SECRET);
         String rawBody = "{\"event\":\"Message\",\"data\":{\"info\":{\"sender\":\"5511999999999@s.whatsapp.net\",\"id\":\"msg-123\"}},\"instanceId\":\"inst-1\"}";
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getHeader("X-Webhook-Secret")).thenReturn(null);
-        when(request.getHeader("apikey")).thenReturn("my-secret-key");
+        when(request.getHeader("apikey")).thenReturn(null);
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + VALID_SECRET);
         when(webhookService.processIncoming(any(WhatsAppWebhookDTO.class))).thenReturn(Optional.of(mock()));
 
         ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
@@ -99,11 +116,12 @@ class WebhookControllerTest {
 
     @Test
     void receiveWebhook_evolutionGoPascalCase_returns200AndParsesCorrectly() {
-        WebhookController controller = new WebhookController(webhookService, objectMapper, "");
+        WebhookController controller = new WebhookController(webhookService, objectMapper, VALID_SECRET);
         String rawBody = "{\"Event\":\"Message\",\"Data\":{\"Info\":{\"Sender\":\"5511999999999@s.whatsapp.net\","
                 + "\"ID\":\"msg-pascal-123\"},\"Message\":{\"ExtendedTextMessage\":{\"Text\":\"Oi nutri\"}}},"
                 + "\"InstanceId\":\"inst-1\"}";
         HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("X-Webhook-Secret")).thenReturn(VALID_SECRET);
         when(webhookService.processIncoming(any(WhatsAppWebhookDTO.class))).thenReturn(Optional.of(mock()));
 
         ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
