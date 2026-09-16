@@ -18,6 +18,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -98,6 +99,17 @@ class TenantAwareDataSourceTest {
         verify(mockPreparedStatement).setString(1, "");
         verify(mockPreparedStatement).setString(2, "on");
         verify(mockPreparedStatement).execute();
+    }
+
+    @Test
+    void getConnection_postgresWhenSetConfigFails_throwsSQLException() throws SQLException {
+        when(targetDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+        when(mockMetaData.getDatabaseProductName()).thenReturn("PostgreSQL");
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
+        when(mockPreparedStatement.execute()).thenThrow(new SQLException("connection broken"));
+
+        assertThrows(SQLException.class, () -> tenantAwareDataSource.getConnection());
     }
 
     @Test

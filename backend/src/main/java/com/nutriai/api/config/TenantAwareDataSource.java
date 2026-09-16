@@ -44,7 +44,7 @@ public class TenantAwareDataSource extends DelegatingDataSource {
         return TenantAwareConnection.wrap(conn, isPostgres);
     }
 
-    private void applyTenantContext(Connection conn) {
+    private void applyTenantContext(Connection conn) throws SQLException {
         String tenantIdStr = "";
         String bypassStr = "off";
 
@@ -64,7 +64,8 @@ public class TenantAwareDataSource extends DelegatingDataSource {
             ps.setString(2, bypassStr);
             ps.execute();
         } catch (SQLException e) {
-            LOG.warn("Failed to set PostgreSQL RLS tenant context on connection: {}", e.getMessage());
+            LOG.error("Failed to set PostgreSQL RLS tenant context on connection: {}", e.getMessage());
+            throw e;
         }
     }
 
