@@ -145,6 +145,7 @@ export function PatientsView() {
 
   const [mode, setMode] = useState<'table' | 'grid'>('table');
   const [filterOpen, setFilterOpen] = useState(false);
+  const [createPatientError, setCreatePatientError] = useState<string | null>(null);
 
   const showInactive = statusFilter === 'inactive';
 
@@ -413,20 +414,27 @@ export function PatientsView() {
 
       <NewPatientModal
         open={newPatientModalOpen}
-        onClose={() => setNewPatientModalOpen(false)}
+        onClose={() => {
+          setCreatePatientError(null);
+          setNewPatientModalOpen(false);
+        }}
         isSubmitting={createMutation.isPending}
+        errorMessage={createPatientError}
         onSave={(data) => {
+          setCreatePatientError(null);
           createMutation.mutate(data, {
             onSuccess: () => {
               useToastStore.getState().showSuccess('Paciente cadastrado com sucesso');
+              setCreatePatientError(null);
               setNewPatientModalOpen(false);
             },
             onError: (err) => {
-              useToastStore
-                .getState()
-                .showError(
-                  resolveMutationErrorMessage(err, 'Erro ao cadastrar paciente — tente novamente'),
-                );
+              const msg = resolveMutationErrorMessage(
+                err,
+                'Erro ao cadastrar paciente — tente novamente',
+              );
+              setCreatePatientError(msg);
+              useToastStore.getState().showError(msg);
             },
           });
         }}

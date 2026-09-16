@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useUpdatePatient } from '../../stores/patientStore';
+import { useUpdatePatient, resolveMutationErrorMessage } from '../../stores/patientStore';
 import { useToastStore } from '../../stores/toastStore';
 import type { Patient, ObjectiveOption } from '../../types/patient';
 import { OBJECTIVE_LABELS, OBJECTIVE_KEYS, REVERSE_OBJECTIVE_LABELS } from '../../types/patient';
@@ -20,13 +20,14 @@ function stripPhone(value: string): string {
   return value.replace(/\D/g, '').slice(0, 11);
 }
 
-interface EditPatientModalProps {
+export interface EditPatientModalProps {
   patient: Patient;
+  open?: boolean;
   onClose: () => void;
 }
 
 // eslint-disable-next-line max-lines-per-function, complexity
-export function EditPatientModal({ patient, onClose }: EditPatientModalProps) {
+export function EditPatientModal({ patient, open, onClose }: EditPatientModalProps) {
   const updateMutation = useUpdatePatient();
   const [sex, setSex] = useState(patient.sex || 'F');
   const [objective, setObjective] = useState<ObjectiveOption>(
@@ -111,11 +112,12 @@ export function EditPatientModal({ patient, onClose }: EditPatientModalProps) {
           onClose();
         },
         onError: (error) => {
-          setSubmitError(
-            error instanceof Error
-              ? error.message
-              : 'Não foi possível atualizar o paciente. Tente novamente.',
+          const message = resolveMutationErrorMessage(
+            error,
+            'Não foi possível atualizar o paciente. Tente novamente.',
           );
+          setSubmitError(message);
+          useToastStore.getState().showError(message);
         },
       },
     );
@@ -135,6 +137,8 @@ export function EditPatientModal({ patient, onClose }: EditPatientModalProps) {
   });
 
   const canSubmit = form.name.trim().length >= 2 && !updateMutation.isPending;
+
+  if (open === false) return null;
 
   return (
     <div

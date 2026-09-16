@@ -272,6 +272,8 @@ export function PlansView({ patientId }: PlansViewProps) {
     carb: '',
     fat: '',
   });
+  const [addFoodError, setAddFoodError] = useState<string | null>(null);
+  const [addMealError, setAddMealError] = useState<string | null>(null);
 
   const updatePlan = useUpdatePlan(patientId);
   const addMealSlot = useAddMealSlot(patientId);
@@ -1069,9 +1071,15 @@ export function PlansView({ patientId }: PlansViewProps) {
 
       {addFoodModalOpen && activeMeal && activeOpt && (
         <AddFoodModal
-          onClose={() => planUI.setAddFoodModalOpen(false)}
+          onClose={() => {
+            setAddFoodError(null);
+            planUI.setAddFoodModalOpen(false);
+          }}
+          isSubmitting={addFoodItem.isPending}
+          error={addFoodError}
           onAdd={(data) => {
             if (!activeMeal || !activeOpt) return;
+            setAddFoodError(null);
             addFoodItem.mutate(
               {
                 mealId: activeMeal.id,
@@ -1081,14 +1089,16 @@ export function PlansView({ patientId }: PlansViewProps) {
               {
                 onSuccess: () => {
                   useToastStore.getState().showSuccess('Alimento adicionado à refeição');
+                  setAddFoodError(null);
                   planUI.setAddFoodModalOpen(false);
                 },
                 onError: (err) => {
-                  useToastStore
-                    .getState()
-                    .showError(
-                      resolveMutationErrorMessage(err, 'Erro ao adicionar alimento à refeição'),
-                    );
+                  const msg = resolveMutationErrorMessage(
+                    err,
+                    'Erro ao adicionar alimento à refeição',
+                  );
+                  setAddFoodError(msg);
+                  useToastStore.getState().showError(msg);
                 },
               },
             );
@@ -1097,19 +1107,26 @@ export function PlansView({ patientId }: PlansViewProps) {
       )}
       {addMealModalOpen && (
         <AddMealModal
-          onClose={() => planUI.setAddMealModalOpen(false)}
+          onClose={() => {
+            setAddMealError(null);
+            planUI.setAddMealModalOpen(false);
+          }}
+          isSubmitting={addMealSlot.isPending}
+          error={addMealError}
           onAdd={(data) => {
+            setAddMealError(null);
             addMealSlot.mutate(
               { label: data.label, time: data.time },
               {
                 onSuccess: () => {
                   useToastStore.getState().showSuccess('Refeição criada com sucesso');
+                  setAddMealError(null);
                   planUI.setAddMealModalOpen(false);
                 },
                 onError: (err) => {
-                  useToastStore
-                    .getState()
-                    .showError(resolveMutationErrorMessage(err, 'Erro ao criar refeição'));
+                  const msg = resolveMutationErrorMessage(err, 'Erro ao criar refeição');
+                  setAddMealError(msg);
+                  useToastStore.getState().showError(msg);
                 },
               },
             );

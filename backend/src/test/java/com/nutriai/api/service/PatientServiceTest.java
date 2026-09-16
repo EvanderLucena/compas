@@ -414,4 +414,27 @@ class PatientServiceTest {
         assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatusCode());
         assertEquals("Número de WhatsApp inválido", ex.getReason());
     }
+
+    @Test
+    void createPatient_homonymAllowed_createsMultiplePatientsWithSameName() {
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(patientRepository.save(any(Patient.class))).thenAnswer(inv -> {
+            Patient p = inv.getArgument(0);
+            p.setId(UUID.randomUUID());
+            return p;
+        });
+        when(episodeRepository.save(any(Episode.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CreatePatientRequest req1 = new CreatePatientRequest("Ana Beatriz", null, null, null, null, "EMAGRECIMENTO", null, true);
+        CreatePatientRequest req2 = new CreatePatientRequest("Ana Beatriz", null, null, null, null, "HIPERTROFIA", null, true);
+
+        PatientResponse resp1 = patientService.createPatient(nutritionistId, req1);
+        PatientResponse resp2 = patientService.createPatient(nutritionistId, req2);
+
+        assertNotNull(resp1);
+        assertNotNull(resp2);
+        assertNotEquals(resp1.id(), resp2.id());
+        assertEquals(resp1.name(), resp2.name());
+        verify(patientRepository, times(2)).save(any(Patient.class));
+    }
 }
