@@ -78,13 +78,21 @@ public class MessageProcessorWorker {
             }
 
             UUID messageId = messageIdOpt.get();
-            executor.execute(() -> {
-                try {
-                    processSingleMessage(messageId);
-                } finally {
+            boolean submitted = false;
+            try {
+                executor.execute(() -> {
+                    try {
+                        processSingleMessage(messageId);
+                    } finally {
+                        concurrencySemaphore.release();
+                    }
+                });
+                submitted = true;
+            } finally {
+                if (!submitted) {
                     concurrencySemaphore.release();
                 }
-            });
+            }
         }
     }
 
