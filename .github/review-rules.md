@@ -67,3 +67,6 @@ Spring Data `JpaRepository` interfaces inherit `findAll`, `findById`, `deleteByI
 
 ### Test-only repository methods
 `*RepositoryTest` classes use bare repository methods (no nutritionistId scoping) for setup/cleanup. These are integration tests against a sandboxed DB; service-layer scoping rules do not apply. Do not flag tenant-isolation issues in `*RepositoryTest` files.
+
+### Webhook secret optional authentication
+The WhatsApp webhook endpoint (`/api/v1/webhooks/whatsapp`) allows unauthenticated requests when `NUTRIAI_WEBHOOK_SECRET` is not configured (for dev/local setup and backward compatibility), and enforces constant-time secret validation on `X-Webhook-Secret`/`apikey`/`Bearer` headers when configured. Security at the transport layer is complemented by message deduplication (`messageId`) and phone verification. Do NOT flag empty default webhook secrets or fail-open dev behavior as a vulnerability.

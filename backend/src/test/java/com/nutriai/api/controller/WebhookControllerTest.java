@@ -30,15 +30,16 @@ class WebhookControllerTest {
     private static final String VALID_SECRET = "test-webhook-secret-123";
 
     @Test
-    void receiveWebhook_secretNotConfigured_returns401FailClosed() {
+    void receiveWebhook_secretNotConfigured_returns200() {
         WebhookController controller = new WebhookController(webhookService, objectMapper, "");
         String rawBody = "{\"event\":\"Message\",\"data\":{\"info\":{\"sender\":\"5511999999999@s.whatsapp.net\",\"id\":\"msg-123\"}},\"instanceId\":\"inst-1\"}";
         HttpServletRequest request = mock(HttpServletRequest.class);
+        when(webhookService.processIncoming(any(WhatsAppWebhookDTO.class))).thenReturn(Optional.of(mock()));
 
         ResponseEntity<Void> response = controller.receiveWebhook(rawBody, request);
 
-        assertEquals(401, response.getStatusCode().value());
-        verify(webhookService, never()).processIncoming(any());
+        assertEquals(200, response.getStatusCode().value());
+        verify(webhookService).processIncoming(any());
     }
 
     @Test

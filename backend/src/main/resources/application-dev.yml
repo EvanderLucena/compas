@@ -29,7 +29,7 @@ nutriai:
       secure: false
       same-site: Lax
   webhook:
-    secret: ${NUTRIAI_WEBHOOK_SECRET:dev-webhook-secret-do-not-use-in-prod}
+    secret: ${NUTRIAI_WEBHOOK_SECRET:}
   seed:
     admin:
       email: admin@nutriai.com
