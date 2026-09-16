@@ -27,14 +27,15 @@ public class TenantAwareDataSource extends DelegatingDataSource {
     @Override
     public Connection getConnection() throws SQLException {
         Connection conn = super.getConnection();
-        boolean isPostgres = isPostgreSQL(conn);
-        if (isPostgres) {
-            try {
+        boolean isPostgres;
+        try {
+            isPostgres = isPostgreSQL(conn);
+            if (isPostgres) {
                 applyTenantContext(conn);
-            } catch (SQLException e) {
-                closeQuietly(conn, e);
-                throw e;
             }
+        } catch (SQLException e) {
+            closeQuietly(conn, e);
+            throw e;
         }
         return TenantAwareConnection.wrap(conn, isPostgres);
     }
@@ -42,14 +43,15 @@ public class TenantAwareDataSource extends DelegatingDataSource {
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
         Connection conn = super.getConnection(username, password);
-        boolean isPostgres = isPostgreSQL(conn);
-        if (isPostgres) {
-            try {
+        boolean isPostgres;
+        try {
+            isPostgres = isPostgreSQL(conn);
+            if (isPostgres) {
                 applyTenantContext(conn);
-            } catch (SQLException e) {
-                closeQuietly(conn, e);
-                throw e;
             }
+        } catch (SQLException e) {
+            closeQuietly(conn, e);
+            throw e;
         }
         return TenantAwareConnection.wrap(conn, isPostgres);
     }
@@ -88,11 +90,7 @@ public class TenantAwareDataSource extends DelegatingDataSource {
         }
     }
 
-    private boolean isPostgreSQL(Connection conn) {
-        try {
-            return "PostgreSQL".equalsIgnoreCase(conn.getMetaData().getDatabaseProductName());
-        } catch (Exception e) {
-            return false;
-        }
+    private boolean isPostgreSQL(Connection conn) throws SQLException {
+        return "PostgreSQL".equalsIgnoreCase(conn.getMetaData().getDatabaseProductName());
     }
 }

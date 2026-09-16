@@ -34,7 +34,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -60,6 +61,7 @@ public class DataInitializer implements CommandLineRunner {
     private final PlanExtraRepository planExtraRepository;
     private final BiometryAssessmentRepository assessmentRepository;
     private final EpisodeHistoryEventRepository historyEventRepository;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${nutriai.seed.admin.email:admin@nutriai.com}")
     private String adminEmail;
@@ -82,7 +84,8 @@ public class DataInitializer implements CommandLineRunner {
             MealFoodRepository mealFoodRepository,
             PlanExtraRepository planExtraRepository,
             BiometryAssessmentRepository assessmentRepository,
-            EpisodeHistoryEventRepository historyEventRepository) {
+            EpisodeHistoryEventRepository historyEventRepository,
+            PlatformTransactionManager transactionManager) {
         this.nutritionistRepository = nutritionistRepository;
         this.passwordEncoder = passwordEncoder;
         this.patientRepository = patientRepository;
@@ -95,23 +98,26 @@ public class DataInitializer implements CommandLineRunner {
         this.planExtraRepository = planExtraRepository;
         this.assessmentRepository = assessmentRepository;
         this.historyEventRepository = historyEventRepository;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Override
     public void run(String... args) {
         TenantContext.executeWithBypass(() -> {
-            Nutritionist demo = ensureDemoNutritionist();
-            List<Food> foods = ensureDemoFoods(demo.getId());
-            if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
-                ensureDemoHistoryCycle(demo.getId(), foods);
-                logger.info("Dev seed already has patients, skipping demo clinical data. Foods available: {}.", foods.size());
-                return;
-            }
+            transactionTemplate.executeWithoutResult(status -> {
+                Nutritionist demo = ensureDemoNutritionist();
+                List<Food> foods = ensureDemoFoods(demo.getId());
+                if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
+                    ensureDemoHistoryCycle(demo.getId(), foods);
+                    logger.info("Dev seed already has patients, skipping demo clinical data. Foods available: {}.", foods.size());
+                    return;
+                }
 
-            List<Patient> patients = createDemoPatients(demo.getId());
-            createDemoClinicalData(demo.getId(), patients, foods);
-            ensureDemoHistoryCycle(demo.getId(), foods);
-            logger.info("Dev seed created: {} patients, {} foods, plans, biometry and history.", patients.size(), foods.size());
+                List<Patient> patients = createDemoPatients(demo.getId());
+                createDemoClinicalData(demo.getId(), patients, foods);
+                ensureDemoHistoryCycle(demo.getId(), foods);
+                logger.info("Dev seed created: {} patients, {} foods, plans, biometry and history.", patients.size(), foods.size());
+            });
         });
     }
 
