@@ -6,9 +6,11 @@ import type {
   PatchExtractionPayload,
 } from '../types/whatsapp';
 
-export async function getExtractions(patientId: string): Promise<Extraction[]> {
+export async function getExtractions(patientId: string, date?: string): Promise<Extraction[]> {
+  const params = date ? { date } : undefined;
   const response = await apiClient.get<{ success: boolean; data: Extraction[] }>(
     `/patients/${patientId}/extractions`,
+    { params },
   );
   return response.data.data;
 }

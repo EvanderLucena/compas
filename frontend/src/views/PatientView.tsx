@@ -342,19 +342,77 @@ function TodayTab({
   plan: MealPlan | null;
   onSetTab: (t: Tab) => void;
 }) {
+  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [selectedDate, setSelectedDate] = React.useState<string>(todayStr);
+  const isToday = selectedDate === todayStr;
+
+  const dateInfo = React.useMemo(() => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    const today = new Date();
+    const todayIso = today.toISOString().split('T')[0];
+
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayIso = yesterday.toISOString().split('T')[0];
+
+    const weekday = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    const monthName = d.toLocaleDateString('pt-BR', { month: 'long' });
+    const shortMonth = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+
+    if (selectedDate === todayIso) {
+      return {
+        label: `Hoje · ${day} de ${monthName}`,
+        short: 'hoje',
+        dayOfWeekIndex: (d.getDay() + 6) % 7,
+      };
+    }
+    if (selectedDate === yesterdayIso) {
+      return {
+        label: `Ontem · ${day} de ${monthName}`,
+        short: 'ontem',
+        dayOfWeekIndex: (d.getDay() + 6) % 7,
+      };
+    }
+    const capWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    return {
+      label: `${capWeekday}, ${day} de ${monthName}`,
+      short: `${day} de ${shortMonth}`,
+      dayOfWeekIndex: (d.getDay() + 6) % 7,
+    };
+  }, [selectedDate]);
+
+  const handlePrevDay = () => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() - 1);
+    setSelectedDate(date.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    if (selectedDate >= todayStr) return;
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + 1);
+    const nextIso = date.toISOString().split('T')[0];
+    if (nextIso <= todayStr) {
+      setSelectedDate(nextIso);
+    }
+  };
+
   const {
     data: extractions,
     isLoading: extractionsLoading,
     isError: extractionsError,
-  } = useExtractions(patientId);
+  } = useExtractions(patientId, selectedDate);
 
   const extractionEvents = React.useMemo(
     () => (extractions ? mapExtractionsToTimelineEvents(extractions) : []),
     [extractions],
   );
   const timelineEvents = React.useMemo(
-    () => [...extractionEvents, ...patient.timeline],
-    [extractionEvents, patient.timeline],
+    () => (isToday ? [...extractionEvents, ...patient.timeline] : extractionEvents),
+    [extractionEvents, patient.timeline, isToday],
   );
 
   const kcalTarget = plan?.kcalTarget ?? patient.macrosToday.kcal.target;
@@ -418,17 +476,127 @@ function TodayTab({
     if (patient.weekMacroFill && patient.weekMacroFill.length === 7) {
       return patient.weekMacroFill;
     }
-    const todayFill =
+    const fillRatio =
       kcalTarget > 0 ? Math.min(1, reportedMacrosToday.kcal.actual / kcalTarget) : 0;
-    const dayOfWeek = (new Date().getDay() + 6) % 7; // Monday = 0, Sunday = 6
     const fill = [0, 0, 0, 0, 0, 0, 0];
-    fill[dayOfWeek] = todayFill;
+    fill[dateInfo.dayOfWeekIndex] = fillRatio;
     return fill;
-  }, [patient.weekMacroFill, kcalTarget, reportedMacrosToday.kcal.actual]);
+  }, [patient.weekMacroFill, kcalTarget, reportedMacrosToday.kcal.actual, dateInfo.dayOfWeekIndex]);
 
   return (
     <div>
       <div style={{ padding: '24px 28px' }}>
+        {/* Barra de navegação por data com mini calendário */}
+        <div
+          className="today-date-bar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 20,
+            padding: '10px 14px',
+            background: 'var(--surface-2)',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              data-testid="btn-prev-day"
+              className="btn btn-ghost"
+              style={{ padding: '5px 10px', fontSize: 13 }}
+              onClick={handlePrevDay}
+              title="Ver dia anterior"
+            >
+              ◀
+            </button>
+
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '5px 14px',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+                title="Clique para abrir o calendário e escolher outra data"
+              >
+                <span style={{ fontSize: 14 }}>📅</span>
+                <span>{dateInfo.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--fg-subtle)', marginLeft: 4 }}>▼</span>
+                <input
+                  type="date"
+                  data-testid="date-picker-input"
+                  value={selectedDate}
+                  max={todayStr}
+                  onChange={(e) => {
+                    if (e.target.value) setSelectedDate(e.target.value);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    opacity: 0,
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    cursor: 'pointer',
+                  }}
+                />
+              </label>
+            </div>
+
+            <button
+              data-testid="btn-next-day"
+              className="btn btn-ghost"
+              style={{ padding: '5px 10px', fontSize: 13, opacity: isToday ? 0.35 : 1 }}
+              onClick={handleNextDay}
+              disabled={isToday}
+              title={isToday ? 'Você já está no dia de hoje' : 'Ver próximo dia'}
+            >
+              ▶
+            </button>
+
+            {!isToday && (
+              <button
+                data-testid="btn-go-today"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '4px 10px', marginLeft: 4 }}
+                onClick={() => setSelectedDate(todayStr)}
+              >
+                Voltar para Hoje
+              </button>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 12,
+              color: 'var(--fg-muted)',
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: isToday ? 'var(--lime-dim)' : 'var(--fg-subtle)',
+              }}
+            />
+            <span>{isToday ? 'Monitoramento em tempo real' : 'Visualizando dados históricos'}</span>
+          </div>
+        </div>
+
         <div
           className="today-cards-grid"
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}
@@ -618,15 +786,17 @@ function TodayTab({
             <div className="sub">SEG — DOM</div>
           </div>
           <div className="card-b">
-            <WeekBars values={weekMacroFill} height={42} />
+            <WeekBars values={weekMacroFill} height={42} activeIndex={dateInfo.dayOfWeekIndex} />
           </div>
         </div>
 
         {/* Timeline */}
         <div className="card">
           <div className="card-h">
-            <div className="title">Refeições reportadas · hoje</div>
-            <div className="sub">SOMENTE REGISTROS DO PACIENTE</div>
+            <div className="title">Refeições reportadas · {dateInfo.short}</div>
+            <div className="sub">
+              {isToday ? 'SOMENTE REGISTROS DO PACIENTE' : `DATA: ${dateInfo.label.toUpperCase()}`}
+            </div>
             <div className="spacer" />
             <div
               style={{
@@ -665,7 +835,13 @@ function TodayTab({
                 <p style={{ color: 'var(--fg-muted)', fontSize: 11 }}>Mostrando dados locais.</p>
               </div>
             )}
-            {!extractionsLoading && <Timeline items={timelineEvents} patientId={patientId} />}
+            {!extractionsLoading && (
+              <Timeline
+                items={timelineEvents}
+                patientId={patientId}
+                emptyTitle={`Nenhum registro em ${dateInfo.short}`}
+              />
+            )}
           </div>
         </div>
       </div>

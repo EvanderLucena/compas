@@ -49,18 +49,19 @@ export function mapExtractionsToTimelineEvents(extractions: Extraction[]): Timel
   });
 }
 
-/** TanStack Query hook for extractions today */
-export function useExtractions(patientId: string | null) {
+/** TanStack Query hook for extractions by date (defaults to today) */
+export function useExtractions(patientId: string | null, date?: string) {
+  const isToday = !date || date === new Date().toISOString().split('T')[0];
   return useQuery({
-    queryKey: ['whatsapp-extractions', patientId],
+    queryKey: ['whatsapp-extractions', patientId, date ?? 'today'],
     queryFn: () => {
       if (!patientId) throw new Error('Patient ID is required');
-      return whatsappApi.getExtractions(patientId);
+      return whatsappApi.getExtractions(patientId, date);
     },
     enabled: !!patientId,
-    staleTime: 10_000,
-    refetchInterval: 15_000,
-    refetchOnWindowFocus: true,
+    staleTime: isToday ? 10_000 : 5 * 60_000,
+    refetchInterval: isToday ? 15_000 : false,
+    refetchOnWindowFocus: isToday,
   });
 }
 

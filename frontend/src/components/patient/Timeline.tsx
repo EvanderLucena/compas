@@ -6,9 +6,10 @@ import { ExtractionEditor } from './ExtractionEditor';
 interface TimelineProps {
   items: TimelineEvent[];
   patientId?: string;
+  emptyTitle?: string;
 }
 
-export function Timeline({ items, patientId }: TimelineProps) {
+export function Timeline({ items, patientId, emptyTitle }: TimelineProps) {
   const reported = items.filter((ev) => ev.kind === 'log');
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -34,7 +35,9 @@ export function Timeline({ items, patientId }: TimelineProps) {
         >
           <span style={{ fontSize: 18 }}>🍽️</span>
         </div>
-        <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>Nenhum registro hoje</div>
+        <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 6 }}>
+          {emptyTitle || 'Nenhum registro hoje'}
+        </div>
         <div style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 280, margin: '0 auto' }}>
           Quando o paciente enviar refeições pelo WhatsApp, elas aparecerão aqui com os macros
           estimados pela IA.
