@@ -348,7 +348,7 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 ### Parked (revisitar quando trigger acontecer)
 
 - [ ] **Mutation testing** (PIT + StrykerJS) — quando suite >30 arquivos ou testes de IA fracos detectados
-- [ ] **PostgreSQL RLS** — quando usuários reais chegarem ou auditoria LGPD formal
+- [x] **PostgreSQL RLS** — ativado em todas as 16 tabelas tenant via migração V24 + TenantContext + TenantAwareDataSource (PR #133) ✅
 - [ ] **Audit logging** — quando dados reais de saúde em produção
 - [ ] **Error Prone** (compilador Java) — depois que PMD estiver estável
 - [ ] **SonarQube Community** — quando time crescer (hoje overhead > valor pra solo dev)
