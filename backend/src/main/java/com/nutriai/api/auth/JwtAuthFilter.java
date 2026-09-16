@@ -24,28 +24,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final NutritionistRepository nutritionistRepository;
 
-    private static final long NUTRITIONIST_CACHE_TTL_MS = 5 * 60 * 1000L;
-    private final java.util.Map<UUID, Long> verifiedNutritionists = new java.util.concurrent.ConcurrentHashMap<>();
-
     public JwtAuthFilter(JwtService jwtService, NutritionistRepository nutritionistRepository) {
         this.jwtService = jwtService;
         this.nutritionistRepository = nutritionistRepository;
-    }
-
-    private boolean isNutritionistActive(UUID nutritionistId) {
-        Long cachedAt = verifiedNutritionists.get(nutritionistId);
-        long now = System.currentTimeMillis();
-        if (cachedAt != null && (now - cachedAt) < NUTRITIONIST_CACHE_TTL_MS) {
-            return true;
-        }
-
-        boolean exists = nutritionistRepository.existsById(nutritionistId);
-        if (exists) {
-            verifiedNutritionists.put(nutritionistId, now);
-        } else {
-            verifiedNutritionists.remove(nutritionistId);
-        }
-        return exists;
     }
 
     @Override
@@ -65,7 +46,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 UUID nutritionistId = UUID.fromString(claims.getPayload().getSubject());
                 String role = claims.getPayload().get("role", String.class);
 
-                if (!isNutritionistActive(nutritionistId)) {
+                if (!nutritionistRepository.existsById(nutritionistId)) {
                     SecurityContextHolder.clearContext();
                     filterChain.doFilter(request, response);
                     return;

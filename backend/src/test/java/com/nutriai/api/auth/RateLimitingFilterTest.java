@@ -110,4 +110,22 @@ class RateLimitingFilterTest {
 
         verify(filterChain).doFilter(request, response);
     }
+
+    @Test
+    void doFilterInternal_withXForwardedFor_extractsFirstIp() throws Exception {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        FilterChain filterChain = mock(FilterChain.class);
+
+        when(request.getRequestURI()).thenReturn("/api/v1/auth/login");
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("203.0.113.195, 70.41.3.18");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.increment("rate_limit:login:203.0.113.195")).thenReturn(1L);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(redisTemplate).expire(eq("rate_limit:login:203.0.113.195"), any(Duration.class));
+        verify(filterChain).doFilter(request, response);
+    }
 }
