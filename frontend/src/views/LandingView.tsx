@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 
 const FEATURES = [
@@ -178,7 +179,7 @@ const FAQ_ITEMS = [
 
 function BrandLogo() {
   return (
-    <div className="landing-logo">
+    <Link to="/" className="landing-logo" aria-label="NutriAI - Início">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
         <path
           d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
@@ -190,7 +191,7 @@ function BrandLogo() {
       <span>
         Nutri<span style={{ color: 'var(--lime-dim)' }}>AI</span>
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -515,6 +516,9 @@ function BioMockup() {
 }
 
 export function LandingView() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
   return (
     <div className="landing">
       <nav className="landing-nav">
@@ -532,7 +536,75 @@ export function LandingView() {
               Começar grátis
             </Link>
           </div>
+          <button
+            type="button"
+            className="landing-mobile-toggle"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+          >
+            {mobileMenuOpen ? (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
+            <span>Menu</span>
+          </button>
         </div>
+        {mobileMenuOpen && (
+          <div className="landing-mobile-menu">
+            <a href="#como-funciona" onClick={() => setMobileMenuOpen(false)}>
+              Como funciona
+            </a>
+            <a href="#funcionalidades" onClick={() => setMobileMenuOpen(false)}>
+              Funcionalidades
+            </a>
+            <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>
+              Planos
+            </a>
+            <a href="#faq" onClick={() => setMobileMenuOpen(false)}>
+              FAQ
+            </a>
+            <div className="landing-mobile-menu-ctas">
+              <Link
+                to="/login"
+                className="btn btn-secondary"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Entrar
+              </Link>
+              <Link
+                to="/signup"
+                className="btn btn-primary"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Começar grátis
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       <section className="landing-hero">
@@ -554,6 +626,13 @@ export function LandingView() {
               Testar 30 dias grátis
             </Link>
             <span className="landing-hero-hint">30 dias grátis · Cancele quando quiser</span>
+            <div className="landing-trust-bar">
+              <span>🔒 Privacidade por design (LGPD)</span>
+              <span className="sep">·</span>
+              <span>⚡ Zero app pro paciente</span>
+              <span className="sep">·</span>
+              <span>📋 Baseado nas suas prescrições</span>
+            </div>
           </div>
         </div>
       </section>
@@ -806,13 +885,41 @@ export function LandingView() {
       <section className="landing-section" id="faq">
         <div className="landing-section-inner">
           <div className="landing-eyebrow">Perguntas frequentes</div>
-          <div className="landing-faq">
-            {FAQ_ITEMS.map((item, i) => (
-              <div key={i} className="landing-faq-item">
-                <h4>{item.q}</h4>
-                <p>{item.a}</p>
-              </div>
-            ))}
+          <h2 className="landing-section-title" style={{ marginBottom: 32 }}>
+            Tudo o que você precisa saber
+          </h2>
+          <div className="landing-faq-accordion">
+            {FAQ_ITEMS.map((item, i) => {
+              const isOpen = openFaq === i;
+              return (
+                <div key={i} className="landing-faq-card">
+                  <button
+                    type="button"
+                    className="landing-faq-trigger"
+                    onClick={() => setOpenFaq(isOpen ? null : i)}
+                    aria-expanded={isOpen}
+                  >
+                    <span>{item.q}</span>
+                    <svg
+                      className={`landing-faq-icon ${isOpen ? 'open' : ''}`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  {isOpen && (
+                    <div className="landing-faq-content">
+                      <p>{item.a}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -820,7 +927,7 @@ export function LandingView() {
       <section className="landing-cta-final">
         <div className="landing-cta-final-inner">
           <h2>Pronto pra transformar o acompanhamento?</h2>
-          <p>30 dias grátis. Cadastre o cartão, cancele quando quiser.</p>
+          <p>30 dias grátis. Todas as funcionalidades inclusas, cancele quando quiser.</p>
           <Link to="/signup" className="btn btn-primary landing-cta-btn">
             Começar agora
           </Link>
@@ -834,10 +941,10 @@ export function LandingView() {
             <p className="landing-footer-copy">© 2026 NutriAI. Todos os direitos reservados.</p>
           </div>
           <div className="landing-footer-links">
-            <a href="#">Termos de uso</a>
-            <a href="#">Privacidade</a>
-            <a href="#">LGPD</a>
-            <a href="#">Contato</a>
+            <a href="#privacidade">Termos de uso</a>
+            <a href="#privacidade">Privacidade</a>
+            <a href="#privacidade">LGPD</a>
+            <a href="mailto:contato@nutriai.com.br">Contato</a>
           </div>
         </div>
       </footer>

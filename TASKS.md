@@ -187,11 +187,11 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 
 ### Onboarding como mini tutorial
 
-- [ ] **Reposicionar Onboarding como tour guiado** — deixar claro que é tutorial de produto, não assistente de configuração real.
-- [ ] **Remover promessas falsas do Onboarding** — retirar steps/CTAs que sugerem convite WhatsApp, pagamento, plano configurado ou pacientes criados quando isso não persiste.
-- [ ] **Criar roteiro de steps do tutorial** — boas-vindas, carteira de pacientes, detalhe do paciente, plano alimentar, biometria/histórico e próximo passo.
-- [ ] **CTA final honesto** — oferecer "Criar primeiro paciente" e "Explorar painel", sem simular automações futuras.
-- [ ] **Persistir conclusão do tutorial** — marcar onboarding como concluído apenas quando o usuário finalizar/pular o tour.
+- [x] **Reposicionar Onboarding como tour guiado** — deixar claro que é tutorial de produto, não assistente de configuração real.
+- [x] **Remover promessas falsas do Onboarding** — retirar steps/CTAs que sugerem convite WhatsApp, pagamento, plano configurado ou pacientes criados quando isso não persiste.
+- [x] **Criar roteiro de steps do tutorial** — boas-vindas, carteira de pacientes, detalhe do paciente, plano alimentar, biometria/histórico e próximo passo.
+- [x] **CTA final honesto** — oferecer "Criar primeiro paciente" e "Explorar painel", sem simular automações futuras.
+- [x] **Persistir conclusão do tutorial** — marcar onboarding como concluído apenas quando o usuário finalizar/pular o tour.
 - [ ] **Playwright do tutorial** — validar navegação next/back/skip/finalizar e redirecionamento final.
 
 ### Validação e acabamento de formulários
