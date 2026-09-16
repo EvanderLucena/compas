@@ -5,6 +5,7 @@ import { resolveMutationErrorMessage } from '../../stores/patientStore';
 import { IconPlus, IconX } from '../icons';
 import { useValidation } from '../../hooks/useValidation';
 import { parseNumberInput } from '../../utils/numberInput';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 const SKINFOLD_KEYS = [
   'peitoral',
@@ -264,6 +265,8 @@ export function NewBiometryModal({ createMutation, onSuccess, onClose }: NewBiom
   const isSubmitting = createMutation.isPending;
   const parsedWeight = parseDecimal(form.weight);
   const canSubmit = Boolean(form.assessmentDate) && parsedWeight != null && parsedWeight > 0;
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
 
   return (
     <div
@@ -279,10 +282,12 @@ export function NewBiometryModal({ createMutation, onSuccess, onClose }: NewBiom
       onClick={onClose}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-biometry-title"
-        className="card"
+        tabIndex={-1}
+        className="card outline-none"
         style={{
           width: 'min(680px, 100%)',
           maxHeight: '90vh',

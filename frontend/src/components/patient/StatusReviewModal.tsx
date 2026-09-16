@@ -4,6 +4,7 @@ import { useToastStore } from '../../stores/toastStore';
 import type { PatientStatus } from '../../types/patient';
 import { STATUS_LABELS, STATUS_COLORS } from '../../types/patient';
 import { IconX, IconCheck } from '../icons';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface StatusReviewModalProps {
   patientId: string;
@@ -39,6 +40,9 @@ export function StatusReviewModal({ patientId, currentStatus, onClose }: StatusR
     );
   };
 
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   return (
     <div
       style={{
@@ -53,14 +57,24 @@ export function StatusReviewModal({ patientId, currentStatus, onClose }: StatusR
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Revisar status"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(400px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-h">
           <div className="title">Revisar status</div>
           <div className="spacer" />
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px 6px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost"
+            style={{ padding: '4px 6px' }}
+          >
             <IconX size={14} />
           </button>
         </div>

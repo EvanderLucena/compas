@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import type { Patient } from '../../types/patient';
 import { IconWhatsapp, IconEdit, IconX } from '../icons';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface WhatsAppActivationModalProps {
   patient: Patient;
@@ -12,6 +14,9 @@ export function WhatsAppActivationModal({
   onClose,
   onEditPatient,
 }: WhatsAppActivationModalProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   const handleEdit = () => {
     onClose();
     onEditPatient();
@@ -30,7 +35,12 @@ export function WhatsAppActivationModal({
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Ativar WhatsApp"
+        tabIndex={-1}
+        className="card outline-none"
         style={{
           width: 380,
           padding: 28,

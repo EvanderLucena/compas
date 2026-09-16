@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useId, useMemo } from 'react';
+import { useState, useCallback, useId, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
+import { useModalA11y } from '../hooks/useModalA11y';
 import {
   usePatientUIStore,
   usePatients,
@@ -46,13 +47,9 @@ function TogglePatientModal({
   onConfirm: () => void;
 }) {
   const titleId = useId();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   return (
     <div
       style={{
@@ -66,10 +63,12 @@ function TogglePatientModal({
       onClick={onClose}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="card"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(400px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >

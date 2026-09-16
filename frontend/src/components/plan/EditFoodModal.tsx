@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { MealFood } from '../../types/plan';
 import { FOOD_UNIT_SYMBOLS } from '../../types/food';
 import { IconX, IconCheck } from '../icons';
 import { useValidation } from '../../hooks/useValidation';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface EditFoodModalProps {
   item: MealFood;
@@ -111,6 +112,9 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
     fontFamily: mono ? 'var(--font-mono)' : 'var(--font-ui)',
   });
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   return (
     <div
       style={{
@@ -125,14 +129,24 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editar alimento"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(460px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-h">
           <div className="title">Editar alimento</div>
           <div className="spacer" />
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px 6px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost"
+            style={{ padding: '4px 6px' }}
+          >
             <IconX size={14} />
           </button>
         </div>

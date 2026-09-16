@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect, useCallback, useId } from 'react';
+import { type ReactNode, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../lib/utils';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface ModalProps {
   open: boolean;
@@ -13,24 +14,9 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, ariaLabel, children, className }: ModalProps) {
   const titleId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    },
-    [onClose],
-  );
-
-  useEffect(() => {
-    if (open) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = '';
-    };
-  }, [open, handleEscape]);
+  useModalA11y({ open, onClose, containerRef });
 
   if (!open) return null;
 
@@ -39,12 +25,14 @@ export function Modal({ open, onClose, title, ariaLabel, children, className }: 
       <div className="absolute inset-0 bg-ink/50 backdrop-blur-sm" />
 
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-label={!title ? ariaLabel : undefined}
+        tabIndex={-1}
         className={cn(
-          'relative z-10 w-full max-w-lg rounded-[var(--radius-lg)] border border-border bg-surface shadow-xl',
+          'relative z-10 w-full max-w-lg rounded-[var(--radius-lg)] border border-border bg-surface shadow-xl outline-none',
           'animate-in fade-in zoom-in-95',
           className,
         )}
@@ -56,6 +44,7 @@ export function Modal({ open, onClose, title, ariaLabel, children, className }: 
               {title}
             </h2>
             <button
+              type="button"
               onClick={onClose}
               className="text-fg-subtle hover:text-fg transition-colors text-lg leading-none cursor-pointer"
               aria-label="Fechar"

@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import { useValidation } from '../../hooks/useValidation';
 import { IconPlus, IconX } from '../icons';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface AddMealModalProps {
   onClose: () => void;
@@ -129,15 +131,18 @@ function MealTimeInput({
 
 export function AddMealModal({ onClose, onAdd, isSubmitting = false, error }: AddMealModalProps) {
   const form = useMealForm();
-
-  const handleSave = () => {
-    if (!form.validateAll()) return;
-    onAdd({ label: form.label.trim(), time: form.time });
-  };
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleClose = () => {
     form.reset();
     onClose();
+  };
+
+  useModalA11y({ onClose: handleClose, containerRef });
+
+  const handleSave = () => {
+    if (!form.validateAll()) return;
+    onAdd({ label: form.label.trim(), time: form.time });
   };
 
   return (
@@ -154,10 +159,12 @@ export function AddMealModal({ onClose, onAdd, isSubmitting = false, error }: Ad
       onClick={handleClose}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-meal-title"
-        className="card"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(420px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >

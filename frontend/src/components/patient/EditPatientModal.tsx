@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useUpdatePatient, resolveMutationErrorMessage } from '../../stores/patientStore';
 import { useToastStore } from '../../stores/toastStore';
 import type { Patient, ObjectiveOption } from '../../types/patient';
@@ -6,6 +6,7 @@ import { OBJECTIVE_LABELS, OBJECTIVE_KEYS, REVERSE_OBJECTIVE_LABELS } from '../.
 import { IconX, IconCheck } from '../icons';
 import { useValidation } from '../../hooks/useValidation';
 import { parseNumberInput } from '../../utils/numberInput';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 function formatPhone(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -137,6 +138,8 @@ export function EditPatientModal({ patient, open, onClose }: EditPatientModalPro
   });
 
   const canSubmit = form.name.trim().length >= 2 && !updateMutation.isPending;
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ open: open !== false, onClose, containerRef });
 
   if (open === false) return null;
 
@@ -154,14 +157,24 @@ export function EditPatientModal({ patient, open, onClose }: EditPatientModalPro
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editar paciente"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(480px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-h">
           <div className="title">Editar paciente</div>
           <div className="spacer" />
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px 6px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost"
+            style={{ padding: '4px 6px' }}
+          >
             <IconX size={14} />
           </button>
         </div>
