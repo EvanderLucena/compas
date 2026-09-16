@@ -7,6 +7,7 @@ import com.nutriai.api.service.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,8 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Public webhook endpoint for Evolution Go WhatsApp callbacks.
- * No @PreAuthorize — no auth required by Evolution Go (no HMAC).
- * Security is message-level: dedup by messageId + phone matching.
+ * No @PreAuthorize — external webhook callbacks do not carry user JWT.
+ * Security:
+ * 1. Webhook secret validation when configured (X-Webhook-Secret, apikey, Bearer token, query param).
+ * 2. Message-level dedup by messageId + phone matching.
  */
 @RestController
 @RequestMapping("/api/v1/webhooks/whatsapp")
@@ -27,16 +30,26 @@ public class WebhookController {
 
     private final WebhookService webhookService;
     private final ObjectMapper objectMapper;
+    private final String webhookSecret;
 
-    public WebhookController(WebhookService webhookService, ObjectMapper objectMapper) {
+    public WebhookController(
+            WebhookService webhookService,
+            ObjectMapper objectMapper,
+            @Value("${nutriai.webhook.secret:}") String webhookSecret) {
         this.webhookService = webhookService;
         this.objectMapper = objectMapper;
+        this.webhookSecret = webhookSecret != null ? webhookSecret.trim() : "";
     }
 
     @PostMapping
     public ResponseEntity<Void> receiveWebhook(
             @RequestBody String rawBody,
             HttpServletRequest request) {
+
+        if (!isAuthorized(request)) {
+            LOG.warn("Unauthorized WhatsApp webhook attempt from IP: {}", request.getRemoteAddr());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
 
         WhatsAppWebhookDTO payload = parsePayload(rawBody);
         if (payload == null) {
@@ -49,6 +62,40 @@ public class WebhookController {
 
         // Return 200 immediately — processing is async
         return ResponseEntity.ok().build();
+    }
+
+    private boolean isAuthorized(HttpServletRequest request) {
+        if (webhookSecret.isEmpty()) {
+            return true;
+        }
+
+        String xWebhookSecret = request.getHeader("X-Webhook-Secret");
+        if (webhookSecret.equals(xWebhookSecret)) {
+            return true;
+        }
+
+        String apikey = request.getHeader("apikey");
+        if (webhookSecret.equals(apikey)) {
+            return true;
+        }
+
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null) {
+            if (authHeader.startsWith("Bearer ") && webhookSecret.equals(authHeader.substring(7).trim())) {
+                return true;
+            }
+            if (webhookSecret.equals(authHeader.trim())) {
+                return true;
+            }
+        }
+
+        String tokenParam = request.getParameter("token");
+        if (webhookSecret.equals(tokenParam)) {
+            return true;
+        }
+
+        String secretParam = request.getParameter("secret");
+        return webhookSecret.equals(secretParam);
     }
 
     private WhatsAppWebhookDTO parsePayload(String rawBody) {

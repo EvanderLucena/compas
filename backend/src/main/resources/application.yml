@@ -6,6 +6,13 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/nutriai}
     username: ${SPRING_DATASOURCE_USERNAME:nutriai}
     password: ${SPRING_DATASOURCE_PASSWORD:changeme}
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:15}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 30000
+      leak-detection-threshold: 20000
 
   data:
     redis:
@@ -63,7 +70,5 @@ nutriai:
     unknown-response-template: "${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_TEMPLATE:Olá! Sou a assistente inteligente da NutriAI 🥗. Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\nPor favor, peça ao seu nutricionista para cadastrar seu número no painel NutriAI para que possamos começar a acompanhar seu plano alimentar!}"
 
   webhook:
-    # Evolution Go does not support HMAC signatures by default.
-    # Security relies on message ID deduplication + phone matching.
-    # Keep property for backward compatibility but it has no effect.
+    # Secret for authenticating inbound webhook requests (X-Webhook-Secret, apikey, or Bearer)
     secret: ${NUTRIAI_WEBHOOK_SECRET:}
