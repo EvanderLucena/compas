@@ -1,16 +1,18 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useModalA11y } from './useModalA11y';
 
 function TestModal({
   open,
   onClose,
   closeOnEscape,
+  hiddenLast,
 }: {
   open: boolean;
   onClose: () => void;
   closeOnEscape?: boolean;
+  hiddenLast?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   useModalA11y({ open, onClose, containerRef, closeOnEscape });
@@ -24,6 +26,23 @@ function TestModal({
       <button data-testid="btn-close" onClick={onClose}>
         Close
       </button>
+      {hiddenLast && (
+        <button data-testid="btn-hidden" style={{ display: 'none' }}>
+          Hidden
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RerenderContainer() {
+  const [, setCount] = useState(0);
+  return (
+    <div>
+      <button data-testid="re-render-trigger" onClick={() => setCount((c) => c + 1)}>
+        Re-render
+      </button>
+      <TestModal open={true} onClose={() => {}} />
     </div>
   );
 }
@@ -72,5 +91,34 @@ describe('useModalA11y', () => {
     // Focus first element and press Shift+Tab -> should wrap to last element
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('skips elements with display: none from Tab trap cycle', () => {
+    render(<TestModal open={true} onClose={vi.fn()} hiddenLast={true} />);
+
+    const input = screen.getByTestId('input-1');
+    const closeBtn = screen.getByTestId('btn-close');
+
+    // btn-close should be treated as last focusable element because btn-hidden has display: none
+    closeBtn.focus();
+    expect(document.activeElement).toBe(closeBtn);
+
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: false });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('does not jump focus or reset body scroll when parent re-renders with new onClose', () => {
+    render(<RerenderContainer />);
+
+    const actionBtn = screen.getByTestId('btn-action');
+    actionBtn.focus();
+    expect(document.activeElement).toBe(actionBtn);
+
+    const reRenderBtn = screen.getByTestId('re-render-trigger');
+    fireEvent.click(reRenderBtn);
+
+    // Focus must stay on actionBtn instead of jumping
+    expect(document.activeElement).toBe(actionBtn);
+    expect(document.body.style.overflow).toBe('hidden');
   });
 });

@@ -94,17 +94,22 @@ function LogoutView() {
   return null;
 }
 
+function RootLayout() {
+  const location = useLocation();
+  return (
+    <ErrorBoundary key={location.pathname}>
+      <InitializeAuth />
+      <ThemeSync />
+      <Suspense fallback={<PageFallback fullScreen />}>
+        <Outlet />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 const router = createBrowserRouter([
   {
-    element: (
-      <ErrorBoundary>
-        <InitializeAuth />
-        <ThemeSync />
-        <Suspense fallback={<PageFallback fullScreen />}>
-          <Outlet />
-        </Suspense>
-      </ErrorBoundary>
-    ),
+    element: <RootLayout />,
     children: [
       {
         path: '/',

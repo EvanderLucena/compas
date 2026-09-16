@@ -12,17 +12,23 @@ export interface UseModalA11yOptions {
 const FOCUSABLE_SELECTOR =
   'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable]';
 
+function isElementVisible(el: HTMLElement): boolean {
+  if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') {
+    return false;
+  }
+  const isJSDOM = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
+  if (isJSDOM) {
+    return el.style.display !== 'none' && el.style.visibility !== 'hidden';
+  }
+  if (typeof el.checkVisibility === 'function') {
+    return el.checkVisibility({ checkVisibilityCSS: true });
+  }
+  return el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null;
+}
+
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   const elements = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-  return elements.filter((el) => {
-    // Check if layout dimensions exist in real browser
-    const hasLayout = el.offsetWidth > 0 || el.offsetHeight > 0 || el.offsetParent !== null;
-    const isHidden = el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true';
-
-    // In environments with layout engines, require visible dimensions; in JSDOM, allow non-hidden
-    if (el.offsetParent !== null) return true;
-    return !isHidden && (hasLayout || typeof window !== 'undefined');
-  });
+  return elements.filter(isElementVisible);
 }
 
 function handleTabTrap(e: KeyboardEvent, container: HTMLElement): void {
@@ -57,6 +63,9 @@ export function useModalA11y({
   closeOnEscape = true,
   preventScroll = true,
 }: UseModalA11yOptions): void {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -86,7 +95,7 @@ export function useModalA11y({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (closeOnEscape && e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -110,5 +119,5 @@ export function useModalA11y({
         previousActiveElement.current.focus();
       }
     };
-  }, [open, onClose, containerRef, initialFocusRef, closeOnEscape, preventScroll]);
+  }, [open, containerRef, initialFocusRef, closeOnEscape, preventScroll]);
 }

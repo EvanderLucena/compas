@@ -64,6 +64,27 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Conteúdo normal')).toBeInTheDocument();
   });
 
+  it('resets automatically when key changes (e.g. on route navigation)', () => {
+    let shouldThrow = true;
+    const { rerender } = render(
+      <ErrorBoundary key="/route-a">
+        <ProblematicComponent shouldThrow={shouldThrow} />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.getByText('Algo deu errado')).toBeInTheDocument();
+
+    // Navigate to route-b where component doesn't throw
+    shouldThrow = false;
+    rerender(
+      <ErrorBoundary key="/route-b">
+        <ProblematicComponent shouldThrow={shouldThrow} />
+      </ErrorBoundary>,
+    );
+
+    expect(screen.getByText('Conteúdo normal')).toBeInTheDocument();
+  });
+
   it('calls custom onError handler when provided', () => {
     const onError = vi.fn();
     render(
