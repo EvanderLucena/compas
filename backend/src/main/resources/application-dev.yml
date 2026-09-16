@@ -28,6 +28,8 @@ nutriai:
     cookie:
       secure: false
       same-site: Lax
+  webhook:
+    secret: ${NUTRIAI_WEBHOOK_SECRET:}
   seed:
     admin:
       email: admin@nutriai.com
