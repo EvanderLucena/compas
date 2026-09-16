@@ -150,12 +150,10 @@ CREATE POLICY whatsapp_message_tenant_isolation ON whatsapp_message
     FOR ALL
     USING (
         COALESCE(current_setting('app.bypass_rls', true), 'off') = 'on'
-        OR nutritionist_id IS NULL
         OR nutritionist_id = NULLIF(current_setting('app.current_nutritionist_id', true), '')::uuid
     )
     WITH CHECK (
         COALESCE(current_setting('app.bypass_rls', true), 'off') = 'on'
-        OR nutritionist_id IS NULL
         OR nutritionist_id = NULLIF(current_setting('app.current_nutritionist_id', true), '')::uuid
     );
 
