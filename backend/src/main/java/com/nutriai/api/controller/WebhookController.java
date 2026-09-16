@@ -60,8 +60,13 @@ public class WebhookController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
 
-        // Process the webhook
-        webhookService.processIncoming(payload);
+        // Process the webhook in system bypass mode (patient phone resolution across tenants)
+        com.nutriai.api.auth.TenantContext.setBypassRls(true);
+        try {
+            webhookService.processIncoming(payload);
+        } finally {
+            com.nutriai.api.auth.TenantContext.clear();
+        }
 
         // Return 200 immediately — processing is async
         return ResponseEntity.ok().build();

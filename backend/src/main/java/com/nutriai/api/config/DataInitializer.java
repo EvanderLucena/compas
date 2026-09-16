@@ -1,5 +1,6 @@
 package com.nutriai.api.config;
 
+import com.nutriai.api.auth.TenantContext;
 import com.nutriai.api.model.BiometryAssessment;
 import com.nutriai.api.model.Episode;
 import com.nutriai.api.model.EpisodeHistoryEvent;
@@ -97,20 +98,21 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     @Override
-    @Transactional
     public void run(String... args) {
-        Nutritionist demo = ensureDemoNutritionist();
-        List<Food> foods = ensureDemoFoods(demo.getId());
-        if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
-            ensureDemoHistoryCycle(demo.getId(), foods);
-            logger.info("Dev seed already has patients, skipping demo clinical data. Foods available: {}.", foods.size());
-            return;
-        }
+        TenantContext.executeWithBypass(() -> {
+            Nutritionist demo = ensureDemoNutritionist();
+            List<Food> foods = ensureDemoFoods(demo.getId());
+            if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
+                ensureDemoHistoryCycle(demo.getId(), foods);
+                logger.info("Dev seed already has patients, skipping demo clinical data. Foods available: {}.", foods.size());
+                return;
+            }
 
-        List<Patient> patients = createDemoPatients(demo.getId());
-        createDemoClinicalData(demo.getId(), patients, foods);
-        ensureDemoHistoryCycle(demo.getId(), foods);
-        logger.info("Dev seed created: {} patients, {} foods, plans, biometry and history.", patients.size(), foods.size());
+            List<Patient> patients = createDemoPatients(demo.getId());
+            createDemoClinicalData(demo.getId(), patients, foods);
+            ensureDemoHistoryCycle(demo.getId(), foods);
+            logger.info("Dev seed created: {} patients, {} foods, plans, biometry and history.", patients.size(), foods.size());
+        });
     }
 
     private Nutritionist ensureDemoNutritionist() {
