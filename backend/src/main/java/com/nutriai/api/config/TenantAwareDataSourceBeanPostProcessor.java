@@ -15,7 +15,7 @@ public class TenantAwareDataSourceBeanPostProcessor implements BeanPostProcessor
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-        if (bean instanceof DataSource dataSource && !(bean instanceof TenantAwareDataSource)) {
+        if ("dataSource".equals(beanName) && bean instanceof DataSource dataSource && !(bean instanceof TenantAwareDataSource)) {
             return new TenantAwareDataSource(dataSource);
         }
         return bean;

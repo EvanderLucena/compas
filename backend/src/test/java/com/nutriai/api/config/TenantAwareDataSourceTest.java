@@ -129,6 +129,32 @@ class TenantAwareDataSourceTest {
     }
 
     @Test
+    void getConnection_postgresWhenContextChangesMidConnection_resyncsStatement() throws SQLException {
+        TenantContext.setBypassRls(true);
+
+        when(targetDataSource.getConnection()).thenReturn(mockConnection);
+        when(mockConnection.getMetaData()).thenReturn(mockMetaData);
+        when(mockMetaData.getDatabaseProductName()).thenReturn("PostgreSQL");
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
+
+        Connection wrapped = tenantAwareDataSource.getConnection();
+
+        // Initially bypass is set
+        verify(mockPreparedStatement).setString(1, "");
+        verify(mockPreparedStatement).setString(2, "on");
+
+        // Now switch context to a tenant mid-connection
+        UUID tenantId = UUID.randomUUID();
+        TenantContext.setTenantId(tenantId);
+
+        // Preparing a statement triggers resync
+        wrapped.prepareStatement("SELECT * FROM patient");
+
+        verify(mockPreparedStatement).setString(1, tenantId.toString());
+        verify(mockPreparedStatement).setString(2, "off");
+    }
+
+    @Test
     void beanPostProcessor_wrapsDataSource() {
         TenantAwareDataSourceBeanPostProcessor processor = new TenantAwareDataSourceBeanPostProcessor();
 
@@ -142,5 +168,9 @@ class TenantAwareDataSourceTest {
         // Ignores other beans
         String otherBean = "notADataSource";
         assertSame(otherBean, processor.postProcessAfterInitialization(otherBean, "otherBean"));
+
+        // Ignores secondary DataSources
+        DataSource secondaryDs = mock(DataSource.class);
+        assertSame(secondaryDs, processor.postProcessAfterInitialization(secondaryDs, "secondaryDataSource"));
     }
 }

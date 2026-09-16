@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Async queue worker that processes enqueued messages concurrently.
@@ -98,10 +99,9 @@ public class MessageProcessorWorker {
     }
 
     public void processSingleMessage(UUID messageId) {
-        Optional<WhatsAppMessage> msgOpt;
-        TenantContext.setBypassRls(true);
-        try {
-            msgOpt = whatsAppMessageRepository.findById(messageId);
+        AtomicReference<Optional<WhatsAppMessage>> msgRef = new AtomicReference<>();
+        TenantContext.executeWithBypass(() -> {
+            Optional<WhatsAppMessage> msgOpt = whatsAppMessageRepository.findById(messageId);
             if (msgOpt.isEmpty()) {
                 try {
                     Thread.sleep(100);
@@ -109,13 +109,14 @@ public class MessageProcessorWorker {
                     Thread.currentThread().interrupt();
                 }
                 msgOpt = whatsAppMessageRepository.findById(messageId);
-                if (msgOpt.isEmpty()) {
-                    log.warn("Message {} not found in DB, dropping from queue", messageId);
-                    return;
-                }
             }
-        } finally {
-            TenantContext.clear();
+            msgRef.set(msgOpt);
+        });
+
+        Optional<WhatsAppMessage> msgOpt = msgRef.get();
+        if (msgOpt == null || msgOpt.isEmpty()) {
+            log.warn("Message {} not found in DB, dropping from queue", messageId);
+            return;
         }
 
         WhatsAppMessage message = msgOpt.get();
@@ -131,24 +132,25 @@ public class MessageProcessorWorker {
             return;
         }
 
+        Runnable processTask = () -> {
+            try {
+                conversationService.processMessage(messageId);
+            } catch (Exception e) {
+                // Increment retry count, clear processed flag, update lastRetryAt
+                message.setRetryCount(message.getRetryCount() + 1);
+                message.setProcessed(false);
+                message.setProcessedAt(null);
+                message.setLastRetryAt(LocalDateTime.now());
+                whatsAppMessageRepository.save(message);
+                log.error("Error processing message {} (retry {}/{}): {}",
+                        messageId, message.getRetryCount(), MAX_RETRIES, e.getMessage(), e);
+            }
+        };
+
         if (message.getNutritionistId() != null) {
-            TenantContext.setTenantId(message.getNutritionistId());
+            TenantContext.executeAsTenant(message.getNutritionistId(), processTask);
         } else {
-            TenantContext.setBypassRls(true);
-        }
-        try {
-            conversationService.processMessage(messageId);
-        } catch (Exception e) {
-            // Increment retry count, clear processed flag, update lastRetryAt
-            message.setRetryCount(message.getRetryCount() + 1);
-            message.setProcessed(false);
-            message.setProcessedAt(null);
-            message.setLastRetryAt(LocalDateTime.now());
-            whatsAppMessageRepository.save(message);
-            log.error("Error processing message {} (retry {}/{}): {}",
-                    messageId, message.getRetryCount(), MAX_RETRIES, e.getMessage(), e);
-        } finally {
-            TenantContext.clear();
+            TenantContext.executeWithBypass(processTask);
         }
     }
 
