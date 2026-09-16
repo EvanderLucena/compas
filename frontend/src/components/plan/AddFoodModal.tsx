@@ -4,6 +4,7 @@ import { mapFoodFromApi, FOOD_UNIT_SYMBOLS } from '../../types/food';
 import { listFoods } from '../../api/foods';
 import { parseNumberInput, sanitizeNumberInput } from '../../utils/numberInput';
 import { IconSearch, IconPlus, IconX } from '../icons';
+import { useModalA11y } from '../../hooks/useModalA11y';
 
 interface AddFoodModalProps {
   onClose: () => void;
@@ -106,6 +107,10 @@ export function AddFoodModal({ onClose, onAdd, isSubmitting = false, error }: Ad
     onClose();
   };
 
+  const canSubmit = selected && referenceAmount && !amountError && !isSubmitting;
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   const unitSymbol = selected ? FOOD_UNIT_SYMBOLS[selected.unit] : '';
 
   return (
@@ -122,14 +127,24 @@ export function AddFoodModal({ onClose, onAdd, isSubmitting = false, error }: Ad
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Adicionar alimento"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(520px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-h">
           <div className="title">Adicionar alimento</div>
           <div className="spacer" />
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px 6px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost"
+            style={{ padding: '4px 6px' }}
+          >
             <IconX size={14} />
           </button>
         </div>
@@ -358,10 +373,11 @@ export function AddFoodModal({ onClose, onAdd, isSubmitting = false, error }: Ad
             Cancelar
           </button>
           <button
+            type="button"
             className="btn btn-primary"
-            disabled={!selected || !referenceAmount || isSubmitting}
+            disabled={!canSubmit}
             onClick={handleAdd}
-            style={{ opacity: selected && referenceAmount && !isSubmitting ? 1 : 0.45 }}
+            style={{ opacity: canSubmit ? 1 : 0.45 }}
           >
             <IconPlus size={13} /> {isSubmitting ? 'Adicionando...' : 'Adicionar'}
           </button>

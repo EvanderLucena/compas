@@ -1,13 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { Rail } from './Rail';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { Outlet } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
 import { useRouteSync } from '../../hooks/useRouteSync';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
+import { PageFallback } from '../ui/PageFallback';
 
 export function AppShell() {
   useRouteSync();
+  const location = useLocation();
   const setSidebarOpen = useNavigationStore((s) => s.setSidebarOpen);
 
   useEffect(() => {
@@ -28,7 +31,11 @@ export function AppShell() {
       <div className="main">
         <Topbar />
         <div className="page">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Suspense fallback={<PageFallback />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { IconPlus, IconX, IconTrash, IconEdit } from '../components/icons';
 import { parseNumberInput } from '../utils/numberInput';
 import {
@@ -100,14 +101,19 @@ function TotalCell({
 }
 
 function DeleteConfirmModal({
+  title,
   name,
   onClose,
   onConfirm,
 }: {
+  title?: string;
   name: string;
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   return (
     <div
       style={{
@@ -122,7 +128,12 @@ function DeleteConfirmModal({
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || 'Excluir'}
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(400px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >

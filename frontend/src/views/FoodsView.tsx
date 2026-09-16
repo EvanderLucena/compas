@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import {
   FOOD_CATEGORIES,
   FOOD_CATEGORY_LABELS,
@@ -319,6 +320,8 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
 
   const unitSymbol = FOOD_UNIT_SYMBOLS[unit];
   const refLabel = unit === 'UNIDADE' ? 'unidade' : unit === 'ML' ? 'ml' : 'g';
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
 
   return (
     <div
@@ -334,7 +337,12 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editar alimento"
+        tabIndex={-1}
+        className="card outline-none"
         style={{
           width: 'min(520px, 100%)',
           maxHeight: '90vh',
@@ -570,6 +578,9 @@ function DeleteConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
+
   return (
     <div
       style={{
@@ -584,7 +595,12 @@ function DeleteConfirmModal({
       onClick={onClose}
     >
       <div
-        className="card"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Excluir alimento"
+        tabIndex={-1}
+        className="card outline-none"
         style={{ width: 'min(400px, 100%)', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1002,6 +1018,8 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
 
   const unitSymbol = FOOD_UNIT_SYMBOLS[unit];
   const refLabel = unit === 'UNIDADE' ? 'unidade' : unit === 'ML' ? 'ml' : 'g';
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalA11y({ onClose, containerRef });
 
   return (
     <div
@@ -1017,10 +1035,12 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-food-title"
-        className="card"
+        tabIndex={-1}
+        className="card outline-none"
         style={{
           width: 'min(520px, 100%)',
           maxHeight: '90vh',

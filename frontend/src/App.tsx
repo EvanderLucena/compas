@@ -7,21 +7,36 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useAuthStore } from './stores/authStore';
 import { usePublicTheme } from './hooks/usePublicTheme';
 import { AppShell } from './components/shell/AppShell';
-import { HomeView } from './views/HomeView';
-import { PatientsView } from './views/PatientsView';
-import { PatientView } from './views/PatientView';
-import { FoodsView } from './views/FoodsView';
-import { InsightsView } from './views/InsightsView';
-import { LandingView } from './views/LandingView';
-import { LoginView } from './views/LoginView';
-import { SignupView } from './views/SignupView';
-import { OnboardingView } from './views/OnboardingView';
 import { Toast } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { PageFallback } from './components/ui/PageFallback';
 import type { ReactNode } from 'react';
+
+const LandingView = lazy(() =>
+  import('./views/LandingView').then((m) => ({ default: m.LandingView })),
+);
+const LoginView = lazy(() => import('./views/LoginView').then((m) => ({ default: m.LoginView })));
+const SignupView = lazy(() =>
+  import('./views/SignupView').then((m) => ({ default: m.SignupView })),
+);
+const OnboardingView = lazy(() =>
+  import('./views/OnboardingView').then((m) => ({ default: m.OnboardingView })),
+);
+const HomeView = lazy(() => import('./views/HomeView').then((m) => ({ default: m.HomeView })));
+const PatientsView = lazy(() =>
+  import('./views/PatientsView').then((m) => ({ default: m.PatientsView })),
+);
+const PatientView = lazy(() =>
+  import('./views/PatientView').then((m) => ({ default: m.PatientView })),
+);
+const FoodsView = lazy(() => import('./views/FoodsView').then((m) => ({ default: m.FoodsView })));
+const InsightsView = lazy(() =>
+  import('./views/InsightsView').then((m) => ({ default: m.InsightsView })),
+);
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -79,14 +94,22 @@ function LogoutView() {
   return null;
 }
 
+function RootLayout() {
+  const location = useLocation();
+  return (
+    <ErrorBoundary key={location.pathname}>
+      <InitializeAuth />
+      <ThemeSync />
+      <Suspense fallback={<PageFallback fullScreen />}>
+        <Outlet />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 const router = createBrowserRouter([
   {
-    element: (
-      <>
-        <InitializeAuth />
-        <ThemeSync />
-      </>
-    ),
+    element: <RootLayout />,
     children: [
       {
         path: '/',
@@ -142,10 +165,12 @@ const router = createBrowserRouter([
 
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toast />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+        <Toast />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
