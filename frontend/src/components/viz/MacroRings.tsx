@@ -38,8 +38,7 @@ export function MacroRings({ macros, size = 64, className }: MacroRingsProps) {
               <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{it.label}</div>
               <div className="mono tnum" style={{ fontSize: 11.5 }}>
                 {it.data.actual}
-                {it.unit || ''} / {it.data.target}
-                {it.unit || ''}
+                {it.unit || ''} / {it.data.target > 0 ? `${it.data.target}${it.unit || ''}` : '—'}
               </div>
             </div>
           </div>

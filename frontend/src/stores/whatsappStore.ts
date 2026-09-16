@@ -44,6 +44,7 @@ export function mapExtractionsToTimelineEvents(extractions: Extraction[]): Timel
       macros,
       hasMessage: true,
       extractionId: ex.id,
+      rawItems: ex.items,
     };
   });
 }
@@ -57,7 +58,9 @@ export function useExtractions(patientId: string | null) {
       return whatsappApi.getExtractions(patientId);
     },
     enabled: !!patientId,
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -148,6 +151,8 @@ export function useWhatsAppStatus() {
   return useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: whatsappApi.getStatus,
-    staleTime: 30_000,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 }

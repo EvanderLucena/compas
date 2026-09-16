@@ -342,24 +342,89 @@ function TodayTab({
   plan: MealPlan | null;
   onSetTab: (t: Tab) => void;
 }) {
-  const reportedMacrosToday: MacroTarget = patient.macrosToday;
   const {
     data: extractions,
     isLoading: extractionsLoading,
     isError: extractionsError,
   } = useExtractions(patientId);
 
-  const extractionEvents = extractions ? mapExtractionsToTimelineEvents(extractions) : [];
-  const timelineEvents = [...extractionEvents, ...patient.timeline];
+  const extractionEvents = React.useMemo(
+    () => (extractions ? mapExtractionsToTimelineEvents(extractions) : []),
+    [extractions],
+  );
+  const timelineEvents = React.useMemo(
+    () => [...extractionEvents, ...patient.timeline],
+    [extractionEvents, patient.timeline],
+  );
 
   const kcalTarget = plan?.kcalTarget ?? patient.macrosToday.kcal.target;
   const protTarget = plan?.protTarget ?? patient.macrosToday.prot.target;
   const carbTarget = plan?.carbTarget ?? patient.macrosToday.carb.target;
   const fatTarget = plan?.fatTarget ?? patient.macrosToday.fat.target;
 
+  const reportedMacrosToday: MacroTarget = React.useMemo(() => {
+    let actualKcal = 0;
+    let actualProt = 0;
+    let actualCarb = 0;
+    let actualFat = 0;
+
+    if (extractions && extractions.length > 0) {
+      actualKcal = Math.round(
+        extractions.reduce((sum, ex) => sum + (Number(ex.totalKcal) || 0), 0),
+      );
+      actualProt = Math.round(
+        extractions.reduce((sum, ex) => sum + (Number(ex.totalProt) || 0), 0),
+      );
+      actualCarb = Math.round(
+        extractions.reduce((sum, ex) => sum + (Number(ex.totalCarb) || 0), 0),
+      );
+      actualFat = Math.round(extractions.reduce((sum, ex) => sum + (Number(ex.totalFat) || 0), 0));
+    } else {
+      const logs = timelineEvents.filter((ev) => ev.kind === 'log' && ev.macros);
+      if (logs.length > 0) {
+        actualKcal = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.kcal || 0), 0));
+        actualProt = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.prot || 0), 0));
+        actualCarb = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.carb || 0), 0));
+        actualFat = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.fat || 0), 0));
+      } else {
+        actualKcal = patient.macrosToday.kcal.actual;
+        actualProt = patient.macrosToday.prot.actual;
+        actualCarb = patient.macrosToday.carb.actual;
+        actualFat = patient.macrosToday.fat.actual;
+      }
+    }
+
+    return {
+      kcal: { target: kcalTarget, actual: actualKcal },
+      prot: { target: protTarget, actual: actualProt },
+      carb: { target: carbTarget, actual: actualCarb },
+      fat: { target: fatTarget, actual: actualFat },
+    };
+  }, [
+    extractions,
+    timelineEvents,
+    patient.macrosToday,
+    kcalTarget,
+    protTarget,
+    carbTarget,
+    fatTarget,
+  ]);
+
   const mealCount = plan?.meals?.length ?? 6;
   const timelineCount = timelineEvents.filter((ev) => ev.kind === 'log').length;
   const hasTimelineData = timelineCount > 0;
+
+  const weekMacroFill = React.useMemo(() => {
+    if (patient.weekMacroFill && patient.weekMacroFill.length === 7) {
+      return patient.weekMacroFill;
+    }
+    const todayFill =
+      kcalTarget > 0 ? Math.min(1, reportedMacrosToday.kcal.actual / kcalTarget) : 0;
+    const dayOfWeek = (new Date().getDay() + 6) % 7; // Monday = 0, Sunday = 6
+    const fill = [0, 0, 0, 0, 0, 0, 0];
+    fill[dayOfWeek] = todayFill;
+    return fill;
+  }, [patient.weekMacroFill, kcalTarget, reportedMacrosToday.kcal.actual]);
 
   return (
     <div>
@@ -553,7 +618,7 @@ function TodayTab({
             <div className="sub">SEG — DOM</div>
           </div>
           <div className="card-b">
-            <WeekBars values={patient.weekMacroFill} height={42} />
+            <WeekBars values={weekMacroFill} height={42} />
           </div>
         </div>
 

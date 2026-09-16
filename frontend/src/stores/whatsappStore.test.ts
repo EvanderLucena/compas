@@ -43,6 +43,8 @@ describe('whatsappStore', () => {
       expect(events[0].macros.fat).toBe(9);
       expect(events[0].time).toBeTruthy();
       expect(events[0].hasMessage).toBe(true);
+      expect(events[0].rawItems).toHaveLength(3);
+      expect(events[0].rawItems?.[0].name).toBe('Arroz');
     });
 
     it('handles empty extractions array', () => {

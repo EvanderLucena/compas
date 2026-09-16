@@ -70,11 +70,6 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function ThemeSync() {
-  usePublicTheme();
-  return <Outlet />;
-}
-
 function InitializeAuth() {
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
   useEffect(() => {
@@ -96,10 +91,11 @@ function LogoutView() {
 
 function RootLayout() {
   const location = useLocation();
+  usePublicTheme();
+
   return (
     <ErrorBoundary key={location.pathname}>
       <InitializeAuth />
-      <ThemeSync />
       <Suspense fallback={<PageFallback fullScreen />}>
         <Outlet />
       </Suspense>

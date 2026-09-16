@@ -20,13 +20,21 @@ interface ExtractionEditorProps {
 
 export function ExtractionEditor({ ev, extractionId, patientId, onClose }: ExtractionEditorProps) {
   const [items, setItems] = useState<ExtractionRow[]>(
-    ev.items.map((name, i) => ({
-      name,
-      kcal: i === 0 ? (ev.macros?.kcal ?? 0) : 0,
-      prot: i === 0 ? (ev.macros?.prot ?? 0) : 0,
-      carb: i === 0 ? (ev.macros?.carb ?? 0) : 0,
-      fat: i === 0 ? (ev.macros?.fat ?? 0) : 0,
-    })),
+    ev.rawItems && ev.rawItems.length > 0
+      ? ev.rawItems.map((item) => ({
+          name: item.name,
+          kcal: item.kcal,
+          prot: item.prot,
+          carb: item.carb,
+          fat: item.fat,
+        }))
+      : ev.items.map((name, i) => ({
+          name,
+          kcal: i === 0 ? (ev.macros?.kcal ?? 0) : 0,
+          prot: i === 0 ? (ev.macros?.prot ?? 0) : 0,
+          carb: i === 0 ? (ev.macros?.carb ?? 0) : 0,
+          fat: i === 0 ? (ev.macros?.fat ?? 0) : 0,
+        })),
   );
   const patchExtraction = usePatchExtraction(patientId);
 
