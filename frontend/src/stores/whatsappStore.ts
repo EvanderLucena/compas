@@ -49,9 +49,17 @@ export function mapExtractionsToTimelineEvents(extractions: Extraction[]): Timel
   });
 }
 
+/** Helper to format a Date as YYYY-MM-DD in local time (prevents UTC drift) */
+export function toLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /** TanStack Query hook for extractions by date (defaults to today) */
 export function useExtractions(patientId: string | null, date?: string) {
-  const isToday = !date || date === new Date().toISOString().split('T')[0];
+  const isToday = !date || date === toLocalDateString();
   return useQuery({
     queryKey: ['whatsapp-extractions', patientId, date ?? 'today'],
     queryFn: () => {

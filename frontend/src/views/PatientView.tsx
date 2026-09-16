@@ -25,7 +25,11 @@ import {
   usePatientHistoryEpisodes,
   useHistoricalEpisode,
 } from '../stores/clinicalStore';
-import { useExtractions, mapExtractionsToTimelineEvents } from '../stores/whatsappStore';
+import {
+  useExtractions,
+  mapExtractionsToTimelineEvents,
+  toLocalDateString,
+} from '../stores/whatsappStore';
 import { PlansView } from './PlansView';
 import type { PatientStatus } from '../types/patient';
 import type { MealPlan } from '../types/plan';
@@ -342,7 +346,7 @@ function TodayTab({
   plan: MealPlan | null;
   onSetTab: (t: Tab) => void;
 }) {
-  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = React.useMemo(() => toLocalDateString(), []);
   const [selectedDate, setSelectedDate] = React.useState<string>(todayStr);
   const isToday = selectedDate === todayStr;
 
@@ -350,24 +354,23 @@ function TodayTab({
     const [year, month, day] = selectedDate.split('-').map(Number);
     const d = new Date(year, month - 1, day);
     const today = new Date();
-    const todayIso = today.toISOString().split('T')[0];
+    const todayFormatted = toLocalDateString(today);
 
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-    const yesterdayIso = yesterday.toISOString().split('T')[0];
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    const yesterdayFormatted = toLocalDateString(yesterday);
 
     const weekday = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
     const monthName = d.toLocaleDateString('pt-BR', { month: 'long' });
     const shortMonth = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
 
-    if (selectedDate === todayIso) {
+    if (selectedDate === todayFormatted) {
       return {
         label: `Hoje · ${day} de ${monthName}`,
         short: 'hoje',
         dayOfWeekIndex: (d.getDay() + 6) % 7,
       };
     }
-    if (selectedDate === yesterdayIso) {
+    if (selectedDate === yesterdayFormatted) {
       return {
         label: `Ontem · ${day} de ${monthName}`,
         short: 'ontem',
@@ -384,19 +387,17 @@ function TodayTab({
 
   const handlePrevDay = () => {
     const [y, m, d] = selectedDate.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setDate(date.getDate() - 1);
-    setSelectedDate(date.toISOString().split('T')[0]);
+    const date = new Date(y, m - 1, d - 1);
+    setSelectedDate(toLocalDateString(date));
   };
 
   const handleNextDay = () => {
     if (selectedDate >= todayStr) return;
     const [y, m, d] = selectedDate.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setDate(date.getDate() + 1);
-    const nextIso = date.toISOString().split('T')[0];
-    if (nextIso <= todayStr) {
-      setSelectedDate(nextIso);
+    const date = new Date(y, m - 1, d + 1);
+    const nextFormatted = toLocalDateString(date);
+    if (nextFormatted <= todayStr) {
+      setSelectedDate(nextFormatted);
     }
   };
 
@@ -437,7 +438,7 @@ function TodayTab({
         extractions.reduce((sum, ex) => sum + (Number(ex.totalCarb) || 0), 0),
       );
       actualFat = Math.round(extractions.reduce((sum, ex) => sum + (Number(ex.totalFat) || 0), 0));
-    } else {
+    } else if (isToday) {
       const logs = timelineEvents.filter((ev) => ev.kind === 'log' && ev.macros);
       if (logs.length > 0) {
         actualKcal = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.kcal || 0), 0));
@@ -462,6 +463,7 @@ function TodayTab({
     extractions,
     timelineEvents,
     patient.macrosToday,
+    isToday,
     kcalTarget,
     protTarget,
     carbTarget,
