@@ -59,12 +59,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                 List.of(new SimpleGrantedAuthority("ROLE_" + role))
                         );
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                TenantContext.setTenantId(nutritionistId);
             } catch (Exception e) {
                 SecurityContextHolder.clearContext();
+                TenantContext.clear();
             }
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     @Override

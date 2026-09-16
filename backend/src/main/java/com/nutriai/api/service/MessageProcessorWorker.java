@@ -1,5 +1,6 @@
 package com.nutriai.api.service;
 
+import com.nutriai.api.auth.TenantContext;
 import com.nutriai.api.model.WhatsAppMessage;
 import com.nutriai.api.repository.WhatsAppMessageRepository;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Async queue worker that processes enqueued messages concurrently.
@@ -97,18 +99,24 @@ public class MessageProcessorWorker {
     }
 
     public void processSingleMessage(UUID messageId) {
-        Optional<WhatsAppMessage> msgOpt = whatsAppMessageRepository.findById(messageId);
-        if (msgOpt.isEmpty()) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            msgOpt = whatsAppMessageRepository.findById(messageId);
+        AtomicReference<Optional<WhatsAppMessage>> msgRef = new AtomicReference<>();
+        TenantContext.executeWithBypass(() -> {
+            Optional<WhatsAppMessage> msgOpt = whatsAppMessageRepository.findById(messageId);
             if (msgOpt.isEmpty()) {
-                log.warn("Message {} not found in DB, dropping from queue", messageId);
-                return;
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                msgOpt = whatsAppMessageRepository.findById(messageId);
             }
+            msgRef.set(msgOpt);
+        });
+
+        Optional<WhatsAppMessage> msgOpt = msgRef.get();
+        if (msgOpt == null || msgOpt.isEmpty()) {
+            log.warn("Message {} not found in DB, dropping from queue", messageId);
+            return;
         }
 
         WhatsAppMessage message = msgOpt.get();
@@ -124,17 +132,25 @@ public class MessageProcessorWorker {
             return;
         }
 
-        try {
-            conversationService.processMessage(messageId);
-        } catch (Exception e) {
-            // Increment retry count, clear processed flag, update lastRetryAt
-            message.setRetryCount(message.getRetryCount() + 1);
-            message.setProcessed(false);
-            message.setProcessedAt(null);
-            message.setLastRetryAt(LocalDateTime.now());
-            whatsAppMessageRepository.save(message);
-            log.error("Error processing message {} (retry {}/{}): {}",
-                    messageId, message.getRetryCount(), MAX_RETRIES, e.getMessage(), e);
+        Runnable processTask = () -> {
+            try {
+                conversationService.processMessage(messageId);
+            } catch (Exception e) {
+                // Increment retry count, clear processed flag, update lastRetryAt
+                message.setRetryCount(message.getRetryCount() + 1);
+                message.setProcessed(false);
+                message.setProcessedAt(null);
+                message.setLastRetryAt(LocalDateTime.now());
+                whatsAppMessageRepository.save(message);
+                log.error("Error processing message {} (retry {}/{}): {}",
+                        messageId, message.getRetryCount(), MAX_RETRIES, e.getMessage(), e);
+            }
+        };
+
+        if (message.getNutritionistId() != null) {
+            TenantContext.executeAsTenant(message.getNutritionistId(), processTask);
+        } else {
+            TenantContext.executeWithBypass(processTask);
         }
     }
 
@@ -145,26 +161,28 @@ public class MessageProcessorWorker {
      */
     @Scheduled(fixedDelay = 30000)
     public void requeueFailedMessages() {
-        Pageable pageable = PageRequest.of(0, 100);
-        Page<WhatsAppMessage> failedPage = whatsAppMessageRepository
-                .findByProcessedFalseAndRetryCountLessThanOrderByCreatedAtAsc(MAX_RETRIES, pageable);
+        TenantContext.executeWithBypass(() -> {
+            Pageable pageable = PageRequest.of(0, 100);
+            Page<WhatsAppMessage> failedPage = whatsAppMessageRepository
+                    .findByProcessedFalseAndRetryCountLessThanOrderByCreatedAtAsc(MAX_RETRIES, pageable);
 
-        int requeued = 0;
-        for (WhatsAppMessage msg : failedPage.getContent()) {
-            // Use lastRetryAt for backoff; fall back to createdAt for messages never retried
-            LocalDateTime lastAttempt = msg.getLastRetryAt() != null ? msg.getLastRetryAt() : msg.getCreatedAt();
-            if (lastAttempt != null && lastAttempt.isBefore(LocalDateTime.now().minusMinutes(1))) {
-                // Only re-enqueue if at least 1 minute has passed since last attempt
-                // Update lastRetryAt immediately to prevent duplicate re-enqueue (HIGH fix)
-                msg.setLastRetryAt(LocalDateTime.now());
-                whatsAppMessageRepository.save(msg);
-                messageQueueService.enqueue(msg.getId());
-                requeued++;
+            int requeued = 0;
+            for (WhatsAppMessage msg : failedPage.getContent()) {
+                // Use lastRetryAt for backoff; fall back to createdAt for messages never retried
+                LocalDateTime lastAttempt = msg.getLastRetryAt() != null ? msg.getLastRetryAt() : msg.getCreatedAt();
+                if (lastAttempt != null && lastAttempt.isBefore(LocalDateTime.now().minusMinutes(1))) {
+                    // Only re-enqueue if at least 1 minute has passed since last attempt
+                    // Update lastRetryAt immediately to prevent duplicate re-enqueue (HIGH fix)
+                    msg.setLastRetryAt(LocalDateTime.now());
+                    whatsAppMessageRepository.save(msg);
+                    messageQueueService.enqueue(msg.getId());
+                    requeued++;
+                }
             }
-        }
 
-        if (requeued > 0) {
-            log.info("Re-enqueued {} failed messages for retry", requeued);
-        }
+            if (requeued > 0) {
+                log.info("Re-enqueued {} failed messages for retry", requeued);
+            }
+        });
     }
 }
