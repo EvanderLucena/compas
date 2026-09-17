@@ -332,6 +332,7 @@ public class ConversationService {
             - NUNCA reprove o paciente por comer algo fora do plano.
             - Se o paciente relatou uma refeição: confirme o registro com simpatia e dê uma palavra rápida de incentivo (máximo 2 a 3 frases).
             - Se o paciente estiver complementando ou detalhando uma refeição já mencionada no histórico recente, consolide todos os alimentos da refeição no JSON e use o mesmo mealLabel.
+            - Interprete pratos do dia a dia, gírias e lanches populares brasileiros (ex: 'x-frango', 'xfrango', 'x-tudo', 'x-salada', 'x-bacon' são sanduíches/lanches completos com pão, proteína e queijo; 'misto quente', 'pastel', 'coxinha', etc.). Se o paciente citar frações (ex: 'metade de um xfrango'), estime os macros proporcionais àquela fatia do sanduíche (pão + recheio).
             - Responda em português brasileiro.
 
             CONTEXTO DO PACIENTE:
@@ -476,6 +477,7 @@ public class ConversationService {
             - NUNCA use listas com marcadores (- ou •) ou tópicos.
             - NUNCA reprove o paciente por comer algo fora do plano.
             - Confirme que recebeu a foto e o relato de forma leve e acolhedora.
+            - Interprete lanches populares brasileiros (ex: 'x-frango', 'xfrango', 'x-salada', 'pastel', 'misto quente', etc.) considerando pão e recheio na estimativa.
             - Responda em português brasileiro.
 
             CONTEXTO DO PACIENTE:
