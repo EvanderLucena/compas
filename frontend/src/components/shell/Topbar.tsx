@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
-import { IconCalendar } from '../../components/icons';
+import { IconCalendar, IconUser } from '../../components/icons';
+import { ProfileModal } from '../profile/ProfileModal';
 
 const VIEW_LABELS: Record<string, string[]> = {
   home: ['Dashboard'],
@@ -16,9 +17,10 @@ const VIEW_LABELS: Record<string, string[]> = {
 interface UserProfileMenuProps {
   user: { name?: string; email?: string } | null;
   onLogout: () => void;
+  onOpenProfile: () => void;
 }
 
-function UserProfileMenu({ user, onLogout }: UserProfileMenuProps) {
+function UserProfileMenu({ user, onLogout, onOpenProfile }: UserProfileMenuProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +102,26 @@ function UserProfileMenu({ user, onLogout }: UserProfileMenuProps) {
               justifyContent: 'flex-start',
               fontSize: 12,
               padding: '6px 8px',
+              color: 'var(--fg)',
+              cursor: 'pointer',
+              marginBottom: 4,
+            }}
+            onClick={() => {
+              setOpen(false);
+              onOpenProfile();
+            }}
+          >
+            <IconUser size={14} style={{ marginRight: 6 }} />
+            Meu Perfil
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              fontSize: 12,
+              padding: '6px 8px',
               color: 'var(--coral)',
             }}
             onClick={() => {
@@ -121,6 +143,7 @@ export function Topbar() {
   const { theme, toggleTheme } = useThemeStore();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const crumbs = VIEW_LABELS[activeView] || ['Dashboard'];
   const [now, setNow] = useState(() => new Date());
@@ -209,8 +232,13 @@ export function Topbar() {
             </svg>
           )}
         </button>
-        <UserProfileMenu user={user} onLogout={handleLogout} />
+        <UserProfileMenu
+          user={user}
+          onLogout={handleLogout}
+          onOpenProfile={() => setProfileOpen(true)}
+        />
       </div>
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </header>
   );
 }
