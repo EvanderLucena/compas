@@ -14,7 +14,8 @@ export const FOOD_UNIT_SYMBOLS: Record<FoodUnit, string> = {
   ML: 'ml',
 };
 
-export type FoodCategoryKey = 'PROTEINA' | 'CARBOIDRATO' | 'GORDURA' | 'VEGETAL' | 'FRUTA' | 'BEBIDA' | 'OUTRO';
+export type FoodCategoryKey =
+  'PROTEINA' | 'CARBOIDRATO' | 'GORDURA' | 'VEGETAL' | 'FRUTA' | 'BEBIDA' | 'OUTRO';
 export type FoodCategory = 'Todos' | FoodCategoryKey;
 
 export const FOOD_CATEGORY_KEYS: FoodCategoryKey[] = [
@@ -38,7 +39,7 @@ export const FOOD_CATEGORY_LABELS: Record<FoodCategoryKey, string> = {
 };
 
 export const REVERSE_CATEGORY_LABELS: Record<string, FoodCategoryKey> = Object.fromEntries(
-  Object.entries(FOOD_CATEGORY_LABELS).map(([k, v]) => [v, k as FoodCategoryKey])
+  Object.entries(FOOD_CATEGORY_LABELS).map(([k, v]) => [v, k as FoodCategoryKey]),
 ) as Record<string, FoodCategoryKey>;
 
 export interface Food {
@@ -55,6 +56,7 @@ export interface Food {
   prep: string;
   portionLabel: string;
   used: number;
+  custom?: boolean;
 }
 
 export const FOOD_CATEGORIES: FoodCategory[] = ['Todos', ...FOOD_CATEGORY_KEYS];
@@ -73,6 +75,7 @@ export interface FoodApiResponse {
   prep: string | null;
   portionLabel: string | null;
   usedCount: number;
+  custom?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -104,5 +107,6 @@ export function mapFoodFromApi(api: FoodApiResponse): Food {
     prep: api.prep ?? '',
     portionLabel: api.portionLabel ?? '',
     used: api.usedCount,
+    custom: api.custom ?? true,
   };
 }

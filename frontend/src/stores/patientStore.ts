@@ -135,8 +135,9 @@ export function useDeactivatePatient() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: patientApi.deactivatePatient,
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient', id] });
     },
     onError: () => {
       useToastStore.getState().showError('Erro ao desativar paciente — tente novamente');
@@ -149,8 +150,9 @@ export function useReactivatePatient() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: patientApi.reactivatePatient,
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient', id] });
     },
     onError: () => {
       useToastStore.getState().showError('Erro ao reativar paciente — tente novamente');

@@ -108,10 +108,12 @@ function FoodMenuDropdown({
   onEdit,
   onDelete,
   onClose,
+  isCustom = true,
 }: {
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
+  isCustom?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -144,17 +146,19 @@ function FoodMenuDropdown({
           onClose();
         }}
         icon={<IconEdit size={13} />}
-        label="Editar"
+        label={isCustom ? 'Editar' : 'Visualizar / Duplicar'}
       />
-      <DropdownItem
-        onClick={() => {
-          onDelete();
-          onClose();
-        }}
-        icon={<IconTrash size={13} />}
-        label="Excluir"
-        color="var(--coral)"
-      />
+      {isCustom && (
+        <DropdownItem
+          onClick={() => {
+            onDelete();
+            onClose();
+          }}
+          icon={<IconTrash size={13} />}
+          label="Excluir"
+          color="var(--coral)"
+        />
+      )}
     </div>
   );
 }
@@ -167,6 +171,50 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
   const [prep, setPrep] = useState(food.prep);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const updateFood = useUpdateFood();
+  const createFood = useCreateFood();
+
+  const handleDuplicate = () => {
+    setSubmitError(null);
+    if (!validateAll()) return;
+    const kcal = parseNumberInput(form.kcal);
+    const prot = parseNumberInput(form.prot);
+    const carb = parseNumberInput(form.carb);
+    const fat = parseNumberInput(form.fat);
+    if (kcal == null || prot == null || carb == null || fat == null) {
+      setSubmitError('Preencha todos os campos obrigatórios de macronutrientes.');
+      return;
+    }
+    createFood.mutate(
+      {
+        name: form.name.trim() + ' (Personalizado)',
+        category,
+        unit,
+        referenceAmount: parseNumberInput(form.referenceAmount),
+        kcal,
+        prot,
+        carb,
+        fat,
+        fiber: form.fiber.trim() ? parseNumberInput(form.fiber) : undefined,
+        prep: prep || null,
+        portionLabel: food.portionLabel || null,
+      },
+      {
+        onSuccess: () => {
+          setSubmitError(null);
+          useToastStore.getState().showSuccess('Alimento duplicado como personalizado!');
+          onClose();
+        },
+        onError: (error) => {
+          const msg = resolveMutationErrorMessage(
+            error,
+            'Erro ao duplicar alimento — tente novamente',
+          );
+          setSubmitError(msg);
+          useToastStore.getState().showError(msg);
+        },
+      },
+    );
+  };
 
   const {
     values: form,
@@ -352,13 +400,31 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-h">
-          <div className="title">Editar alimento</div>
+          <div className="title">
+            {food.custom ? 'Editar alimento' : 'Detalhes do alimento (Tabela TACO)'}
+          </div>
           <div className="spacer" />
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px 6px' }}>
             <IconX size={14} />
           </button>
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!food.custom && (
+            <div
+              style={{
+                padding: '10px 14px',
+                background: 'rgba(56, 189, 248, 0.08)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: 6,
+                fontSize: 12.5,
+                color: 'var(--fg)',
+                lineHeight: 1.4,
+              }}
+            >
+              ℹ️ Este é um alimento padrão da <strong>Tabela TACO / IBGE</strong>. Você pode
+              duplicá-lo como personalizado para customizar seus valores à vontade.
+            </div>
+          )}
           {submitError && (
             <div
               role="alert"
@@ -534,35 +600,46 @@ function EditFoodCatalogModal({ food, onClose }: { food: Food; onClose: () => vo
           }}
         >
           <button className="btn btn-ghost" onClick={onClose}>
-            Cancelar
+            {food.custom ? 'Cancelar' : 'Fechar'}
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={
-              !form.name.trim() ||
-              !form.referenceAmount.trim() ||
-              !form.kcal.trim() ||
-              !form.prot.trim() ||
-              !form.carb.trim() ||
-              !form.fat.trim() ||
-              updateFood.isPending
-            }
-            style={{
-              opacity:
-                form.name.trim() &&
-                form.referenceAmount.trim() &&
-                form.kcal.trim() &&
-                form.prot.trim() &&
-                form.carb.trim() &&
-                form.fat.trim() &&
-                !updateFood.isPending
-                  ? 1
-                  : 0.45,
-            }}
-          >
-            <IconCheck size={13} /> {updateFood.isPending ? 'Salvando...' : 'Salvar'}
-          </button>
+          {food.custom ? (
+            <button
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={
+                !form.name.trim() ||
+                !form.referenceAmount.trim() ||
+                !form.kcal.trim() ||
+                !form.prot.trim() ||
+                !form.carb.trim() ||
+                !form.fat.trim() ||
+                updateFood.isPending
+              }
+              style={{
+                opacity:
+                  form.name.trim() &&
+                  form.referenceAmount.trim() &&
+                  form.kcal.trim() &&
+                  form.prot.trim() &&
+                  form.carb.trim() &&
+                  form.fat.trim() &&
+                  !updateFood.isPending
+                    ? 1
+                    : 0.45,
+              }}
+            >
+              <IconCheck size={13} /> {updateFood.isPending ? 'Salvando...' : 'Salvar'}
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={handleDuplicate}
+              disabled={createFood.isPending}
+            >
+              <IconPlus size={13} />{' '}
+              {createFood.isPending ? 'Duplicando...' : 'Duplicar como personalizado'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -702,7 +779,7 @@ function FoodCard({
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <div
               className="mono"
               style={{
@@ -714,6 +791,22 @@ function FoodCard({
             >
               {food.category}
             </div>
+            {!food.custom && (
+              <span
+                style={{
+                  fontSize: 9.5,
+                  padding: '1px 5px',
+                  borderRadius: 3,
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  color: 'var(--sky)',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                TACO
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.005em' }}>
             {food.name}
@@ -733,6 +826,7 @@ function FoodCard({
               onEdit={onEdit}
               onDelete={onDelete}
               onClose={() => setMenuOpen(false)}
+              isCustom={food.custom}
             />
           )}
         </div>
@@ -780,7 +874,7 @@ function FoodCard({
           style={{ fontSize: 11.5, padding: '3px 6px', color: 'var(--fg-muted)' }}
           onClick={onEdit}
         >
-          <IconEdit size={11} /> Editar
+          <IconEdit size={11} /> {food.custom ? 'Editar' : 'Visualizar'}
         </button>
       </div>
     </div>
@@ -1344,7 +1438,9 @@ export function FoodsView() {
     <div>
       <div style={{ padding: '24px 28px 16px', borderBottom: '1px solid var(--border)' }}>
         <div>
-          <div className="eyebrow">Catálogo pessoal · reutilizável nos planos</div>
+          <div className="eyebrow">
+            Catálogo pessoal · Tabela TACO / IBGE e alimentos personalizados
+          </div>
           <h1
             className="serif"
             style={{ fontSize: 32, margin: '4px 0 6px', fontWeight: 400, letterSpacing: '-0.02em' }}

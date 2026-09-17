@@ -205,8 +205,30 @@ export function PatientView() {
             />
           </div>
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div className="eyebrow">
-              Paciente · {patient.id.toUpperCase()} · acompanhamento desde {patient.since}
+            <div
+              className="eyebrow"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+            >
+              <span>
+                Paciente · {patient.id.toUpperCase()} · acompanhamento desde {patient.since}
+              </span>
+              {!patient.active && (
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    color: 'var(--coral)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                  }}
+                >
+                  IA Pausada
+                </span>
+              )}
             </div>
             <h1
               className="serif"

@@ -526,4 +526,33 @@ class ConversationServiceTest {
         // Message stays unprocessed for retry — not saved with processed=true
         verify(whatsAppMessageRepository, never()).save(argThat(msg -> Boolean.TRUE.equals(msg.getProcessed())));
     }
+
+    @Test
+    void processMessage_inactivePatient_sendsPausedMessageAndSkipsLlm() {
+        patient.setActive(false);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        // No LLM call, no extraction
+        verify(llmService, never()).chat(any());
+        verify(extractionService, never()).extractAndSave(any(), any(), any(), any(), any());
+
+        // Evolution message sent with cutoff text
+        verify(evolutionApiService).sendMessage(
+                eq(textMessage.getSenderPhoneNormalized()),
+                argThat(text -> text.contains("pausado no momento") && text.contains("Dra. Maria"))
+        );
+
+        // Saved response with responseType PATIENT_INACTIVE
+        verify(whatsAppResponseRepository, atLeastOnce()).save(argThat(resp ->
+                "PATIENT_INACTIVE".equals(resp.getResponseType()) && resp.getSentAt() != null));
+
+        // Message marked processed
+        verify(whatsAppMessageRepository).save(argThat(msg -> Boolean.TRUE.equals(msg.getProcessed())));
+    }
 }
