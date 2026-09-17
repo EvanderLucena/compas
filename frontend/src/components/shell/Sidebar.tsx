@@ -39,23 +39,22 @@ function SidebarHeader({ user }: { user: { name?: string } | null }) {
   return (
     <div className="sidebar-header">
       <div className="brand-row">
+        <div className="brand-mark" title="NutriAI">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
+              stroke="var(--lime)"
+              strokeWidth="2"
+            />
+            <circle cx="12" cy="14" r="1.6" fill="var(--lime)" />
+          </svg>
+        </div>
         <div className="brand-name">
           Nutri<span style={{ color: 'var(--lime-dim)' }}>AI</span>
         </div>
         <div className="brand-tag mono">v2.4</div>
       </div>
-      <div
-        style={{
-          fontSize: 11.5,
-          color: 'var(--fg-muted)',
-          marginTop: 4,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {user?.name || 'Nutricionista'}
-      </div>
+      <div className="sidebar-user-name">{user?.name || 'Nutricionista'}</div>
     </div>
   );
 }
