@@ -19,6 +19,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshAuth: () => Promise<string>;
   clearError: () => void;
+  updateUser: (partial: Partial<AuthUser>) => void;
 
   // Initialize from stored state
   initializeAuth: () => Promise<void>;
@@ -35,6 +36,13 @@ export const useAuthStore = create<AuthState>()(
       error: null,
       fieldErrors: {},
 
+      updateUser: (partial) => {
+        const current = get().user;
+        if (current) {
+          set({ user: { ...current, ...partial } });
+        }
+      },
+
       signup: async (data) => {
         set({ isLoading: true, error: null, fieldErrors: {} });
         try {
@@ -49,7 +57,9 @@ export const useAuthStore = create<AuthState>()(
           const apiErr = err as { message?: string; errors?: FieldError[] };
           const fieldMap: Record<string, string> = {};
           if (apiErr.errors?.length) {
-            apiErr.errors.forEach((e) => { fieldMap[e.field] = e.message; });
+            apiErr.errors.forEach((e) => {
+              fieldMap[e.field] = e.message;
+            });
           }
           set({
             isLoading: false,
@@ -74,7 +84,9 @@ export const useAuthStore = create<AuthState>()(
           const apiErr = err as { message?: string; errors?: FieldError[] };
           const fieldMap: Record<string, string> = {};
           if (apiErr.errors?.length) {
-            apiErr.errors.forEach((e) => { fieldMap[e.field] = e.message; });
+            apiErr.errors.forEach((e) => {
+              fieldMap[e.field] = e.message;
+            });
           }
           set({
             isAuthenticated: false,

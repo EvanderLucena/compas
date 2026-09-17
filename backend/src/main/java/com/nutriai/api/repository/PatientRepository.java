@@ -33,6 +33,11 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
     Page<Patient> findByNutritionistIdAndActive(UUID nutritionistId, Boolean active, Pageable pageable);
 
     /**
+     * Count active patients for subscription limit enforcement.
+     */
+    long countByNutritionistIdAndActiveTrue(UUID nutritionistId);
+
+    /**
      * Status filter (D-02, D-03).
      */
     List<Patient> findByNutritionistIdAndStatus(UUID nutritionistId, PatientStatus status);

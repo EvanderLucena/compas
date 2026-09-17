@@ -23,6 +23,7 @@
 - [x] **Corrigir extração** — Timeline · aba Hoje.
 - [x] **Nova avaliação biométrica** — modal unificado com Bioimpedância, Pollock 7 dobras, Perimetria.
 - [x] **Novo paciente** — modal: nome, nascimento, sexo, altura, objetivo, WhatsApp.
+- [x] **Perfil do nutricionista** — modal com 3 abas: Dados Profissionais (edição de nome, CRN, especialidade, WhatsApp), Segurança & Senha (alteração de senha com validação BCrypt), Plano & Limites (status Trial, contagem de pacientes ativos vs limite).
 - [x] **Filtrar** — painel inline em Pacientes: status, objetivo, atividade. Badge com nº de filtros ativos.
 - [ ] **Importar TACO** — Alimentos. Out of scope por agora.
 - [ ] **Exportar PDF** — Inteligência. Out of scope por agora.
