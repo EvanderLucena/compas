@@ -555,4 +555,72 @@ class ConversationServiceTest {
         // Message marked processed
         verify(whatsAppMessageRepository).save(argThat(msg -> Boolean.TRUE.equals(msg.getProcessed())));
     }
+
+    @Test
+    void cleanMessageForWhatsApp_truncatedJson_returnsFriendlyFallback() {
+        String truncated = "```json\n{\n  \"meals\": [\n    {\n      \"mealLabel\": \"café\",\n      \"items\": [";
+        String cleaned = ConversationService.cleanMessageForWhatsApp(truncated);
+        assertFalse(cleaned.contains("```"));
+        assertFalse(cleaned.contains("mealLabel"));
+        assertTrue(cleaned.contains("Recebido!"));
+    }
+
+    @Test
+    void cleanMessageForWhatsApp_textBeforeJson_returnsOnlyText() {
+        String content = "Tudo anotado! Já registrei seu café da manhã e almoço.\n```json\n{\n  \"meals\": []\n}\n```";
+        String cleaned = ConversationService.cleanMessageForWhatsApp(content);
+        assertEquals("Tudo anotado! Já registrei seu café da manhã e almoço.", cleaned);
+    }
+
+    @Test
+    void cleanMessageForWhatsApp_rawJsonOnly_returnsFriendlyFallback() {
+        String content = "{\"mealLabel\": \"almoço\", \"items\": []}";
+        String cleaned = ConversationService.cleanMessageForWhatsApp(content);
+        assertFalse(cleaned.contains("{"));
+        assertFalse(cleaned.contains("mealLabel"));
+        assertTrue(cleaned.contains("Recebido!"));
+    }
+
+    @Test
+    void processMessage_multiMealReport_extractsAndSavesAllMeals() {
+        ExtractionResult breakfast = new ExtractionResult("café da manhã",
+                List.of(new ExtractionItemResult("ovos", 150.0, 150, 12, 1, 10)), "raw");
+        ExtractionResult lunch = new ExtractionResult("almoço",
+                List.of(new ExtractionItemResult("arroz", 100.0, 130, 2, 28, 1)), "raw");
+        ExtractionResult multiMeal = new ExtractionResult("café da manhã",
+                List.of(), "raw", List.of(breakfast, lunch));
+
+        LlmResponse llmResponse = new LlmResponse(
+                "Tudo certo! Registrei seu café e almoço.\n```json\n{}\n```",
+                LlmIntent.MEAL_REPORT,
+                multiMeal,
+                true,
+                null
+        );
+
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(llmService.chat(any(LlmRequest.class))).thenReturn(llmResponse);
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+        when(mealPlanRepository.findByEpisodeIdAndNutritionistId(episodeId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        conversationService.processMessage(messageId);
+
+        // Verify both meals were saved
+        verify(extractionService).extractAndSave(eq(messageId), eq(patientId), eq(nutritionistId),
+                eq(episodeId), eq(breakfast));
+        verify(extractionService).extractAndSave(eq(messageId), eq(patientId), eq(nutritionistId),
+                eq(episodeId), eq(lunch));
+
+        // Verify WhatsApp message sent was friendly text without JSON
+        verify(evolutionApiService).sendMessage(eq("11999998888"),
+                eq("Tudo certo! Registrei seu café e almoço."));
+    }
 }

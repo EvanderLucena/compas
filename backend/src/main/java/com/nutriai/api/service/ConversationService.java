@@ -210,7 +210,7 @@ public class ConversationService {
             responseType = "CONVERSATION";
         }
 
-        LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage, imageUrl, 0.3, 500);
+        LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage, imageUrl, 0.3, 1500);
         LlmResponse llmResponse = llmService.chat(llmRequest);
 
         if (!llmResponse.success()) {
@@ -227,9 +227,14 @@ public class ConversationService {
                             patient.getId(), nutritionist.getId());
 
             if (activeEpisode.isPresent()) {
-                extractionService.extractAndSave(
-                        messageId, patient.getId(), nutritionist.getId(),
-                        activeEpisode.get().getId(), extraction);
+                List<ExtractionResult> mealsToSave = extraction.allMeals();
+                for (ExtractionResult singleMeal : mealsToSave) {
+                    if (singleMeal.items() != null && !singleMeal.items().isEmpty()) {
+                        extractionService.extractAndSave(
+                                messageId, patient.getId(), nutritionist.getId(),
+                                activeEpisode.get().getId(), singleMeal);
+                    }
+                }
             } else {
                 log.warn("No active episode for patient {}, extraction skipped but response sent",
                         patient.getId());
@@ -251,9 +256,6 @@ public class ConversationService {
         // 8. Send response via EvolutionApiService
         // Strip markdown JSON extraction blocks so the patient receives only friendly conversational text
         String textToSend = cleanMessageForWhatsApp(responseContent);
-        if (textToSend.isBlank()) {
-            textToSend = responseContent;
-        }
 
         boolean sent = evolutionApiService.sendMessage(
                 message.getSenderPhoneNormalized(),
@@ -339,23 +341,24 @@ public class ConversationService {
             {{planContext}}
             {{conversationContext}}
 
-            Se o paciente está relatando uma refeição (o que comeu), extraia os alimentos mencionados com macros estimados.
-            Responda em formato JSON no campo de extração. Também envie uma resposta empática, curta e objetiva ao paciente.
-
-            Formato de resposta JSON (DENTRO de ```json```):
+            ESTRUTURA OBRIGATÓRIA DA SUA RESPOSTA:
+            1. Escreva PRIMEIRO a mensagem amigável de WhatsApp destinada ao paciente (1 a 3 frases curtas e calorosas confirmando o registro).
+            2. Logo abaixo, se o paciente relatou refeição(ões), inclua o bloco ```json com os dados nutricionais estimados:
             ```json
             {
-              "mealLabel": "almoço",
-              "items": [
-                {"name": "arroz integral", "grams": 150, "kcal": 170, "prot": 3.2, "carb": 35, "fat": 1.5},
-                {"name": "frango grelhado", "grams": 120, "kcal": 198, "prot": 25, "carb": 0, "fat": 10.5}
+              "meals": [
+                {
+                  "mealLabel": "almoço",
+                  "items": [
+                    {"name": "arroz integral", "grams": 150, "kcal": 170, "prot": 3.2, "carb": 35, "fat": 1.5},
+                    {"name": "frango grelhado", "grams": 120, "kcal": 198, "prot": 25, "carb": 0, "fat": 10.5}
+                  ]
+                }
               ]
             }
             ```
-
-            Se o paciente está perguntando sobre o plano alimentar, responda à dúvida de forma clara, direta e amigável (em até 3 frases).
-
-            Se for uma saudação ou mensagem genérica, responda de forma amigável e breve.
+            Se o paciente relatou mais de uma refeição na mesma mensagem (ex: café da manhã e almoço), inclua cada refeição como um item no array "meals".
+            Se for apenas dúvida sobre o plano ou conversa geral, responda apenas a mensagem amigável (sem bloco ```json).
             """.replace("{{patientContext}}", escape(patientContext))
                .replace("{{planContext}}", escape(planContext))
                .replace("{{conversationContext}}", escape(conversationContext));
@@ -482,14 +485,18 @@ public class ConversationService {
             {{planContext}}
             {{conversationContext}}
 
-            Extraia os alimentos mencionados na legenda com macros estimados. Responda em formato JSON no campo de extração. Também envie uma resposta empática, curta e objetiva ao paciente.
-
-            Formato de resposta JSON (DENTRO de ```json```):
+            ESTRUTURA OBRIGATÓRIA DA SUA RESPOSTA:
+            1. Escreva PRIMEIRO a mensagem amigável de WhatsApp destinada ao paciente (1 a 2 frases curtas e calorosas).
+            2. Logo abaixo, inclua o bloco ```json com a extração dos alimentos mencionados na legenda:
             ```json
             {
-              "mealLabel": "almoço",
-              "items": [
-                {"name": "arroz integral", "grams": 150, "kcal": 170, "prot": 3.2, "carb": 35, "fat": 1.5}
+              "meals": [
+                {
+                  "mealLabel": "almoço",
+                  "items": [
+                    {"name": "arroz integral", "grams": 150, "kcal": 170, "prot": 3.2, "carb": 35, "fat": 1.5}
+                  ]
+                }
               ]
             }
             ```
@@ -529,16 +536,19 @@ public class ConversationService {
             {{planContext}}
             {{conversationContext}}
 
-            Extraia os alimentos identificados na foto com macros estimados.
-            Responda em formato JSON no campo de extração. Também envie uma resposta empática, curta e objetiva ao paciente.
-
-            Formato de resposta JSON (DENTRO de ```json```):
+            ESTRUTURA OBRIGATÓRIA DA SUA RESPOSTA:
+            1. Escreva PRIMEIRO a mensagem amigável de WhatsApp destinada ao paciente (1 a 2 frases curtas e calorosas).
+            2. Logo abaixo, inclua o bloco ```json com a extração dos alimentos identificados na foto:
             ```json
             {
-              "mealLabel": "almoço",
-              "items": [
-                {"name": "arroz branco", "grams": 150, "kcal": 192, "prot": 3.7, "carb": 42.1, "fat": 0.3},
-                {"name": "frango grelhado", "grams": 120, "kcal": 191, "prot": 38.4, "carb": 0, "fat": 3.6}
+              "meals": [
+                {
+                  "mealLabel": "almoço",
+                  "items": [
+                    {"name": "arroz branco", "grams": 150, "kcal": 192, "prot": 3.7, "carb": 42.1, "fat": 0.3},
+                    {"name": "frango grelhado", "grams": 120, "kcal": 191, "prot": 38.4, "carb": 0, "fat": 3.6}
+                  ]
+                }
               ]
             }
             ```
@@ -598,13 +608,37 @@ public class ConversationService {
     }
 
     static String cleanMessageForWhatsApp(String content) {
-        if (content == null) {
-            return "";
+        if (content == null || content.isBlank()) {
+            return "Recebido! Já registrei suas informações aqui no plano. Vamos em frente! 💪";
         }
-        String cleaned = content.replaceAll("```json[\\s\\S]*?```", "").trim();
-        cleaned = cleaned.replaceAll("```[\\s\\S]*?```", "").trim();
-        cleaned = cleaned.replaceAll("\\{[^{}]*\"mealLabel\"[^{}]*\\}", "").trim();
+
+        // 1. Remove complete code blocks (```json ... ``` or ``` ... ```)
+        String cleaned = content.replaceAll("(?s)```[a-zA-Z]*\\s*.*?```", "").trim();
+
+        // 2. Remove unclosed code block (e.g. if response was truncated: ```json ...)
+        cleaned = cleaned.replaceAll("(?s)```[a-zA-Z]*\\s*.*$", "").trim();
+
+        // 3. Remove inline JSON objects with mealLabel, meals, or items
+        cleaned = cleaned.replaceAll("(?s)\\{[^{}]*\"(mealLabel|meals|items)\"[^{}]*\\}", "").trim();
+
+        // 4. If any unclosed '{' with JSON keys remains, strip from '{' onwards
+        if (cleaned.contains("{") && (cleaned.contains("\"mealLabel\"") || cleaned.contains("\"meals\"") || cleaned.contains("\"items\""))) {
+            cleaned = cleaned.substring(0, cleaned.indexOf('{')).trim();
+        }
+
+        // 5. If cleaned is blank or still contains JSON structure, use friendly fallback
+        if (cleaned.isBlank() || isJsonSnippet(cleaned)) {
+            return "Recebido! Já registrei sua refeição aqui no seu acompanhamento. Vamos em frente! 💪";
+        }
+
         return cleaned;
+    }
+
+    private static boolean isJsonSnippet(String text) {
+        String trimmed = text.trim();
+        return trimmed.startsWith("{") || trimmed.startsWith("[")
+                || trimmed.contains("\"meals\"") || trimmed.contains("\"mealLabel\"")
+                || trimmed.contains("\"items\"");
     }
 
     private void markProcessed(WhatsAppMessage message) {
