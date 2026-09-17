@@ -542,10 +542,10 @@ class ConversationServiceTest {
         verify(llmService, never()).chat(any());
         verify(extractionService, never()).extractAndSave(any(), any(), any(), any(), any());
 
-        // Evolution message sent with cutoff text
+        // Evolution message sent with direct contact text
         verify(evolutionApiService).sendMessage(
                 eq(textMessage.getSenderPhoneNormalized()),
-                argThat(text -> text.contains("pausado no momento") && text.contains("Dra. Maria"))
+                argThat(text -> text.contains("entre em contato diretamente") && text.contains("Dra. Maria"))
         );
 
         // Saved response with responseType PATIENT_INACTIVE

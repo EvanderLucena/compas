@@ -116,25 +116,25 @@ public class ConversationService {
         }
         Nutritionist nutritionist = nutritionistOpt.get();
 
-        // 3.1 If patient is paused/inactive → do not process with LLM, send polite cutoff notification
+        // 3.1 If patient is paused/inactive → do not process with LLM, send polite direct contact notification
         if (Boolean.FALSE.equals(patient.getActive())) {
-            log.info("Patient {} is inactive/paused, sending cutoff message", patient.getId());
-            String pausedText = "Olá, " + patient.getName() + "! Seu acompanhamento nutricional com " +
-                    nutritionist.getName() + " está pausado no momento. " +
-                    "Por favor, entre em contato diretamente com seu(sua) nutricionista para mais informações.";
+            log.info("Patient {} is inactive/paused, sending direct contact message", patient.getId());
+            String contactText = "Olá, " + patient.getName() + "! Para te orientar da melhor forma e tirar suas dúvidas, " +
+                    "por favor entre em contato diretamente com seu(sua) nutricionista, " +
+                    nutritionist.getName() + ". Um abraço!";
 
             WhatsAppResponse waResponse = WhatsAppResponse.builder()
                     .messageId(messageId)
                     .nutritionistId(nutritionist.getId())
                     .patientId(patient.getId())
                     .responseType("PATIENT_INACTIVE")
-                    .responseContent(pausedText)
+                    .responseContent(contactText)
                     .build();
             whatsAppResponseRepository.save(waResponse);
 
             boolean sent = evolutionApiService.sendMessage(
                     message.getSenderPhoneNormalized(),
-                    pausedText
+                    contactText
             );
             if (sent) {
                 waResponse.setSentAt(LocalDateTime.now());
