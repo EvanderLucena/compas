@@ -69,9 +69,9 @@ public class FoodService {
 
         Page<Food> result;
         if (hasFilter) {
-            result = foodRepository.findByNutritionistIdWithFilters(nutritionistId, escapedSearch, upperCategory, pageRequest);
+            result = foodRepository.findAvailableByNutritionistIdWithFilters(nutritionistId, escapedSearch, upperCategory, pageRequest);
         } else {
-            result = foodRepository.findByNutritionistId(nutritionistId, pageRequest);
+            result = foodRepository.findAvailableByNutritionistId(nutritionistId, pageRequest);
         }
 
         return FoodListResponse.from(result);
@@ -79,15 +79,20 @@ public class FoodService {
 
     @Transactional(readOnly = true)
     public FoodResponse getFood(UUID nutritionistId, UUID foodId) {
-        Food food = foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)
+        Food food = foodRepository.findAvailableById(foodId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alimento", foodId));
         return FoodResponse.from(food);
     }
 
     @Transactional
     public FoodResponse updateFood(UUID nutritionistId, UUID foodId, UpdateFoodRequest req) {
-        Food food = foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)
+        Food food = foodRepository.findAvailableById(foodId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alimento", foodId));
+
+        if (food.getNutritionistId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Alimentos da tabela TACO são padrão do sistema e não podem ser alterados.");
+        }
 
         if (req.name() != null) food.setName(req.name());
         if (req.category() != null) {
@@ -115,8 +120,13 @@ public class FoodService {
 
     @Transactional
     public void deleteFood(UUID nutritionistId, UUID foodId) {
-        Food food = foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)
+        Food food = foodRepository.findAvailableById(foodId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alimento", foodId));
+
+        if (food.getNutritionistId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Alimentos da tabela TACO são padrão do sistema e não podem ser excluídos.");
+        }
 
         foodRepository.delete(food);
         logger.info("Food deleted: id={}, nutritionistId={}", foodId, nutritionistId);

@@ -3,6 +3,7 @@ package com.nutriai.api.service;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutriai.api.dto.llm.ExtractionItemResult;
 import com.nutriai.api.dto.llm.ExtractionResult;
@@ -17,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,9 +31,9 @@ public class OllamaCloudLlmService implements LlmService {
 
     private static final Logger log = LoggerFactory.getLogger(OllamaCloudLlmService.class);
 
-    private static final Pattern JSON_BLOCK_PATTERN = Pattern.compile("```json\\s*\\n(.*?)\\n```", Pattern.DOTALL);
-    private static final Pattern JSON_OBJECT_PATTERN =
-            Pattern.compile("\\{[^{}]*\"mealLabel\"[^{}]*\\}", Pattern.DOTALL);
+    private static final Pattern CODE_BLOCK_PATTERN =
+            Pattern.compile("```(?:json)?\\s*([\\s\\S]*?)(?:```|$)", Pattern.CASE_INSENSITIVE);
+
 
     private final String baseUrl;
     private final String model;
@@ -174,7 +176,9 @@ public class OllamaCloudLlmService implements LlmService {
      */
     private LlmIntent classifyIntent(String responseContent, String originalMessage) {
         // If the response contains extraction JSON structure, it's a meal report
-        if (responseContent.contains("\"mealLabel\"") || responseContent.contains("\"items\"")) {
+        if (responseContent.contains("\"mealLabel\"")
+                || responseContent.contains("\"items\"")
+                || responseContent.contains("\"meals\"")) {
             return LlmIntent.MEAL_REPORT;
         }
 
@@ -208,42 +212,98 @@ public class OllamaCloudLlmService implements LlmService {
 
     /**
      * Parse extraction JSON from response content.
-     * Looks for JSON in markdown code blocks first, then inline JSON.
+     * Handles single meal objects, {"meals": [...]}, and top-level arrays.
      */
     private ExtractionResult parseExtraction(String content, String originalMessage) {
-        String json = null;
-
-        // Try markdown code block first
-        Matcher blockMatcher = JSON_BLOCK_PATTERN.matcher(content);
-        if (blockMatcher.find()) {
-            json = blockMatcher.group(1).trim();
-        }
-
-        // Try inline JSON object with mealLabel
-        if (json == null) {
-            Matcher objectMatcher = JSON_OBJECT_PATTERN.matcher(content);
-            if (objectMatcher.find()) {
-                json = objectMatcher.group();
-            }
-        }
-
-        if (json == null) {
+        String json = extractJsonContent(content);
+        if (json == null || json.isBlank()) {
             log.warn("Could not find extraction JSON in LLM response");
             return null;
         }
 
         try {
-            ExtractionResult result = objectMapper.readValue(json, ExtractionResult.class);
-            // Ensure extractionRaw is set
-            if (result.extractionRaw() == null) {
-                return new ExtractionResult(result.mealLabel(), result.items(), originalMessage);
+            JsonNode root = objectMapper.readTree(json);
+            if (root.has("meals") && root.get("meals").isArray()) {
+                List<ExtractionResult> mealList = new ArrayList<>();
+                for (JsonNode mealNode : root.get("meals")) {
+                    String label = mealNode.has("mealLabel") ? mealNode.get("mealLabel").asText() : null;
+                    List<ExtractionItemResult> items = parseItems(mealNode.get("items"));
+                    mealList.add(new ExtractionResult(label, items, originalMessage));
+                }
+                if (!mealList.isEmpty()) {
+                    return new ExtractionResult(
+                            mealList.get(0).mealLabel(), mealList.get(0).items(), originalMessage, mealList);
+                }
+            } else if (root.isArray()) {
+                List<ExtractionResult> mealList = new ArrayList<>();
+                for (JsonNode mealNode : root) {
+                    String label = mealNode.has("mealLabel") ? mealNode.get("mealLabel").asText() : null;
+                    List<ExtractionItemResult> items = parseItems(mealNode.get("items"));
+                    mealList.add(new ExtractionResult(label, items, originalMessage));
+                }
+                if (!mealList.isEmpty()) {
+                    return new ExtractionResult(
+                            mealList.get(0).mealLabel(), mealList.get(0).items(), originalMessage, mealList);
+                }
+            } else {
+                // Single meal object
+                String label = root.has("mealLabel") ? root.get("mealLabel").asText() : null;
+                List<ExtractionItemResult> items = parseItems(root.get("items"));
+                return new ExtractionResult(label, items, originalMessage);
             }
-            return result;
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.warn("Failed to parse extraction JSON: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private String extractJsonContent(String content) {
+        if (content == null) {
             return null;
         }
+        // 1. Try markdown code block (```json ... ``` or ``` ... ```)
+        Matcher blockMatcher = CODE_BLOCK_PATTERN.matcher(content);
+        if (blockMatcher.find()) {
+            String block = blockMatcher.group(1).trim();
+            if (block.startsWith("{") || block.startsWith("[")) {
+                return block;
+            }
+        }
+
+        // 2. Try raw JSON substring from first '{' to last '}'
+        int firstBrace = content.indexOf('{');
+        int lastBrace = content.lastIndexOf('}');
+        if (firstBrace != -1 && lastBrace > firstBrace) {
+            return content.substring(firstBrace, lastBrace + 1).trim();
+        }
+
+        // 3. Try raw JSON array substring from first '[' to last ']'
+        int firstBracket = content.indexOf('[');
+        int lastBracket = content.lastIndexOf(']');
+        if (firstBracket != -1 && lastBracket > firstBracket) {
+            return content.substring(firstBracket, lastBracket + 1).trim();
+        }
+
+        return null;
     }
+
+    private List<ExtractionItemResult> parseItems(JsonNode itemsNode) {
+        if (itemsNode == null || !itemsNode.isArray()) {
+            return List.of();
+        }
+        List<ExtractionItemResult> list = new ArrayList<>();
+        for (JsonNode item : itemsNode) {
+            String name = item.has("name") ? item.get("name").asText() : "Alimento";
+            Double grams = item.has("grams") && !item.get("grams").isNull() ? item.get("grams").asDouble() : null;
+            double kcal = item.has("kcal") ? item.get("kcal").asDouble() : 0.0;
+            double prot = item.has("prot") ? item.get("prot").asDouble() : 0.0;
+            double carb = item.has("carb") ? item.get("carb").asDouble() : 0.0;
+            double fat = item.has("fat") ? item.get("fat").asDouble() : 0.0;
+            list.add(new ExtractionItemResult(name, grams, kcal, prot, carb, fat));
+        }
+        return list;
+    }
+
 
     private String truncate(String s, int maxLen) {
         if (s == null) {

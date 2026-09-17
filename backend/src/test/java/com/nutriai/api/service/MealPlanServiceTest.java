@@ -114,7 +114,7 @@ class MealPlanServiceTest {
         when(mealOptionRepository.findById(optionId)).thenReturn(Optional.of(option));
         when(mealSlotRepository.findById(slot.getId())).thenReturn(Optional.of(slot));
         when(mealPlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
-        when(foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)).thenReturn(Optional.of(food));
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(food));
         when(mealFoodRepository.findByOptionIdOrderBySortOrder(optionId)).thenReturn(List.of());
         when(mealFoodRepository.save(any(MealFood.class))).thenAnswer(inv -> {
             MealFood mf = inv.getArgument(0);
@@ -158,7 +158,7 @@ class MealPlanServiceTest {
         when(mealOptionRepository.findById(optionId)).thenReturn(Optional.of(option));
         when(mealSlotRepository.findById(slot.getId())).thenReturn(Optional.of(slot));
         when(mealPlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
-        when(foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)).thenReturn(Optional.of(food));
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(food));
         when(mealFoodRepository.findByOptionIdOrderBySortOrder(optionId)).thenReturn(List.of());
         when(mealFoodRepository.save(any(MealFood.class))).thenAnswer(inv -> {
             MealFood mf = inv.getArgument(0);
@@ -257,7 +257,7 @@ class MealPlanServiceTest {
         when(mealOptionRepository.findById(optionId)).thenReturn(Optional.of(option));
         when(mealSlotRepository.findById(slotId)).thenReturn(Optional.of(slot));
         when(mealPlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
-        when(foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)).thenReturn(Optional.of(food));
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(food));
         when(mealFoodRepository.save(any(MealFood.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateFoodItemRequest req = new UpdateFoodItemRequest(new BigDecimal("200"), null, null, null, null, null);

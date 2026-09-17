@@ -1,5 +1,4 @@
 import { useEffect, Suspense } from 'react';
-import { Rail } from './Rail';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Outlet, useLocation } from 'react-router';
@@ -26,7 +25,6 @@ export function AppShell() {
 
   return (
     <div className="app">
-      <Rail />
       <Sidebar />
       <div className="main">
         <Topbar />

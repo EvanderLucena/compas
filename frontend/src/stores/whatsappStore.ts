@@ -44,20 +44,32 @@ export function mapExtractionsToTimelineEvents(extractions: Extraction[]): Timel
       macros,
       hasMessage: true,
       extractionId: ex.id,
+      rawItems: ex.items,
     };
   });
 }
 
-/** TanStack Query hook for extractions today */
-export function useExtractions(patientId: string | null) {
+/** Helper to format a Date as YYYY-MM-DD in local time (prevents UTC drift) */
+export function toLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** TanStack Query hook for extractions by date (defaults to today) */
+export function useExtractions(patientId: string | null, date?: string) {
+  const isToday = !date || date === toLocalDateString();
   return useQuery({
-    queryKey: ['whatsapp-extractions', patientId],
+    queryKey: ['whatsapp-extractions', patientId, date ?? 'today'],
     queryFn: () => {
       if (!patientId) throw new Error('Patient ID is required');
-      return whatsappApi.getExtractions(patientId);
+      return whatsappApi.getExtractions(patientId, date);
     },
     enabled: !!patientId,
-    staleTime: 30_000,
+    staleTime: isToday ? 10_000 : 5 * 60_000,
+    refetchInterval: isToday ? 15_000 : false,
+    refetchOnWindowFocus: isToday,
   });
 }
 
@@ -148,6 +160,8 @@ export function useWhatsAppStatus() {
   return useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: whatsappApi.getStatus,
-    staleTime: 30_000,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 }

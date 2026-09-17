@@ -5,10 +5,12 @@ import com.nutriai.api.dto.ApiResponse;
 import com.nutriai.api.dto.whatsapp.*;
 import com.nutriai.api.service.WhatsAppIntelligenceService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,14 +30,15 @@ public class WhatsAppIntelligenceController {
     }
 
     /**
-     * GET /api/v1/patients/{id}/extractions — list today's extractions (D-23).
+     * GET /api/v1/patients/{id}/extractions — list extractions for date (defaults to today).
      */
     @GetMapping("/patients/{patientId}/extractions")
-    public ResponseEntity<ApiResponse<List<ExtractionDTO>>> getExtractionsToday(
-            @PathVariable UUID patientId
+    public ResponseEntity<ApiResponse<List<ExtractionDTO>>> getExtractions(
+            @PathVariable UUID patientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
-        List<ExtractionDTO> extractions = whatsAppIntelligenceService.getExtractionsToday(patientId, nutritionistId);
+        List<ExtractionDTO> extractions = whatsAppIntelligenceService.getExtractions(patientId, nutritionistId, date);
         return ResponseEntity.ok(ApiResponse.ok(extractions));
     }
 

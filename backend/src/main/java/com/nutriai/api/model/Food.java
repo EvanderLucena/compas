@@ -24,8 +24,12 @@ public class Food {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @Column(name = "nutritionist_id", nullable = false)
+    @Column(name = "nutritionist_id")
     private UUID nutritionistId;
+
+    public boolean isCustom() {
+        return nutritionistId != null;
+    }
 
     @Column(nullable = false, length = 200)
     private String name;

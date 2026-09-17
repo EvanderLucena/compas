@@ -25,7 +25,11 @@ import {
   usePatientHistoryEpisodes,
   useHistoricalEpisode,
 } from '../stores/clinicalStore';
-import { useExtractions, mapExtractionsToTimelineEvents } from '../stores/whatsappStore';
+import {
+  useExtractions,
+  mapExtractionsToTimelineEvents,
+  toLocalDateString,
+} from '../stores/whatsappStore';
 import { PlansView } from './PlansView';
 import type { PatientStatus } from '../types/patient';
 import type { MealPlan } from '../types/plan';
@@ -201,8 +205,30 @@ export function PatientView() {
             />
           </div>
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div className="eyebrow">
-              Paciente · {patient.id.toUpperCase()} · acompanhamento desde {patient.since}
+            <div
+              className="eyebrow"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+            >
+              <span>
+                Paciente · {patient.id.toUpperCase()} · acompanhamento desde {patient.since}
+              </span>
+              {!patient.active && (
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    color: 'var(--coral)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                  }}
+                >
+                  IA Pausada
+                </span>
+              )}
             </div>
             <h1
               className="serif"
@@ -342,28 +368,259 @@ function TodayTab({
   plan: MealPlan | null;
   onSetTab: (t: Tab) => void;
 }) {
-  const reportedMacrosToday: MacroTarget = patient.macrosToday;
+  const todayStr = React.useMemo(() => toLocalDateString(), []);
+  const [selectedDate, setSelectedDate] = React.useState<string>(todayStr);
+  const isToday = selectedDate === todayStr;
+
+  const dateInfo = React.useMemo(() => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const d = new Date(year, month - 1, day);
+    const today = new Date();
+    const todayFormatted = toLocalDateString(today);
+
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    const yesterdayFormatted = toLocalDateString(yesterday);
+
+    const weekday = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    const monthName = d.toLocaleDateString('pt-BR', { month: 'long' });
+    const shortMonth = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+
+    if (selectedDate === todayFormatted) {
+      return {
+        label: `Hoje · ${day} de ${monthName}`,
+        short: 'hoje',
+        dayOfWeekIndex: (d.getDay() + 6) % 7,
+      };
+    }
+    if (selectedDate === yesterdayFormatted) {
+      return {
+        label: `Ontem · ${day} de ${monthName}`,
+        short: 'ontem',
+        dayOfWeekIndex: (d.getDay() + 6) % 7,
+      };
+    }
+    const capWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    return {
+      label: `${capWeekday}, ${day} de ${monthName}`,
+      short: `${day} de ${shortMonth}`,
+      dayOfWeekIndex: (d.getDay() + 6) % 7,
+    };
+  }, [selectedDate]);
+
+  const handlePrevDay = () => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d - 1);
+    setSelectedDate(toLocalDateString(date));
+  };
+
+  const handleNextDay = () => {
+    if (selectedDate >= todayStr) return;
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const date = new Date(y, m - 1, d + 1);
+    const nextFormatted = toLocalDateString(date);
+    if (nextFormatted <= todayStr) {
+      setSelectedDate(nextFormatted);
+    }
+  };
+
   const {
     data: extractions,
     isLoading: extractionsLoading,
     isError: extractionsError,
-  } = useExtractions(patientId);
+  } = useExtractions(patientId, selectedDate);
 
-  const extractionEvents = extractions ? mapExtractionsToTimelineEvents(extractions) : [];
-  const timelineEvents = [...extractionEvents, ...patient.timeline];
+  const extractionEvents = React.useMemo(
+    () => (extractions ? mapExtractionsToTimelineEvents(extractions) : []),
+    [extractions],
+  );
+  const timelineEvents = React.useMemo(
+    () => (isToday ? [...extractionEvents, ...patient.timeline] : extractionEvents),
+    [extractionEvents, patient.timeline, isToday],
+  );
 
   const kcalTarget = plan?.kcalTarget ?? patient.macrosToday.kcal.target;
   const protTarget = plan?.protTarget ?? patient.macrosToday.prot.target;
   const carbTarget = plan?.carbTarget ?? patient.macrosToday.carb.target;
   const fatTarget = plan?.fatTarget ?? patient.macrosToday.fat.target;
 
+  const reportedMacrosToday: MacroTarget = React.useMemo(() => {
+    let actualKcal = 0;
+    let actualProt = 0;
+    let actualCarb = 0;
+    let actualFat = 0;
+
+    if (extractions && extractions.length > 0) {
+      actualKcal = Math.round(
+        extractions.reduce((sum, ex) => sum + (Number(ex.totalKcal) || 0), 0),
+      );
+      actualProt = Math.round(
+        extractions.reduce((sum, ex) => sum + (Number(ex.totalProt) || 0), 0),
+      );
+      actualCarb = Math.round(
+        extractions.reduce((sum, ex) => sum + (Number(ex.totalCarb) || 0), 0),
+      );
+      actualFat = Math.round(extractions.reduce((sum, ex) => sum + (Number(ex.totalFat) || 0), 0));
+    } else if (isToday) {
+      const logs = timelineEvents.filter((ev) => ev.kind === 'log' && ev.macros);
+      if (logs.length > 0) {
+        actualKcal = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.kcal || 0), 0));
+        actualProt = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.prot || 0), 0));
+        actualCarb = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.carb || 0), 0));
+        actualFat = Math.round(logs.reduce((sum, ev) => sum + (ev.macros?.fat || 0), 0));
+      } else {
+        actualKcal = patient.macrosToday.kcal.actual;
+        actualProt = patient.macrosToday.prot.actual;
+        actualCarb = patient.macrosToday.carb.actual;
+        actualFat = patient.macrosToday.fat.actual;
+      }
+    }
+
+    return {
+      kcal: { target: kcalTarget, actual: actualKcal },
+      prot: { target: protTarget, actual: actualProt },
+      carb: { target: carbTarget, actual: actualCarb },
+      fat: { target: fatTarget, actual: actualFat },
+    };
+  }, [
+    extractions,
+    timelineEvents,
+    patient.macrosToday,
+    isToday,
+    kcalTarget,
+    protTarget,
+    carbTarget,
+    fatTarget,
+  ]);
+
   const mealCount = plan?.meals?.length ?? 6;
   const timelineCount = timelineEvents.filter((ev) => ev.kind === 'log').length;
   const hasTimelineData = timelineCount > 0;
 
+  const weekMacroFill = React.useMemo(() => {
+    if (patient.weekMacroFill && patient.weekMacroFill.length === 7) {
+      return patient.weekMacroFill;
+    }
+    const fillRatio =
+      kcalTarget > 0 ? Math.min(1, reportedMacrosToday.kcal.actual / kcalTarget) : 0;
+    const fill = [0, 0, 0, 0, 0, 0, 0];
+    fill[dateInfo.dayOfWeekIndex] = fillRatio;
+    return fill;
+  }, [patient.weekMacroFill, kcalTarget, reportedMacrosToday.kcal.actual, dateInfo.dayOfWeekIndex]);
+
   return (
     <div>
       <div style={{ padding: '24px 28px' }}>
+        {/* Barra de navegação por data com mini calendário */}
+        <div
+          className="today-date-bar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 20,
+            padding: '10px 14px',
+            background: 'var(--surface-2)',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              data-testid="btn-prev-day"
+              className="btn btn-ghost"
+              style={{ padding: '5px 10px', fontSize: 13 }}
+              onClick={handlePrevDay}
+              title="Ver dia anterior"
+            >
+              ◀
+            </button>
+
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '5px 14px',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+                title="Clique para abrir o calendário e escolher outra data"
+              >
+                <span style={{ fontSize: 14 }}>📅</span>
+                <span>{dateInfo.label}</span>
+                <span style={{ fontSize: 10, color: 'var(--fg-subtle)', marginLeft: 4 }}>▼</span>
+                <input
+                  type="date"
+                  data-testid="date-picker-input"
+                  value={selectedDate}
+                  max={todayStr}
+                  onChange={(e) => {
+                    if (e.target.value) setSelectedDate(e.target.value);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    opacity: 0,
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    cursor: 'pointer',
+                  }}
+                />
+              </label>
+            </div>
+
+            <button
+              data-testid="btn-next-day"
+              className="btn btn-ghost"
+              style={{ padding: '5px 10px', fontSize: 13, opacity: isToday ? 0.35 : 1 }}
+              onClick={handleNextDay}
+              disabled={isToday}
+              title={isToday ? 'Você já está no dia de hoje' : 'Ver próximo dia'}
+            >
+              ▶
+            </button>
+
+            {!isToday && (
+              <button
+                data-testid="btn-go-today"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '4px 10px', marginLeft: 4 }}
+                onClick={() => setSelectedDate(todayStr)}
+              >
+                Voltar para Hoje
+              </button>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 12,
+              color: 'var(--fg-muted)',
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: isToday ? 'var(--lime-dim)' : 'var(--fg-subtle)',
+              }}
+            />
+            <span>{isToday ? 'Monitoramento em tempo real' : 'Visualizando dados históricos'}</span>
+          </div>
+        </div>
+
         <div
           className="today-cards-grid"
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 22 }}
@@ -553,15 +810,17 @@ function TodayTab({
             <div className="sub">SEG — DOM</div>
           </div>
           <div className="card-b">
-            <WeekBars values={patient.weekMacroFill} height={42} />
+            <WeekBars values={weekMacroFill} height={42} activeIndex={dateInfo.dayOfWeekIndex} />
           </div>
         </div>
 
         {/* Timeline */}
         <div className="card">
           <div className="card-h">
-            <div className="title">Refeições reportadas · hoje</div>
-            <div className="sub">SOMENTE REGISTROS DO PACIENTE</div>
+            <div className="title">Refeições reportadas · {dateInfo.short}</div>
+            <div className="sub">
+              {isToday ? 'SOMENTE REGISTROS DO PACIENTE' : `DATA: ${dateInfo.label.toUpperCase()}`}
+            </div>
             <div className="spacer" />
             <div
               style={{
@@ -600,7 +859,13 @@ function TodayTab({
                 <p style={{ color: 'var(--fg-muted)', fontSize: 11 }}>Mostrando dados locais.</p>
               </div>
             )}
-            {!extractionsLoading && <Timeline items={timelineEvents} patientId={patientId} />}
+            {!extractionsLoading && (
+              <Timeline
+                items={timelineEvents}
+                patientId={patientId}
+                emptyTitle={`Nenhum registro em ${dateInfo.short}`}
+              />
+            )}
           </div>
         </div>
       </div>

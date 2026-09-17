@@ -20,6 +20,7 @@ public record FoodResponse(
         String prep,
         String portionLabel,
         Integer usedCount,
+        Boolean custom,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -38,6 +39,7 @@ public record FoodResponse(
                 food.getPrep(),
                 food.getPortionLabel(),
                 food.getUsedCount(),
+                food.getNutritionistId() != null,
                 food.getCreatedAt(),
                 food.getUpdatedAt()
         );

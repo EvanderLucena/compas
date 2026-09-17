@@ -165,6 +165,15 @@ export interface TimelineEvent {
   hasMessage?: boolean;
   offPlan?: boolean;
   extractionId?: string;
+  rawItems?: Array<{
+    name: string;
+    kcal: number;
+    prot: number;
+    carb: number;
+    fat: number;
+    grams?: number | null;
+    sortOrder?: number;
+  }>;
 }
 
 export interface DetailedPatient extends Patient {

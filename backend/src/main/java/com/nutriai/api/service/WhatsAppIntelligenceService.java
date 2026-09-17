@@ -62,15 +62,16 @@ public class WhatsAppIntelligenceService {
     }
 
     /**
-     * Get today's extractions for a patient, scoped by nutritionistId (D-23, D-14).
+     * Get extractions for a patient on a specific date (defaults to today), scoped by nutritionistId (D-23, D-14).
      */
-    public List<ExtractionDTO> getExtractionsToday(UUID patientId, UUID nutritionistId) {
+    public List<ExtractionDTO> getExtractions(UUID patientId, UUID nutritionistId, LocalDate date) {
         Patient patient = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Paciente não encontrado"));
 
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+        LocalDate targetDate = date != null ? date : LocalDate.now();
+        LocalDateTime startOfDay = targetDate.atStartOfDay();
+        LocalDateTime endOfDay = targetDate.atTime(LocalTime.MAX);
 
         List<MealExtraction> extractions = mealExtractionRepository
                 .findByPatientIdAndNutritionistIdAndExtractedAtBetween(
@@ -79,6 +80,13 @@ public class WhatsAppIntelligenceService {
         return extractions.stream()
                 .map(this::toExtractionDTO)
                 .toList();
+    }
+
+    /**
+     * Get today's extractions for a patient, scoped by nutritionistId (D-23, D-14).
+     */
+    public List<ExtractionDTO> getExtractionsToday(UUID patientId, UUID nutritionistId) {
+        return getExtractions(patientId, nutritionistId, null);
     }
 
     /**

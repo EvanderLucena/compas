@@ -131,6 +131,34 @@ class WhatsAppIntelligenceControllerTest {
     }
 
     @Test
+    void getExtractions_withPastDate_returnsListForThatDate() throws Exception {
+        LocalDate pastDate = LocalDate.now().minusDays(5);
+        MealExtraction pastExtraction = MealExtraction.builder()
+                .messageId(UUID.randomUUID())
+                .nutritionistId(nutritionistId)
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .extractionRaw("Jantar: sopa de legumes")
+                .mealLabel("Jantar")
+                .totalKcal(new BigDecimal("220.0"))
+                .totalProt(new BigDecimal("12.0"))
+                .totalCarb(new BigDecimal("30.0"))
+                .totalFat(new BigDecimal("4.0"))
+                .extractedAt(pastDate.atTime(19, 30))
+                .build();
+        mealExtractionRepository.save(pastExtraction);
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/extractions", patientId)
+                        .param("date", pastDate.toString())
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].mealLabel").value("Jantar"))
+                .andExpect(jsonPath("$.data[0].totalKcal").value(220.0));
+    }
+
+    @Test
     void getExtractionsToday_wrongTenant_returns404() throws Exception {
         // Create a second nutritionist
         SignupRequest otherSignup = new SignupRequest("Dr. Other WA", "wa-other@test.com", "senha12345", "54321", "RJ", "Nutrição", null, true);

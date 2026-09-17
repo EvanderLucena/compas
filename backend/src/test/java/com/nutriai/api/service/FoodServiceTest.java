@@ -75,10 +75,10 @@ class FoodServiceTest {
     }
 
     @Test
-    void listFoods_returnsOnlyNutritionistsFoods() {
+    void listFoods_returnsAvailableFoods() {
         Food food = Food.builder().id(UUID.randomUUID()).nutritionistId(nutritionistId).name("Arroz").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
         Page<Food> page = new PageImpl<>(List.of(food));
-        when(foodRepository.findByNutritionistId(eq(nutritionistId), any(PageRequest.class))).thenReturn(page);
+        when(foodRepository.findAvailableByNutritionistId(eq(nutritionistId), any(PageRequest.class))).thenReturn(page);
 
         FoodService.FoodListResponse resp = foodService.listFoods(nutritionistId, 0, 12, null, null);
 
@@ -90,20 +90,20 @@ class FoodServiceTest {
     void listFoods_withSearchAndCategory_usesFilteredQuery() {
         Food food = Food.builder().id(UUID.randomUUID()).nutritionistId(nutritionistId).name("Arroz").category("CARBOIDRATO").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
         Page<Food> page = new PageImpl<>(List.of(food));
-        when(foodRepository.findByNutritionistIdWithFilters(eq(nutritionistId), eq("arroz"), eq("CARBOIDRATO"), any(PageRequest.class))).thenReturn(page);
+        when(foodRepository.findAvailableByNutritionistIdWithFilters(eq(nutritionistId), eq("arroz"), eq("CARBOIDRATO"), any(PageRequest.class))).thenReturn(page);
 
         FoodService.FoodListResponse resp = foodService.listFoods(nutritionistId, 0, 12, "arroz", "CARBOIDRATO");
 
         assertEquals(1, resp.content().size());
-        verify(foodRepository).findByNutritionistIdWithFilters(eq(nutritionistId), eq("arroz"), eq("CARBOIDRATO"), any(PageRequest.class));
-        verify(foodRepository, never()).findByNutritionistId(any(), any());
+        verify(foodRepository).findAvailableByNutritionistIdWithFilters(eq(nutritionistId), eq("arroz"), eq("CARBOIDRATO"), any(PageRequest.class));
+        verify(foodRepository, never()).findAvailableByNutritionistId(any(), any());
     }
 
     @Test
     void getFood_returnsFoodForCorrectNutritionist() {
         UUID foodId = UUID.randomUUID();
         Food food = Food.builder().id(foodId).nutritionistId(nutritionistId).name("Arroz").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
-        when(foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)).thenReturn(Optional.of(food));
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(food));
 
         FoodResponse resp = foodService.getFood(nutritionistId, foodId);
 
@@ -115,7 +115,7 @@ class FoodServiceTest {
     void getFood_throws404ForWrongNutritionist() {
         UUID foodId = UUID.randomUUID();
         UUID wrongNutriId = UUID.randomUUID();
-        when(foodRepository.findByIdAndNutritionistId(foodId, wrongNutriId)).thenReturn(Optional.empty());
+        when(foodRepository.findAvailableById(foodId, wrongNutriId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> foodService.getFood(wrongNutriId, foodId));
     }
@@ -124,7 +124,7 @@ class FoodServiceTest {
     void updateFood_modifiesCorrectFieldsAndPersists() {
         UUID foodId = UUID.randomUUID();
         Food food = Food.builder().id(foodId).nutritionistId(nutritionistId).name("Arroz branco").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
-        when(foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)).thenReturn(Optional.of(food));
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(food));
         when(foodRepository.save(any(Food.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateFoodRequest req = new UpdateFoodRequest("Arroz integral", null, null, null, null, null, null, null, null, null, null);
@@ -135,10 +135,21 @@ class FoodServiceTest {
     }
 
     @Test
+    void updateFood_standardFood_throws403() {
+        UUID foodId = UUID.randomUUID();
+        Food standardFood = Food.builder().id(foodId).nutritionistId(null).name("Arroz branco").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(standardFood));
+
+        UpdateFoodRequest req = new UpdateFoodRequest("Arroz modificado", null, null, null, null, null, null, null, null, null, null);
+        assertThrows(ResponseStatusException.class, () -> foodService.updateFood(nutritionistId, foodId, req));
+        verify(foodRepository, never()).save(any(Food.class));
+    }
+
+    @Test
     void deleteFood_removesFood() {
         UUID foodId = UUID.randomUUID();
         Food food = Food.builder().id(foodId).nutritionistId(nutritionistId).name("Arroz").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
-        when(foodRepository.findByIdAndNutritionistId(foodId, nutritionistId)).thenReturn(Optional.of(food));
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(food));
 
         foodService.deleteFood(nutritionistId, foodId);
 
@@ -149,8 +160,18 @@ class FoodServiceTest {
     void deleteFood_throws404ForWrongNutritionist() {
         UUID foodId = UUID.randomUUID();
         UUID wrongNutriId = UUID.randomUUID();
-        when(foodRepository.findByIdAndNutritionistId(foodId, wrongNutriId)).thenReturn(Optional.empty());
+        when(foodRepository.findAvailableById(foodId, wrongNutriId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> foodService.deleteFood(wrongNutriId, foodId));
+    }
+
+    @Test
+    void deleteFood_standardFood_throws403() {
+        UUID foodId = UUID.randomUUID();
+        Food standardFood = Food.builder().id(foodId).nutritionistId(null).name("Arroz branco").unit("GRAMAS").referenceAmount(new BigDecimal("100")).kcal(new BigDecimal("130")).prot(new BigDecimal("2.7")).carb(new BigDecimal("28")).fat(new BigDecimal("0.3")).build();
+        when(foodRepository.findAvailableById(foodId, nutritionistId)).thenReturn(Optional.of(standardFood));
+
+        assertThrows(ResponseStatusException.class, () -> foodService.deleteFood(nutritionistId, foodId));
+        verify(foodRepository, never()).delete(any(Food.class));
     }
 }

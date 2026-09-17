@@ -43,6 +43,8 @@ describe('whatsappStore', () => {
       expect(events[0].macros.fat).toBe(9);
       expect(events[0].time).toBeTruthy();
       expect(events[0].hasMessage).toBe(true);
+      expect(events[0].rawItems).toHaveLength(3);
+      expect(events[0].rawItems?.[0].name).toBe('Arroz');
     });
 
     it('handles empty extractions array', () => {
@@ -96,11 +98,20 @@ describe('whatsappStore', () => {
       expect(state.activationModalOpen).toBe(false);
     });
 
-    it('setActivationModalOpen toggles state', () => {
+    it('setActivationModalOpen updates the state', () => {
       useWhatsAppUIStore.getState().setActivationModalOpen(true);
       expect(useWhatsAppUIStore.getState().activationModalOpen).toBe(true);
+
       useWhatsAppUIStore.getState().setActivationModalOpen(false);
       expect(useWhatsAppUIStore.getState().activationModalOpen).toBe(false);
+    });
+  });
+
+  describe('toLocalDateString', () => {
+    it('formats given date correctly as YYYY-MM-DD using local time', async () => {
+      const { toLocalDateString } = await import('./whatsappStore');
+      const testDate = new Date(2026, 8, 16, 23, 45, 0); // Sept 16, 2026
+      expect(toLocalDateString(testDate)).toBe('2026-09-16');
     });
   });
 });
