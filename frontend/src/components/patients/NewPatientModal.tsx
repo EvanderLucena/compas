@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { OBJECTIVE_LABELS, OBJECTIVE_KEYS } from '../../types/patient';
 import type { ObjectiveOption } from '../../types/patient';
 import { useValidation } from '../../hooks/useValidation';
+import { parseNumberInput } from '../../utils/numberInput';
 
 function formatPhone(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -72,7 +73,7 @@ export function NewPatientModal({
       heightCm: {
         custom: (v: string) => {
           if (!v.trim()) return undefined;
-          const n = Number(v.replace(',', '.'));
+          const n = parseNumberInput(v);
           if (!Number.isFinite(n)) return 'Altura deve ser um número.';
           if (n < 50 || n > 250) return 'Altura deve estar entre 50 e 250 cm.';
           return undefined;
@@ -105,12 +106,15 @@ export function NewPatientModal({
   const handleSubmit = () => {
     if (!terms) return;
     if (!validateAll()) return;
+    const parsedHeightCm = form.heightCm.trim() ? parseNumberInput(form.heightCm) : undefined;
     onSave?.({
       name: form.name.trim(),
       objective: form.objective as ObjectiveOption,
       ...(form.birthDate ? { birthDate: form.birthDate } : {}),
       sex,
-      ...(form.heightCm ? { heightCm: Number(form.heightCm) } : {}),
+      ...(parsedHeightCm !== undefined && Number.isFinite(parsedHeightCm)
+        ? { heightCm: parsedHeightCm }
+        : {}),
       ...(stripPhone(form.whatsapp) ? { whatsapp: stripPhone(form.whatsapp) } : {}),
       terms,
     });

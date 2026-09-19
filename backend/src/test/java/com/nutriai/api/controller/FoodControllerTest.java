@@ -105,6 +105,38 @@ class FoodControllerTest {
     }
 
     @Test
+    void createFood_withNegativeKcal_returns400() throws Exception {
+        CreateFoodRequest req = new CreateFoodRequest(
+                "Alimento Teste", "CARBOIDRATO", "GRAMAS",
+                new BigDecimal("100"), new BigDecimal("-10.0"), new BigDecimal("2.0"),
+                new BigDecimal("20.0"), new BigDecimal("1.0"), null, null, null
+        );
+
+        mockMvc.perform(post("/api/v1/foods")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void createFood_withZeroReferenceAmount_returns400() throws Exception {
+        CreateFoodRequest req = new CreateFoodRequest(
+                "Alimento Teste", "CARBOIDRATO", "GRAMAS",
+                new BigDecimal("0"), new BigDecimal("100.0"), new BigDecimal("2.0"),
+                new BigDecimal("20.0"), new BigDecimal("1.0"), null, null, null
+        );
+
+        mockMvc.perform(post("/api/v1/foods")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void listFoods_returnsPaginatedList() throws Exception {
         CreateFoodRequest req1 = new CreateFoodRequest("Arroz branco", "CARBOIDRATO", "GRAMAS", new BigDecimal("100"), new BigDecimal("130"), new BigDecimal("2.7"), new BigDecimal("28"), new BigDecimal("0.3"), null, null, null);
         CreateFoodRequest req2 = new CreateFoodRequest("Pão integral", "PROTEINA", "GRAMAS", new BigDecimal("30"), new BigDecimal("70"), new BigDecimal("2.5"), new BigDecimal("12"), new BigDecimal("1"), null, null, "1 fatia");
