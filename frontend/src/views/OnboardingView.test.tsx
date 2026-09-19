@@ -36,7 +36,7 @@ describe('OnboardingView — Mini Tutorial Tour', () => {
     mockGetCurrentUser.mockResolvedValue({
       id: 'nutri-1',
       name: 'Dra. Helena',
-      email: 'helena@compas.app.br',
+      email: 'helena@nutriai.com',
       role: 'NUTRITIONIST',
     });
   });
