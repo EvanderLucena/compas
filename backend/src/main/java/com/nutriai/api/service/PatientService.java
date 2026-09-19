@@ -364,4 +364,10 @@ public class PatientService {
 
         return decision;
     }
+
+    @Transactional(readOnly = true)
+    public com.nutriai.api.dto.jev.JevSubstitutionDecision evaluateSubstitution(
+            UUID nutritionistId, UUID patientId, String prescribedFood, String desiredFood) {
+        return mealPlanService.evaluateSubstitution(nutritionistId, patientId, prescribedFood, desiredFood);
+    }
 }

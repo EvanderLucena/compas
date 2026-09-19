@@ -378,6 +378,9 @@ public class ConversationService {
 
         String emotionalContext = "";
         if (message != null && (Boolean.TRUE.equals(message.getJevRequiresAttention())
+                || "struggling".equalsIgnoreCase(message.getJevSentiment())
+                || "guilty".equalsIgnoreCase(message.getJevSentiment())
+                || "anxious".equalsIgnoreCase(message.getJevSentiment())
                 || "guilty_or_struggling".equalsIgnoreCase(message.getJevSentiment()))) {
             emotionalContext = """
 

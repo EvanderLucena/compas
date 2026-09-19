@@ -396,7 +396,7 @@ public class TypeSafeJevService implements JevService {
             );
 
             if (response.statusCode() != 200) {
-                LOG.warn("Jev API returned HTTP {} for payload: {}", response.statusCode(), response.body());
+                LOG.warn("Jev API returned HTTP status {}", response.statusCode());
                 return Optional.empty();
             }
 

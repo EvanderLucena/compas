@@ -135,7 +135,7 @@ public class ClinicalRadarService {
             String sentiment = row[0] != null ? row[0].toString() : "";
             long count = row[1] instanceof Number num ? num.longValue() : 0L;
 
-            if (sentiment.contains("motivated") || sentiment.contains("positive")) {
+            if (sentiment.contains("motivated") || sentiment.contains("positive") || sentiment.contains("confident")) {
                 motivated += count;
             } else if (sentiment.contains("struggling") || sentiment.contains("guilty")) {
                 struggling += count;
