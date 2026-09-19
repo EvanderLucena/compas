@@ -96,4 +96,13 @@ public class PatientController {
                 nutritionistId, patientId, request.prescribedFood(), request.desiredFood());
         return ResponseEntity.ok(ApiResponse.ok(decision));
     }
+
+    @GetMapping("/{id}/consumption-patterns")
+    public ResponseEntity<ApiResponse<com.nutriai.api.dto.intelligence.PatientConsumptionPatternsDTO>> getConsumptionPatterns(
+            @PathVariable UUID id
+    ) {
+        UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
+        var patterns = patientService.getConsumptionPatterns(id, nutritionistId);
+        return ResponseEntity.ok(ApiResponse.ok(patterns));
+    }
 }

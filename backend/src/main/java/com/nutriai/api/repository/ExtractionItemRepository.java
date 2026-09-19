@@ -16,6 +16,11 @@ public interface ExtractionItemRepository extends JpaRepository<ExtractionItem, 
     List<ExtractionItem> findByExtractionIdOrderBySortOrder(UUID extractionId);
 
     /**
+     * Find all items for multiple extractions.
+     */
+    List<ExtractionItem> findByExtractionIdIn(List<UUID> extractionIds);
+
+    /**
      * Delete all items for a given extraction (used when correcting an extraction).
      */
     void deleteAllByExtractionId(UUID extractionId);

@@ -285,3 +285,5 @@ export interface HistorySnapshot {
   assessments: BiometryAssessmentDTO[];
   timelineEvents: TimelineEventDTO[];
 }
+
+export type * from './consumption';

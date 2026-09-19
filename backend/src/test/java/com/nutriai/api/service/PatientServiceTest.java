@@ -5,8 +5,12 @@ import com.nutriai.api.exception.ResourceNotFoundException;
 import com.nutriai.api.model.*;
 import com.nutriai.api.repository.EpisodeHistoryEventRepository;
 import com.nutriai.api.repository.EpisodeRepository;
+import com.nutriai.api.repository.ExtractionItemRepository;
 import com.nutriai.api.repository.MealExtractionRepository;
+import com.nutriai.api.repository.MealFoodRepository;
+import com.nutriai.api.repository.MealOptionRepository;
 import com.nutriai.api.repository.MealPlanRepository;
+import com.nutriai.api.repository.MealSlotRepository;
 import com.nutriai.api.repository.NutritionistRepository;
 import com.nutriai.api.repository.PatientRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +58,18 @@ class PatientServiceTest {
 
     @Mock
     private JevService jevService;
+
+    @Mock
+    private ExtractionItemRepository extractionItemRepository;
+
+    @Mock
+    private MealSlotRepository mealSlotRepository;
+
+    @Mock
+    private MealOptionRepository mealOptionRepository;
+
+    @Mock
+    private MealFoodRepository mealFoodRepository;
 
     @InjectMocks
     private PatientService patientService;
@@ -475,5 +491,106 @@ class PatientServiceTest {
         assertEquals(PatientStatus.ONTRACK, decision.suggestedStatus());
         assertEquals("Excelente adesão aos registros e macros.", samplePatient.getAiAdherenceInsight());
         verify(patientRepository).save(samplePatient);
+    }
+
+    @Test
+    void getConsumptionPatterns_whenNoExtractions_returnsDefaultEmptyPatterns() {
+        UUID patientId = samplePatient.getId();
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId))
+                .thenReturn(Optional.of(samplePatient));
+        when(mealExtractionRepository.findByPatientIdAndNutritionistIdAndExtractedAtBetween(
+                eq(patientId), eq(nutritionistId), any(), any()))
+                .thenReturn(List.of());
+
+        var patterns = patientService.getConsumptionPatterns(patientId, nutritionistId);
+
+        assertNotNull(patterns);
+        assertEquals(14, patterns.periodDays());
+        assertEquals(0, patterns.totalLoggedMeals());
+        assertEquals(0.0, patterns.dailyAverageMeals());
+        assertTrue(patterns.frequentOffPlanFoods().isEmpty());
+        assertFalse(patterns.observedPatterns().isEmpty());
+    }
+
+    @Test
+    void getConsumptionPatterns_withExtractions_identifiesOffPlanFoodsAndPatterns() {
+        UUID patientId = samplePatient.getId();
+        UUID extraction1Id = UUID.randomUUID();
+        UUID extraction2Id = UUID.randomUUID();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId))
+                .thenReturn(Optional.of(samplePatient));
+
+        var ext1 = MealExtraction.builder()
+                .id(extraction1Id)
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .episodeId(UUID.randomUUID())
+                .messageId(UUID.randomUUID())
+                .extractionRaw("Iogurte grego com mel")
+                .mealLabel("Lanche tarde")
+                .totalKcal(new BigDecimal("220"))
+                .totalProt(new BigDecimal("15"))
+                .extractedAt(java.time.LocalDateTime.now().minusDays(2).withHour(15))
+                .build();
+
+        var ext2 = MealExtraction.builder()
+                .id(extraction2Id)
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .episodeId(UUID.randomUUID())
+                .messageId(UUID.randomUUID())
+                .extractionRaw("Iogurte grego com chia")
+                .mealLabel("Lanche tarde")
+                .totalKcal(new BigDecimal("210"))
+                .totalProt(new BigDecimal("14"))
+                .extractedAt(java.time.LocalDateTime.now().minusDays(1).withHour(15))
+                .build();
+
+        when(mealExtractionRepository.findByPatientIdAndNutritionistIdAndExtractedAtBetween(
+                eq(patientId), eq(nutritionistId), any(), any()))
+                .thenReturn(List.of(ext1, ext2));
+
+        var item1 = ExtractionItem.builder()
+                .id(UUID.randomUUID())
+                .extractionId(extraction1Id)
+                .name("Iogurte grego")
+                .grams(new BigDecimal("150"))
+                .kcal(new BigDecimal("180"))
+                .prot(new BigDecimal("12"))
+                .carb(new BigDecimal("8"))
+                .fat(new BigDecimal("4"))
+                .build();
+
+        var item2 = ExtractionItem.builder()
+                .id(UUID.randomUUID())
+                .extractionId(extraction2Id)
+                .name("Iogurte grego")
+                .grams(new BigDecimal("150"))
+                .kcal(new BigDecimal("180"))
+                .prot(new BigDecimal("12"))
+                .carb(new BigDecimal("8"))
+                .fat(new BigDecimal("4"))
+                .build();
+
+        when(extractionItemRepository.findByExtractionIdIn(anyList()))
+                .thenReturn(List.of(item1, item2));
+
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        var patterns = patientService.getConsumptionPatterns(patientId, nutritionistId);
+
+        assertNotNull(patterns);
+        assertEquals(2, patterns.totalLoggedMeals());
+        assertEquals(1, patterns.frequentOffPlanFoods().size());
+
+        var offPlan = patterns.frequentOffPlanFoods().get(0);
+        assertEquals("Iogurte grego", offPlan.foodName());
+        assertEquals(2, offPlan.consumptionCount());
+        assertEquals("Lanche tarde", offPlan.commonMealLabel());
+        assertEquals(new BigDecimal("150"), offPlan.typicalGrams());
+        assertEquals(new BigDecimal("180"), offPlan.typicalKcal());
+        assertFalse(patterns.observedPatterns().isEmpty());
     }
 }

@@ -17,6 +17,7 @@ import {
   MultiLineChart,
   StatusReviewModal,
   WhatsAppActivationRow,
+  InsightsTab,
 } from '../components/patient';
 import { MacroRings, WeekBars, LineChart } from '../components/viz';
 import {
@@ -349,7 +350,13 @@ export function PatientView() {
       )}
       {tab === 'plan' && <PlansView patientId={patientId} />}
       {tab === 'biometry' && <BiometryTab patientId={patientId} patientStatus={patient.status} />}
-      {tab === 'insights' && <InsightsTab adherenceInsight={patient.aiSummary} />}
+      {tab === 'insights' && (
+        <InsightsTab
+          patientId={patientId}
+          adherenceInsight={patient.aiSummary}
+          onNavigateToPlan={() => setTab('plan')}
+        />
+      )}
       {tab === 'history' && <HistoryTab patientId={patientId} />}
 
       {editOpen && <EditPatientModal patient={patient} onClose={() => setEditOpen(false)} />}
@@ -1419,83 +1426,6 @@ function BioCell({
           {sub}
         </div>
       )}
-    </div>
-  );
-}
-
-function InsightsTab({ adherenceInsight }: { adherenceInsight?: string | null }) {
-  return (
-    <div style={{ padding: '24px 28px' }}>
-      {adherenceInsight && (
-        <div
-          className="card"
-          style={{
-            marginBottom: 20,
-            borderLeft: '4px solid var(--lime)',
-            background: 'var(--surface)',
-          }}
-        >
-          <div className="card-h">
-            <div className="title">Diagnóstico Clínico de Adesão</div>
-            <div className="spacer" />
-            <div
-              className="mono"
-              style={{
-                fontSize: 10.5,
-                color: 'var(--lime-dim)',
-                letterSpacing: '0.06em',
-                fontWeight: 600,
-              }}
-            >
-              AVALIAÇÃO CLÍNICA
-            </div>
-          </div>
-          <div className="card-b" style={{ fontSize: 13.5, color: 'var(--fg)', lineHeight: 1.6 }}>
-            {adherenceInsight}
-          </div>
-        </div>
-      )}
-      <div className="card">
-        <div className="card-h">
-          <div className="title">Padrões observados no consumo</div>
-          <div className="sub">ÚLTIMOS 14 DIAS</div>
-          <div className="spacer" />
-          <div
-            className="mono"
-            style={{ fontSize: 10.5, color: 'var(--fg-subtle)', letterSpacing: '0.06em' }}
-          >
-            APENAS DADOS EXTRAÍDOS
-          </div>
-        </div>
-        <div className="card-b">
-          <ul
-            style={{
-              margin: 0,
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 14,
-            }}
-          >
-            {[
-              'Horários de maior frequência de registro: 07:00–09:00 e 12:00–13:30',
-              'Proteína média por refeição: 28g (desvio padrão 6g)',
-              'Hidratação raramente reportada — apenas 2 registros nos últimos 7 dias',
-              'Frequência de lanches reportados no período da tarde vem caindo nas últimas 2 semanas',
-            ].map((t, i) => (
-              <li key={i} style={{ fontSize: 13.5, display: 'flex', gap: 12, color: 'var(--fg)' }}>
-                <span
-                  style={{ color: 'var(--lime-dim)', fontFamily: 'var(--font-mono)', fontSize: 12 }}
-                >
-                  0{i + 1}
-                </span>
-                <span>{t}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
     </div>
   );
 }

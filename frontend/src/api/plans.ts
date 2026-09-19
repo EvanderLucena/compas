@@ -67,10 +67,7 @@ export async function getPlan(patientId: string): Promise<MealPlan> {
   return response.data.data;
 }
 
-export async function updatePlan(
-  patientId: string,
-  data: UpdatePlanRequest,
-): Promise<MealPlan> {
+export async function updatePlan(patientId: string, data: UpdatePlanRequest): Promise<MealPlan> {
   const response = await apiClient.patch<{ success: boolean; data: MealPlan }>(
     `/patients/${patientId}/plan`,
     data,
@@ -101,10 +98,7 @@ export async function updateMealSlot(
   return response.data.data;
 }
 
-export async function deleteMealSlot(
-  patientId: string,
-  mealId: string,
-): Promise<void> {
+export async function deleteMealSlot(patientId: string, mealId: string): Promise<void> {
   await apiClient.delete(`/patients/${patientId}/plan/meals/${mealId}`);
 }
 
@@ -138,9 +132,7 @@ export async function deleteOption(
   mealId: string,
   optionId: string,
 ): Promise<void> {
-  await apiClient.delete(
-    `/patients/${patientId}/plan/meals/${mealId}/options/${optionId}`,
-  );
+  await apiClient.delete(`/patients/${patientId}/plan/meals/${mealId}/options/${optionId}`);
 }
 
 export async function addFoodItem(
@@ -152,10 +144,7 @@ export async function addFoodItem(
   const response = await apiClient.post<{
     success: boolean;
     data: MealPlan['meals'][number]['options'][number]['items'][number];
-  }>(
-    `/patients/${patientId}/plan/meals/${mealId}/options/${optionId}/items`,
-    data,
-  );
+  }>(`/patients/${patientId}/plan/meals/${mealId}/options/${optionId}/items`, data);
   return response.data.data;
 }
 
@@ -169,10 +158,7 @@ export async function updateFoodItem(
   const response = await apiClient.patch<{
     success: boolean;
     data: MealPlan['meals'][number]['options'][number]['items'][number];
-  }>(
-    `/patients/${patientId}/plan/meals/${mealId}/options/${optionId}/items/${itemId}`,
-    data,
-  );
+  }>(`/patients/${patientId}/plan/meals/${mealId}/options/${optionId}/items/${itemId}`, data);
   return response.data.data;
 }
 
@@ -210,9 +196,27 @@ export async function updateExtra(
   return response.data.data;
 }
 
-export async function deleteExtra(
-  patientId: string,
-  extraId: string,
-): Promise<void> {
+export async function deleteExtra(patientId: string, extraId: string): Promise<void> {
   await apiClient.delete(`/patients/${patientId}/plan/extras/${extraId}`);
+}
+
+export interface AdoptFrequentFoodRequest {
+  foodName: string;
+  typicalGrams?: number;
+  typicalKcal?: number;
+  typicalProt?: number;
+  typicalCarb?: number;
+  typicalFat?: number;
+}
+
+export async function adoptFrequentFood(
+  patientId: string,
+  mealId: string,
+  data: AdoptFrequentFoodRequest,
+): Promise<MealPlan['meals'][number]['options'][number]> {
+  const response = await apiClient.post<{
+    success: boolean;
+    data: MealPlan['meals'][number]['options'][number];
+  }>(`/patients/${patientId}/plan/meals/${mealId}/options/adopt-frequent-food`, data);
+  return response.data.data;
 }

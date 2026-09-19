@@ -171,4 +171,16 @@ public class PlanController {
         mealPlanService.deleteExtra(nutritionistId, extraId);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/meals/{mealId}/options/adopt-frequent-food")
+    public ResponseEntity<ApiResponse<MealOptionResponse>> adoptFrequentFood(
+            @PathVariable UUID patientId,
+            @PathVariable UUID mealId,
+            @RequestBody @Valid AdoptFrequentFoodRequest request
+    ) {
+        UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
+        MealOptionResponse response = mealPlanService.adoptFrequentFoodAsAlternativeOption(
+                nutritionistId, patientId, mealId, request);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
 }
