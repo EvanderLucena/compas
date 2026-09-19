@@ -2,22 +2,16 @@ import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import { Link } from 'react-router';
+import { IconCompas } from '../components/ui/CompasLogo';
 
 function AuthLeftBranding() {
   return (
     <div className="auth-left">
       <div className="auth-left-content">
         <div className="auth-brand">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-              style={{ stroke: 'var(--lime)' }}
-              strokeWidth="1.6"
-            />
-            <circle cx="12" cy="14" r="1.4" style={{ fill: 'var(--lime)' }} />
-          </svg>
+          <IconCompas size={28} />
           <span className="auth-brand-name">
-            Nutri<span>AI</span>
+            compas<span>.</span>
           </span>
         </div>
         <h1 className="auth-left-title">
@@ -39,16 +33,9 @@ function MobileBrandHeader() {
   return (
     <div className="auth-mobile-brand">
       <div className="auth-brand" style={{ marginBottom: 0 }}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-            style={{ stroke: 'var(--lime-dim)' }}
-            strokeWidth="1.6"
-          />
-          <circle cx="12" cy="14" r="1.4" style={{ fill: 'var(--lime-dim)' }} />
-        </svg>
+        <IconCompas size={24} color="var(--lime-dim)" />
         <span className="auth-brand-name" style={{ color: 'var(--fg)' }}>
-          Nutri<span style={{ color: 'var(--lime-dim)' }}>AI</span>
+          compas<span style={{ color: 'var(--lime-dim)' }}>.</span>
         </span>
       </div>
     </div>
@@ -182,7 +169,7 @@ export function LoginView() {
     e.preventDefault();
     useToastStore
       .getState()
-      .showSuccess('Para redefinir sua senha, entre em contato com suporte@nutriai.com.br');
+      .showSuccess('Para redefinir sua senha, entre em contato com suporte@compas.app.br');
   };
 
   const handleGoogleAuth = () => {
@@ -201,7 +188,7 @@ export function LoginView() {
 
           <div className="auth-form-header">
             <h2>Entrar</h2>
-            <p>Acesse sua conta NutriAI</p>
+            <p>Acesse sua conta Compas</p>
           </div>
 
           {localError && <div className="auth-error">{localError}</div>}

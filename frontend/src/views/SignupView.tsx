@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate, Link } from 'react-router';
+import { IconCompas } from '../components/ui/CompasLogo';
 
 const UFS = [
   'AC',
@@ -116,16 +117,9 @@ export function SignupView() {
       <div className="auth-left">
         <div className="auth-left-content">
           <div className="auth-brand">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-                style={{ stroke: 'var(--lime)' }}
-                strokeWidth="1.6"
-              />
-              <circle cx="12" cy="14" r="1.4" style={{ fill: 'var(--lime)' }} />
-            </svg>
+            <IconCompas size={28} />
             <span className="auth-brand-name">
-              Nutri<span>AI</span>
+              compas<span>.</span>
             </span>
           </div>
           <h1 className="auth-left-title">
@@ -154,16 +148,9 @@ export function SignupView() {
         <div className="auth-form-wrap">
           <div className="auth-mobile-brand">
             <div className="auth-brand" style={{ marginBottom: 0 }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-                  style={{ stroke: 'var(--lime-dim)' }}
-                  strokeWidth="1.6"
-                />
-                <circle cx="12" cy="14" r="1.4" style={{ fill: 'var(--lime-dim)' }} />
-              </svg>
+              <IconCompas size={24} color="var(--lime-dim)" />
               <span className="auth-brand-name" style={{ color: 'var(--fg)' }}>
-                Nutri<span style={{ color: 'var(--lime-dim)' }}>AI</span>
+                compas<span style={{ color: 'var(--lime-dim)' }}>.</span>
               </span>
             </div>
           </div>
