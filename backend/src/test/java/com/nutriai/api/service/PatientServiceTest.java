@@ -593,4 +593,49 @@ class PatientServiceTest {
         assertEquals(new BigDecimal("180"), offPlan.typicalKcal());
         assertFalse(patterns.observedPatterns().isEmpty());
     }
+
+    @Test
+    void getConsumptionPatterns_withNullGramsAndKcal_doesNotFabricateValues() {
+        UUID patientId = samplePatient.getId();
+        UUID extraction1Id = UUID.randomUUID();
+        UUID extraction2Id = UUID.randomUUID();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId))
+                .thenReturn(Optional.of(samplePatient));
+
+        var ext1 = MealExtraction.builder()
+                .id(extraction1Id).patientId(patientId).nutritionistId(nutritionistId)
+                .mealLabel("Almoço").extractedAt(java.time.LocalDateTime.now().minusDays(1))
+                .build();
+        var ext2 = MealExtraction.builder()
+                .id(extraction2Id).patientId(patientId).nutritionistId(nutritionistId)
+                .mealLabel("Almoço").extractedAt(java.time.LocalDateTime.now().minusDays(2))
+                .build();
+
+        when(mealExtractionRepository.findByPatientIdAndNutritionistIdAndExtractedAtBetween(
+                eq(patientId), eq(nutritionistId), any(), any()))
+                .thenReturn(List.of(ext1, ext2));
+
+        var item1 = ExtractionItem.builder()
+                .id(UUID.randomUUID()).extractionId(extraction1Id).name("Doce de leite")
+                .grams(null).kcal(null).prot(null).carb(null).fat(null)
+                .build();
+        var item2 = ExtractionItem.builder()
+                .id(UUID.randomUUID()).extractionId(extraction2Id).name("Doce de leite")
+                .grams(null).kcal(null).prot(null).carb(null).fat(null)
+                .build();
+
+        when(extractionItemRepository.findByExtractionIdIn(anyList()))
+                .thenReturn(List.of(item1, item2));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        var patterns = patientService.getConsumptionPatterns(patientId, nutritionistId);
+
+        assertEquals(1, patterns.frequentOffPlanFoods().size());
+        var food = patterns.frequentOffPlanFoods().get(0);
+        assertEquals("Doce de leite", food.foodName());
+        assertEquals(BigDecimal.ZERO, food.typicalGrams());
+        assertEquals(BigDecimal.ZERO, food.typicalKcal());
+    }
 }

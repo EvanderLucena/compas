@@ -791,11 +791,11 @@ public class PatientService {
         }
 
         double getAvgGrams() {
-            return count > 0 && totalGrams > 0 ? (totalGrams / count) : 100.0;
+            return count > 0 && totalGrams > 0 ? (totalGrams / count) : 0.0;
         }
 
         double getAvgKcal() {
-            return count > 0 && totalKcal > 0 ? (totalKcal / count) : 120.0;
+            return count > 0 && totalKcal > 0 ? (totalKcal / count) : 0.0;
         }
 
         String getMostCommonMealLabel() {

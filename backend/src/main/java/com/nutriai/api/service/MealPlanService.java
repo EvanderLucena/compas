@@ -384,6 +384,15 @@ public class MealPlanService {
         return slot;
     }
 
+    private MealSlot findSlotForPatientAndVerifyOwnership(UUID nutritionistId, UUID patientId, UUID slotId) {
+        MealPlan plan = getPlanAndVerifyOwnership(nutritionistId, patientId);
+        MealSlot slot = findSlotAndVerifyOwnership(nutritionistId, slotId);
+        if (!slot.getPlanId().equals(plan.getId())) {
+            throw new ResourceNotFoundException("Refeição", slotId);
+        }
+        return slot;
+    }
+
     private MealOption findOptionAndVerifyOwnership(UUID nutritionistId, UUID optionId) {
         MealOption option = mealOptionRepository.findById(optionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Opção", optionId));
@@ -467,8 +476,7 @@ public class MealPlanService {
     @Transactional
     public MealOptionResponse adoptFrequentFoodAsAlternativeOption(
             UUID nutritionistId, UUID patientId, UUID mealSlotId, AdoptFrequentFoodRequest req) {
-        verifyPatientOwnership(patientId, nutritionistId);
-        MealSlot slot = findSlotAndVerifyOwnership(nutritionistId, mealSlotId);
+        MealSlot slot = findSlotForPatientAndVerifyOwnership(nutritionistId, patientId, mealSlotId);
 
         List<MealOption> existingOptions = mealOptionRepository.findByMealSlotIdOrderBySortOrder(slot.getId());
         int maxSort = existingOptions.stream().mapToInt(MealOption::getSortOrder).max().orElse(-1);
@@ -500,7 +508,9 @@ public class MealPlanService {
             logger.debug("Could not match catalog food for '{}': {}", req.foodName(), e.getMessage());
         }
 
-        BigDecimal grams = req.typicalGrams() != null ? req.typicalGrams() : new BigDecimal("100");
+        BigDecimal grams = (req.typicalGrams() != null && req.typicalGrams().compareTo(BigDecimal.ZERO) > 0)
+                ? req.typicalGrams()
+                : new BigDecimal("100");
         BigDecimal kcal = req.typicalKcal() != null ? req.typicalKcal() : BigDecimal.ZERO;
         BigDecimal prot = req.typicalProt() != null ? req.typicalProt() : BigDecimal.ZERO;
         BigDecimal carb = req.typicalCarb() != null ? req.typicalCarb() : BigDecimal.ZERO;

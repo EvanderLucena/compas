@@ -7,19 +7,33 @@ interface FrequentFoodItemRowProps {
   onAdopt: () => void;
 }
 
+const cardStyle = {
+  padding: '16px 20px',
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+  background: 'var(--surface)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+} as const;
+
+const badgeStyle = {
+  fontSize: 11.5,
+  padding: '2px 8px',
+  borderRadius: 4,
+  background: 'var(--surface-sunken)',
+  color: 'var(--fg-muted)',
+} as const;
+
 export function FrequentFoodItemRow({ food, isAdopting, onAdopt }: FrequentFoodItemRowProps) {
+  const hasMacros = food.typicalProt > 0 || food.typicalCarb > 0 || food.typicalFat > 0;
+  const portionText =
+    food.typicalGrams > 0
+      ? `Porção típica: ${food.typicalGrams}g · ~${food.typicalKcal} kcal`
+      : 'Porção não especificada';
+
   return (
-    <div
-      style={{
-        padding: '16px 20px',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        background: 'var(--surface)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}
-    >
+    <div style={cardStyle}>
       <div
         style={{
           display: 'flex',
@@ -44,28 +58,8 @@ export function FrequentFoodItemRow({ food, isAdopting, onAdopt }: FrequentFoodI
           >
             {food.consumptionCount}x no período
           </span>
-          <span
-            style={{
-              fontSize: 11.5,
-              padding: '2px 8px',
-              borderRadius: 4,
-              background: 'var(--surface-sunken)',
-              color: 'var(--fg-muted)',
-            }}
-          >
-            {food.commonMealLabel}
-          </span>
-          <span
-            style={{
-              fontSize: 11.5,
-              padding: '2px 8px',
-              borderRadius: 4,
-              background: 'var(--surface-sunken)',
-              color: 'var(--fg-muted)',
-            }}
-          >
-            {food.category}
-          </span>
+          <span style={badgeStyle}>{food.commonMealLabel}</span>
+          <span style={badgeStyle}>{food.category}</span>
         </div>
 
         <button
@@ -102,12 +96,16 @@ export function FrequentFoodItemRow({ food, isAdopting, onAdopt }: FrequentFoodI
         }}
       >
         <span className="mono" style={{ color: 'var(--fg)' }}>
-          Porção típica: {food.typicalGrams}g · ~{food.typicalKcal} kcal
+          {portionText}
         </span>
-        <span>·</span>
-        <span>
-          Prot: {food.typicalProt}g | Carb: {food.typicalCarb}g | Gord: {food.typicalFat}g
-        </span>
+        {hasMacros && (
+          <>
+            <span>·</span>
+            <span>
+              Prot: {food.typicalProt}g | Carb: {food.typicalCarb}g | Gord: {food.typicalFat}g
+            </span>
+          </>
+        )}
       </div>
 
       <div
