@@ -42,7 +42,7 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
      * Combined filter query with name search (case-insensitive LIKE) + category (D-08).
      */
     @Query("SELECT f FROM Food f WHERE f.nutritionistId = :nutritionistId " +
-           "AND (:search IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '!') " +
+           "AND (CAST(:search AS string) IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) ESCAPE '!') " +
            "AND (:category IS NULL OR f.category = :category)")
     Page<Food> findByNutritionistIdWithFilters(
             @Param("nutritionistId") UUID nutritionistId,
@@ -55,7 +55,7 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
      * Combined filter query on available foods (custom + system) with search and category.
      */
     @Query("SELECT f FROM Food f WHERE (f.nutritionistId = :nutritionistId OR f.nutritionistId IS NULL) " +
-           "AND (:search IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '!') " +
+           "AND (CAST(:search AS string) IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) ESCAPE '!') " +
            "AND (:category IS NULL OR f.category = :category) ORDER BY f.name ASC")
     Page<Food> findAvailableByNutritionistIdWithFilters(
             @Param("nutritionistId") UUID nutritionistId,

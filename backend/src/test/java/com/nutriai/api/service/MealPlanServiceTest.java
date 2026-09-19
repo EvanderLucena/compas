@@ -29,6 +29,7 @@ class MealPlanServiceTest {
     @Mock private PatientRepository patientRepository;
     @Mock private EpisodeRepository episodeRepository;
     @Mock private EpisodeHistoryEventRepository historyEventRepository;
+    @Mock private JevService jevService;
 
     @InjectMocks
     private MealPlanService mealPlanService;
@@ -384,5 +385,23 @@ class MealPlanServiceTest {
 
         assertEquals(new BigDecimal("260.0"), item.getKcal());
         assertEquals(new BigDecimal("5.4"), item.getProt());
+    }
+
+    @Test
+    void evaluateSubstitution_returnsJevVerdict() {
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId))
+                .thenReturn(Optional.of(patient));
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.evaluateSubstitution(eq("Frango grelhado"), eq("Tilápia"), anyString()))
+                .thenReturn(new com.nutriai.api.dto.jev.JevSubstitutionDecision(
+                        "EQUIVALENTE", 0.95, true, "Ambas são fontes magras de proteína de alto valor biológico", true
+                ));
+
+        var decision = mealPlanService.evaluateSubstitution(nutritionistId, patientId, "Frango grelhado", "Tilápia");
+
+        assertNotNull(decision);
+        assertEquals("EQUIVALENTE", decision.verdict());
+        assertTrue(decision.sameGroup());
+        assertTrue(decision.success());
     }
 }

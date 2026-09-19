@@ -1,13 +1,16 @@
 package com.nutriai.api.service;
 
+import com.nutriai.api.dto.jev.JevSubstitutionDecision;
 import com.nutriai.api.dto.plan.*;
 import com.nutriai.api.exception.ResourceNotFoundException;
 import com.nutriai.api.model.*;
 import com.nutriai.api.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,6 +32,7 @@ public class MealPlanService {
     private final PatientRepository patientRepository;
     private final EpisodeRepository episodeRepository;
     private final EpisodeHistoryEventRepository historyEventRepository;
+    private final JevService jevService;
 
     public MealPlanService(MealPlanRepository mealPlanRepository,
                            MealSlotRepository mealSlotRepository,
@@ -38,7 +42,8 @@ public class MealPlanService {
                            FoodRepository foodRepository,
                            PatientRepository patientRepository,
                            EpisodeRepository episodeRepository,
-                           EpisodeHistoryEventRepository historyEventRepository) {
+                           EpisodeHistoryEventRepository historyEventRepository,
+                           JevService jevService) {
         this.mealPlanRepository = mealPlanRepository;
         this.mealSlotRepository = mealSlotRepository;
         this.mealOptionRepository = mealOptionRepository;
@@ -48,6 +53,7 @@ public class MealPlanService {
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
         this.historyEventRepository = historyEventRepository;
+        this.jevService = jevService;
     }
 
     @Transactional
@@ -434,5 +440,27 @@ public class MealPlanService {
                 : mealFoodRepository.findAllByOptionIds(optionIds);
 
         return PlanResponse.from(plan, slots, extras, allOptions, allItems);
+    }
+
+    @Transactional(readOnly = true)
+    public JevSubstitutionDecision evaluateSubstitution(
+            UUID nutritionistId,
+            UUID patientId,
+            String prescribedFood,
+            String desiredFood
+    ) {
+        Patient patient = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
+
+        if (prescribedFood == null || prescribedFood.isBlank() || desiredFood == null || desiredFood.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Alimento prescrito e substituto são obrigatórios");
+        }
+
+        if (jevService == null || !jevService.isAvailable()) {
+            return JevSubstitutionDecision.fallback();
+        }
+
+        String objective = patient.getObjective() != null ? patient.getObjective().getPortugueseLabel() : "Saúde geral";
+        return jevService.evaluateSubstitution(prescribedFood.trim(), desiredFood.trim(), objective);
     }
 }

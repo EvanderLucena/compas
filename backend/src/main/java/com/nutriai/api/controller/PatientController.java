@@ -78,4 +78,11 @@ public class PatientController {
         PatientResponse response = patientService.reactivatePatient(id, nutritionistId);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
+
+    @PostMapping("/{id}/evaluate-adherence")
+    public ResponseEntity<ApiResponse<com.nutriai.api.dto.jev.JevAdherenceDecision>> evaluateAdherence(@PathVariable UUID id) {
+        UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
+        var decision = patientService.evaluatePatientAdherence(id, nutritionistId);
+        return ResponseEntity.ok(ApiResponse.ok(decision));
+    }
 }

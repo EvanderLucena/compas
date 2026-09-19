@@ -81,4 +81,36 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
             int maxRetryCount,
             Pageable pageable
     );
+
+    /**
+     * Find messages flagged as requiring human attention that are unresolved for a nutritionist, newest first.
+     */
+    List<WhatsAppMessage> findByNutritionistIdAndJevRequiresAttentionTrueAndJevAttentionResolvedFalseOrderByCreatedAtDesc(
+            UUID nutritionistId);
+
+    /**
+     * Count unresolved messages flagged as requiring human attention for a nutritionist.
+     */
+    long countByNutritionistIdAndJevRequiresAttentionTrueAndJevAttentionResolvedFalse(UUID nutritionistId);
+
+    /**
+     * Find message by id and nutritionistId for tenant-isolated updates.
+     */
+    Optional<WhatsAppMessage> findByIdAndNutritionistId(UUID id, UUID nutritionistId);
+
+    /**
+     * Find recent messages by sentiment for a nutritionist.
+     */
+    List<WhatsAppMessage> findByNutritionistIdAndJevSentimentOrderByCreatedAtDesc(
+            UUID nutritionistId, String jevSentiment);
+
+    /**
+     * Aggregate sentiment distribution for messages since a given date.
+     */
+    @Query("SELECT m.jevSentiment, COUNT(m) FROM WhatsAppMessage m "
+            + "WHERE m.nutritionistId = :nutritionistId AND m.jevSentiment IS NOT NULL "
+            + "AND m.createdAt >= :since GROUP BY m.jevSentiment")
+    List<Object[]> countSentimentDistribution(
+            @Param("nutritionistId") UUID nutritionistId,
+            @Param("since") LocalDateTime since);
 }

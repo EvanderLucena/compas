@@ -1,141 +1,97 @@
 import { useMemo } from 'react';
-import { usePatients } from '../stores/patientStore';
-import { mapPatientFromApi } from '../types/patient';
-
-function AggStat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="card" style={{ padding: '16px 18px' }}>
-      <div className="eyebrow" style={{ marginBottom: 6 }}>
-        {label}
-      </div>
-      <div
-        className="mono tnum"
-        style={{ fontSize: 30, fontWeight: 500, letterSpacing: '-0.02em' }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function LegendItem({
-  color,
-  label,
-  value,
-  delta,
-}: {
-  color: string;
-  label: string;
-  value: string;
-  delta?: string;
-}) {
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '12px 1fr auto',
-        gap: 10,
-        alignItems: 'center',
-      }}
-    >
-      <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
-        {delta && (
-          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>
-            {delta}
-          </div>
-        )}
-      </div>
-      <div className="mono tnum" style={{ fontSize: 14, fontWeight: 500 }}>
-        {value}
-      </div>
-    </div>
-  );
-}
+import { useClinicalRadar, useResolveAttention } from '../stores/clinicalRadarStore';
+import { AttentionCard } from '../components/insights/AttentionCard';
+import { SentimentSection } from '../components/insights/SentimentSection';
+import { InsightsHeader } from '../components/insights/InsightsHeader';
+import { RadarKpis } from '../components/insights/RadarKpis';
 
 export function InsightsView() {
-  const { data, isLoading, isError } = usePatients();
-  const activePats = useMemo(() => (data?.content ?? []).map(mapPatientFromApi), [data]);
-  const onTrack = activePats.filter((p) => p.status === 'ontrack').length;
-  const warning = activePats.filter((p) => p.status === 'warning').length;
-  const danger = activePats.filter((p) => p.status === 'danger').length;
-  const total = activePats.length;
+  const { data, isLoading, isError, refetch } = useClinicalRadar();
+  const resolveMutation = useResolveAttention();
+
+  const totalSentiments = useMemo(() => {
+    if (!data?.sentimentDistribution) return 0;
+    const { motivated, neutral, struggling, anxious } = data.sentimentDistribution;
+    return motivated + neutral + struggling + anxious;
+  }, [data?.sentimentDistribution]);
 
   if (isLoading) {
-    return <div className="page">Carregando insights...</div>;
-  }
-
-  if (isError) {
-    return <div className="page">Erro ao carregar insights.</div>;
-  }
-
-  if (total === 0) {
     return (
-      <div className="page">
-        <h1 className="serif" style={{ fontSize: 38, margin: '4px 0 6px', fontWeight: 400 }}>
-          Sem dados para insights
-        </h1>
-        <p style={{ fontSize: 13.5, color: 'var(--fg-muted)' }}>
-          Cadastre pacientes e registros clínicos para liberar análises agregadas.
+      <div className="page" style={{ padding: '24px 32px' }}>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>
+          Carregando radar...
+        </div>
+        <p style={{ color: 'var(--fg-muted)' }}>
+          Analisando sinais clínicos e emocionais da carteira...
         </p>
       </div>
     );
   }
 
-  return (
-    <div className="page">
-      <div style={{ marginBottom: 20 }}>
-        <div className="eyebrow">Análise agregada · {activePats.length} pacientes</div>
-        <h1
-          className="serif"
-          style={{ fontSize: 38, margin: '4px 0 6px', fontWeight: 400, letterSpacing: '-0.02em' }}
-        >
-          Panorama da sua carteira.
+  if (isError || !data) {
+    return (
+      <div className="page" style={{ padding: '24px 32px' }}>
+        <h1 className="serif" style={{ fontSize: 32, margin: '4px 0 10px', fontWeight: 400 }}>
+          Erro ao carregar Radar Clínico
         </h1>
-        <div style={{ fontSize: 13.5, color: 'var(--fg-muted)', maxWidth: 720, lineHeight: 1.55 }}>
-          Dados agregados e anônimos de consumo e biometria extraídos pela IA. Sem conteúdo de
-          conversas individuais.
-        </div>
+        <p style={{ fontSize: 14, color: 'var(--fg-muted)', marginBottom: 16 }}>
+          Não foi possível sincronizar as análises do WhatsApp.
+        </p>
+        <button type="button" className="btn btn-secondary" onClick={() => refetch()}>
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  const { summary, attentionQueue, sentimentDistribution } = data;
+
+  return (
+    <div className="page" style={{ padding: '24px 32px', maxWidth: 1100 }}>
+      <InsightsHeader whatsappConnected={summary.whatsappConnected} />
+      <RadarKpis summary={summary} />
+
+      <div className="divider" style={{ margin: '24px 0 16px' }}>
+        <span>Fila de Atenção ({attentionQueue.length})</span>
       </div>
 
-      <div
-        className="insights-stats-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 14,
-          marginBottom: 16,
-        }}
-      >
-        <AggStat label="Pacientes na carteira" value={total} />
-        <AggStat label="No caminho" value={onTrack} />
-        <AggStat label="Atenção" value={warning} />
-        <AggStat label="Crítico" value={danger} />
-      </div>
-
-      <div className="divider">
-        <span>Limite atual dos dados</span>
-      </div>
-      <div className="card">
-        <div className="card-b">
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.55 }}>
-            Nesta tranche, removemos insights textuais fixos para evitar interpretações enganosas. O
-            próximo corte conectará os padrões a dados clínicos reais.
+      {attentionQueue.length === 0 ? (
+        <div className="card" style={{ padding: '24px', textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>✨</div>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+            Nenhum paciente necessitando de intervenção urgente
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: 'var(--fg-muted)',
+              maxWidth: 520,
+              marginInline: 'auto',
+            }}
+          >
+            As interações recentes estão dentro do fluxo automático e em bom ritmo de adesão. Quando
+            um paciente relatar culpa, dúvida fora do escopo ou risco de desengajamento, ele
+            aparecerá aqui.
           </p>
         </div>
-      </div>
-
-      <div className="divider">
-        <span>Distribuição atual da carteira</span>
-      </div>
-      <div className="card">
-        <div className="card-b" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <LegendItem color="var(--sage)" label="On-track" value={`${onTrack} pacientes`} />
-          <LegendItem color="var(--amber)" label="Atenção" value={`${warning} pacientes`} />
-          <LegendItem color="var(--coral)" label="Crítico" value={`${danger} pacientes`} />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+          {attentionQueue.map((item) => (
+            <AttentionCard
+              key={item.messageId}
+              item={item}
+              isResolving={resolveMutation.isPending}
+              onResolve={(msgId) => resolveMutation.mutate(msgId)}
+            />
+          ))}
         </div>
-      </div>
+      )}
+
+      <SentimentSection
+        sentimentDistribution={sentimentDistribution}
+        totalSentiments={totalSentiments}
+      />
     </div>
   );
 }

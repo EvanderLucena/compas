@@ -33,6 +33,7 @@ class ExtractionServiceTest {
     @Mock MealExtractionRepository mealExtractionRepository;
     @Mock ExtractionItemRepository extractionItemRepository;
     @Mock EpisodeHistoryEventRepository episodeHistoryEventRepository;
+    @Mock JevService jevService;
 
     @InjectMocks
     ExtractionService extractionService;
@@ -304,5 +305,35 @@ class ExtractionServiceTest {
 
         // Did not delete old items
         verify(extractionItemRepository, never()).deleteAllByExtractionId(existingExtractionId);
+    }
+
+    @Test
+    void extractAndSave_withJevSanityFlag_savesSanityStatusAndNote() {
+        ExtractionResult extractionResult = new ExtractionResult(
+                "almoço",
+                List.of(new ExtractionItemResult("hambúrguer triplo", 800.0, 9500, 120, 300, 250)),
+                "Comi 15 hambúrgueres triplos"
+        );
+
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.validateMealSanity(anyString(), anyString(), anyDouble(), anyDouble(), anyList()))
+                .thenReturn(new com.nutriai.api.dto.jev.JevMealSanityDecision(
+                        false, 0.95, "EXCESSIVE_CALORIES", "Calorias excessivas para uma única refeição", true));
+
+        when(mealExtractionRepository.findFirstByPatientIdAndNutritionistIdAndExtractedAtAfterOrderByExtractedAtDesc(
+                any(), any(), any())).thenReturn(Optional.empty());
+
+        ArgumentCaptor<MealExtraction> captor = ArgumentCaptor.forClass(MealExtraction.class);
+        when(mealExtractionRepository.save(captor.capture())).thenAnswer(i -> {
+            MealExtraction me = i.getArgument(0);
+            me.setId(UUID.randomUUID());
+            return me;
+        });
+
+        extractionService.extractAndSave(messageId, patientId, nutritionistId, episodeId, extractionResult);
+
+        MealExtraction captured = captor.getValue();
+        assertEquals("EXCESSIVE_CALORIES", captured.getSanityStatus());
+        assertEquals("Calorias excessivas para uma única refeição", captured.getSanityNote());
     }
 }

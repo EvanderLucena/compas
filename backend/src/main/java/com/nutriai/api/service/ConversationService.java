@@ -8,9 +8,12 @@ import com.nutriai.api.model.*;
 import com.nutriai.api.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.nutriai.api.dto.jev.JevDecision;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +42,12 @@ public class ConversationService {
     private final PlanExtraRepository planExtraRepository;
     private final NutritionistRepository nutritionistRepository;
     private final AudioTranscriptionService audioTranscriptionService;
+    private JevService jevService;
+
+    @Autowired(required = false)
+    public void setJevService(JevService jevService) {
+        this.jevService = jevService;
+    }
 
     public ConversationService(
             LlmService llmService,
@@ -175,6 +184,7 @@ public class ConversationService {
 
             if (transcribedOpt.isPresent() && !transcribedOpt.get().isBlank()) {
                 userMessage = transcribedOpt.get();
+                runJevTriageIfAvailable(message, userMessage);
                 systemPrompt = buildClassifyingPrompt(patient, nutritionist, message);
                 responseType = "CONVERSATION";
             } else {
@@ -197,6 +207,7 @@ public class ConversationService {
                 }
             } else if (message.getMessageContent() != null && !message.getMessageContent().isBlank()) {
                 // Image with caption but no image URL → classify from caption (D-05)
+                runJevTriageIfAvailable(message, userMessage);
                 systemPrompt = buildClassifyingPromptWithImageAck(patient, nutritionist, message);
                 responseType = "CONVERSATION";
             } else {
@@ -206,6 +217,50 @@ public class ConversationService {
             }
         } else {
             // Text message → classify and respond
+            runJevTriageIfAvailable(message, userMessage);
+
+            if (shouldTriggerSafetyNotice(message)) {
+                String emergencyNotice = "Olá, " + patient.getName() + ". Notei seu relato de desconforto ou urgência. " +
+                        "Sua saúde é prioridade total! Notifiquei o(a) nutricionista " + nutritionist.getName() + " com alerta imediato. " +
+                        "Se você estiver sentindo dor forte ou mal-estar agudo, por favor procure um serviço de pronto atendimento médico agora mesmo.";
+                WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                        .messageId(messageId)
+                        .nutritionistId(nutritionist.getId())
+                        .patientId(patient.getId())
+                        .responseType("EMERGENCY_ESCALATION")
+                        .responseContent(emergencyNotice)
+                        .build();
+                whatsAppResponseRepository.save(waResponse);
+                boolean sent = evolutionApiService.sendMessage(message.getSenderPhoneNormalized(), emergencyNotice);
+                if (sent) {
+                    waResponse.setSentAt(LocalDateTime.now());
+                    whatsAppResponseRepository.save(waResponse);
+                }
+                markProcessed(message);
+                log.warn("Emergency alert triggered via Jev triage for message {}", messageId);
+                return;
+            }
+
+            if (shouldFastTrackGreeting(message, userMessage)) {
+                String greetingText = "Olá, " + patient.getName() + "! Tudo bem por aí? Como posso te ajudar com o seu plano hoje? 😊";
+                WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                        .messageId(messageId)
+                        .nutritionistId(nutritionist.getId())
+                        .patientId(patient.getId())
+                        .responseType("GREETING")
+                        .responseContent(greetingText)
+                        .build();
+                whatsAppResponseRepository.save(waResponse);
+                boolean sent = evolutionApiService.sendMessage(message.getSenderPhoneNormalized(), greetingText);
+                if (sent) {
+                    waResponse.setSentAt(LocalDateTime.now());
+                    whatsAppResponseRepository.save(waResponse);
+                }
+                markProcessed(message);
+                log.info("Message {} fast-tracked as GREETING via Jev triage", messageId);
+                return;
+            }
+
             systemPrompt = buildClassifyingPrompt(patient, nutritionist, message);
             responseType = "CONVERSATION";
         }
@@ -321,6 +376,29 @@ public class ConversationService {
         String conversationContext = buildRecentConversationContext(
                 patient, nutritionist, message != null ? message.getId() : null);
 
+        String emotionalContext = "";
+        if (message != null && (Boolean.TRUE.equals(message.getJevRequiresAttention())
+                || "guilty_or_struggling".equalsIgnoreCase(message.getJevSentiment()))) {
+            emotionalContext = """
+
+                ATENÇÃO CLÍNICA / SUPORTE EMOCIONAL:
+                O paciente demonstra sinais de culpa, deslize alimentar ou queixa relevante.
+                Seja especialmente caloroso, empático e encorajador. Acolha com compreensão sem julgar.
+                Se for sintoma clínico ou dúvida complexa, informe com simpatia que a nutricionista foi notificada.
+                """;
+        }
+
+        String substitutionContext = "";
+        if (message != null && "substitution".equalsIgnoreCase(message.getJevIntent())) {
+            substitutionContext = """
+
+                ORIENTAÇÃO PARA SUBSTITUIÇÃO DE ALIMENTOS:
+                O paciente está perguntando ou em dúvida sobre substituição de algum alimento do plano.
+                Avalie com bom senso clínico se a troca pretendida é equilibrada em macronutrientes.
+                Seja prático, incentive opções equivalentes e encoraje a continuidade da rotina sem neuras.
+                """;
+        }
+
         return """
             Você é um assistente de nutrição humana, empático e não julgador. Seu papel é auxiliar o paciente de forma amigável, pontual e orgânica pelo WhatsApp.
 
@@ -341,6 +419,8 @@ public class ConversationService {
             CONTEXTO COMPLETO DO PLANO ALIMENTAR:
             {{planContext}}
             {{conversationContext}}
+            {{emotionalContext}}
+            {{substitutionContext}}
 
             ESTRUTURA OBRIGATÓRIA DA SUA RESPOSTA:
             1. Escreva PRIMEIRO a mensagem amigável de WhatsApp destinada ao paciente (1 a 3 frases curtas e calorosas confirmando o registro).
@@ -362,7 +442,64 @@ public class ConversationService {
             Se for apenas dúvida sobre o plano ou conversa geral, responda apenas a mensagem amigável (sem bloco ```json).
             """.replace("{{patientContext}}", escape(patientContext))
                .replace("{{planContext}}", escape(planContext))
-               .replace("{{conversationContext}}", escape(conversationContext));
+               .replace("{{conversationContext}}", escape(conversationContext))
+               .replace("{{emotionalContext}}", emotionalContext)
+               .replace("{{substitutionContext}}", substitutionContext);
+    }
+
+    private boolean shouldTriggerSafetyNotice(WhatsAppMessage message) {
+        if (message == null) return false;
+        return "emergency".equalsIgnoreCase(message.getJevIntent());
+    }
+
+    private boolean shouldFastTrackGreeting(WhatsAppMessage message, String userMessage) {
+        if (message == null || userMessage == null) {
+            return false;
+        }
+        if (!"greeting".equalsIgnoreCase(message.getJevIntent())) {
+            return false;
+        }
+        if (message.getJevIntentConfidence() == null || message.getJevIntentConfidence().doubleValue() < 0.80) {
+            return false;
+        }
+        String lower = userMessage.toLowerCase().trim();
+        if (lower.length() > 40) {
+            return false;
+        }
+        String[] foodKeywords = {
+                "comi", "almocei", "jantei", "café", "cafe", "lanche",
+                "arroz", "frango", "peso", "kg", "g", "kcal", "dieta",
+                "troca", "substitui", "plano", "dor", "mal", "passando"
+        };
+        for (String kw : foodKeywords) {
+            if (lower.contains(kw)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void runJevTriageIfAvailable(WhatsAppMessage message, String userMessage) {
+        if (jevService == null || !jevService.isAvailable() || userMessage == null || userMessage.isBlank()) {
+            return;
+        }
+        try {
+            JevDecision decision = jevService.analyzePatientMessage(userMessage);
+            if (decision != null && decision.success()) {
+                message.setJevIntent(decision.intent());
+                message.setJevIntentConfidence(BigDecimal.valueOf(decision.intentConfidence()));
+                message.setJevSentiment(decision.sentiment());
+                message.setJevSentimentConfidence(BigDecimal.valueOf(decision.sentimentConfidence()));
+                message.setJevAttentionScore(BigDecimal.valueOf(decision.attentionScore()));
+                message.setJevRequiresAttention(decision.requiresHumanAttention());
+                whatsAppMessageRepository.save(message);
+                log.info("Jev triage for msg {}: intent={}, sentiment={}, attentionScore={}, reqHuman={}",
+                        message.getId(), decision.intent(), decision.sentiment(),
+                        decision.attentionScore(), decision.requiresHumanAttention());
+            }
+        } catch (Exception e) {
+            log.warn("Jev AI triage error for message {}: {}", message.getId(), e.getMessage());
+        }
     }
 
     /**

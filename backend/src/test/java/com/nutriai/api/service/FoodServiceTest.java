@@ -27,6 +27,9 @@ class FoodServiceTest {
     @Mock
     private FoodRepository foodRepository;
 
+    @Mock
+    private JevService jevService;
+
     @InjectMocks
     private FoodService foodService;
 
@@ -173,5 +176,21 @@ class FoodServiceTest {
 
         assertThrows(ResponseStatusException.class, () -> foodService.deleteFood(nutritionistId, foodId));
         verify(foodRepository, never()).delete(any(Food.class));
+    }
+
+    @Test
+    void suggestFoodCategorization_returnsJevDecision() {
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.categorizeFood("Pasta de amendoim")).thenReturn(
+                new com.nutriai.api.dto.jev.JevFoodCategorizationDecision(
+                        "GORDURA", "GRAMAS", 15.0, 0.95, true
+                )
+        );
+
+        var result = foodService.suggestFoodCategorization("Pasta de amendoim");
+        assertEquals("GORDURA", result.category());
+        assertEquals("GRAMAS", result.unit());
+        assertEquals(15.0, result.referenceAmount());
+        assertTrue(result.success());
     }
 }

@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -62,6 +63,29 @@ public class WhatsAppMessage {
     @Column(name = "media_url", columnDefinition = "TEXT")
     private String mediaUrl;
 
+    @Column(name = "jev_intent", length = 50)
+    private String jevIntent;
+
+    @Column(name = "jev_intent_confidence", precision = 4, scale = 3)
+    private BigDecimal jevIntentConfidence;
+
+    @Column(name = "jev_sentiment", length = 50)
+    private String jevSentiment;
+
+    @Column(name = "jev_sentiment_confidence", precision = 4, scale = 3)
+    private BigDecimal jevSentimentConfidence;
+
+    @Column(name = "jev_attention_score", precision = 4, scale = 3)
+    private BigDecimal jevAttentionScore;
+
+    @Builder.Default
+    @Column(name = "jev_requires_attention")
+    private Boolean jevRequiresAttention = false;
+
+    @Builder.Default
+    @Column(name = "jev_attention_resolved")
+    private Boolean jevAttentionResolved = false;
+
     @NotNull
     @Builder.Default
     @Column(nullable = false)
@@ -88,6 +112,12 @@ public class WhatsAppMessage {
         }
         if (messageType == null) {
             messageType = "text";
+        }
+        if (jevRequiresAttention == null) {
+            jevRequiresAttention = false;
+        }
+        if (jevAttentionResolved == null) {
+            jevAttentionResolved = false;
         }
     }
 }

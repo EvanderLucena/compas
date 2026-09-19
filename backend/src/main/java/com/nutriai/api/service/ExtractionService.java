@@ -33,15 +33,18 @@ public class ExtractionService {
     private final MealExtractionRepository mealExtractionRepository;
     private final ExtractionItemRepository extractionItemRepository;
     private final EpisodeHistoryEventRepository episodeHistoryEventRepository;
+    private final JevService jevService;
     private final ObjectMapper objectMapper;
 
     public ExtractionService(
             MealExtractionRepository mealExtractionRepository,
             ExtractionItemRepository extractionItemRepository,
-            EpisodeHistoryEventRepository episodeHistoryEventRepository) {
+            EpisodeHistoryEventRepository episodeHistoryEventRepository,
+            JevService jevService) {
         this.mealExtractionRepository = mealExtractionRepository;
         this.extractionItemRepository = extractionItemRepository;
         this.episodeHistoryEventRepository = episodeHistoryEventRepository;
+        this.jevService = jevService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -70,12 +73,41 @@ public class ExtractionService {
         BigDecimal totalFat = BigDecimal.ZERO;
 
         List<ExtractionItemResult> items = extractionResult.items();
+        double totalGrams = 0.0;
+        List<String> itemNames = new java.util.ArrayList<>();
         if (items != null) {
             for (ExtractionItemResult item : items) {
                 totalKcal = totalKcal.add(BigDecimal.valueOf(item.kcal()));
                 totalProt = totalProt.add(BigDecimal.valueOf(item.prot()));
                 totalCarb = totalCarb.add(BigDecimal.valueOf(item.carb()));
                 totalFat = totalFat.add(BigDecimal.valueOf(item.fat()));
+                if (item.grams() != null) {
+                    totalGrams += item.grams();
+                }
+                if (item.name() != null) {
+                    itemNames.add(item.name());
+                }
+            }
+        }
+
+        // Validate meal sanity via Jev AI (TypeSafe System One)
+        String sanityStatus = "VERIFIED";
+        String sanityNote = null;
+        if (jevService != null && jevService.isAvailable()) {
+            try {
+                var sanity = jevService.validateMealSanity(
+                        extractionResult.extractionRaw(),
+                        extractionResult.mealLabel(),
+                        totalKcal.doubleValue(),
+                        totalGrams,
+                        itemNames
+                );
+                if (sanity != null && sanity.success()) {
+                    sanityStatus = sanity.isPlausible() ? "VERIFIED" : sanity.riskFlag();
+                    sanityNote = sanity.observation();
+                }
+            } catch (Exception ex) {
+                log.warn("Jev meal sanity check failed: {}", ex.getMessage());
             }
         }
 
@@ -99,6 +131,8 @@ public class ExtractionService {
             existing.setTotalProt(totalProt);
             existing.setTotalCarb(totalCarb);
             existing.setTotalFat(totalFat);
+            existing.setSanityStatus(sanityStatus);
+            existing.setSanityNote(sanityNote);
             existing.setExtractedAt(LocalDateTime.now());
             MealExtraction saved = mealExtractionRepository.save(existing);
 
@@ -136,6 +170,8 @@ public class ExtractionService {
                 .totalProt(totalProt)
                 .totalCarb(totalCarb)
                 .totalFat(totalFat)
+                .sanityStatus(sanityStatus)
+                .sanityNote(sanityNote)
                 .extractedAt(LocalDateTime.now())
                 .build();
 

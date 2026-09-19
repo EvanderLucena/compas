@@ -21,7 +21,8 @@ public record PatientResponse(
         BigDecimal weight,
         BigDecimal weightDelta,
         String tag,
-        Boolean active
+        Boolean active,
+        String aiAdherenceInsight
 ) {
     public static PatientResponse from(Patient p) {
         return new PatientResponse(
@@ -39,7 +40,8 @@ public record PatientResponse(
                 p.getWeight(),
                 p.getWeightDelta(),
                 p.getTag(),
-                p.getActive()
+                p.getActive(),
+                p.getAiAdherenceInsight()
         );
     }
 }
