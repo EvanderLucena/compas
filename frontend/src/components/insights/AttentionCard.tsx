@@ -15,9 +15,10 @@ export function AttentionCard({ item, isResolving, onResolve }: AttentionCardPro
   const isStruggling = item.sentiment?.includes('struggling') || item.sentiment?.includes('guilty');
 
   const phoneClean = item.patientWhatsapp.replace(/\D/g, '');
-  const waLink = phoneClean.startsWith('55')
-    ? `https://wa.me/${phoneClean}`
-    : `https://wa.me/55${phoneClean}`;
+  const waLink =
+    phoneClean.length >= 12 && phoneClean.startsWith('55')
+      ? `https://wa.me/${phoneClean}`
+      : `https://wa.me/55${phoneClean}`;
 
   return (
     <div

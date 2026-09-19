@@ -497,9 +497,12 @@ public class ConversationService {
         if (lower.length() > 40) {
             return false;
         }
+        if (lower.matches(".*\\b\\d+\\s*(g|gramas|kg|kcal)\\b.*")) {
+            return false;
+        }
         String[] foodKeywords = {
                 "comi", "almocei", "jantei", "café", "cafe", "lanche",
-                "arroz", "frango", "peso", "kg", "g", "kcal", "dieta",
+                "arroz", "frango", "peso", "dieta",
                 "troca", "substitui", "plano", "dor", "mal", "passando"
         };
         for (String kw : foodKeywords) {

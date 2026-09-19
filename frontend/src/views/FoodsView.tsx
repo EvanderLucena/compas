@@ -1103,10 +1103,11 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       setSuggestion(null);
       return;
     }
+    let isCancelled = false;
     const timer = setTimeout(async () => {
       try {
         const res = await suggestFood(form.name.trim());
-        if (res && res.success) {
+        if (!isCancelled && res && res.success) {
           setSuggestion({
             category: res.category,
             unit: res.unit,
@@ -1117,7 +1118,10 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
         // silent
       }
     }, 450);
-    return () => clearTimeout(timer);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [form.name]);
 
   const handleCreate = () => {
