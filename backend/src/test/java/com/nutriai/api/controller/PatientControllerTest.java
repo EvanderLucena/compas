@@ -131,6 +131,49 @@ class PatientControllerTest {
     }
 
     @Test
+    void createPatient_withFutureBirthDate_returns400() throws Exception {
+        CreatePatientRequest req = new CreatePatientRequest(
+                "Maria Silva",
+                java.time.LocalDate.now().plusDays(2),
+                "F",
+                165,
+                "11999999999",
+                "EMAGRECIMENTO",
+                new BigDecimal("75.00"),
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/patients")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Erro de validação"));
+    }
+
+    @Test
+    void createPatient_withZeroWeight_returns400() throws Exception {
+        CreatePatientRequest req = new CreatePatientRequest(
+                "Maria Silva",
+                null,
+                "F",
+                165,
+                "11999999999",
+                "EMAGRECIMENTO",
+                new BigDecimal("0.00"),
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/patients")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void listPatients_returnsPaginatedList() throws Exception {
         CreatePatientRequest req1 = new CreatePatientRequest("Maria Silva", null, null, null, null, "EMAGRECIMENTO", null, true);
         CreatePatientRequest req2 = new CreatePatientRequest("José Santos", null, null, null, null, "HIPERTROFIA", null, true);

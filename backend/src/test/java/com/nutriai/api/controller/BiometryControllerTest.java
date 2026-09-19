@@ -140,6 +140,26 @@ class BiometryControllerTest {
     }
 
     @Test
+    void createAssessment_withNegativeSkinfold_returns400() throws Exception {
+        String body = """
+                {
+                  "assessmentDate": "2025-01-10",
+                  "weight": 75.0,
+                  "bodyFatPercent": 20.0,
+                  "skinfolds": [
+                    { "measureKey": "triceps", "valueMm": -5.0, "sortOrder": 1 }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/patients/{patientId}/biometry", patientId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void updateAssessment_returnsUpdatedResponse() throws Exception {
         BiometryAssessment assessment = BiometryAssessment.builder()
                 .episodeId(episodeId)

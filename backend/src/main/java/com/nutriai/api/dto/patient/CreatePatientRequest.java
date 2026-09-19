@@ -1,6 +1,14 @@
 package com.nutriai.api.dto.patient;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,21 +18,24 @@ public record CreatePatientRequest(
         @Size(min = 2, max = 100, message = "Nome deve ter entre 2 e 100 caracteres")
         String name,
 
+        @Past(message = "A data de nascimento deve ser no passado")
         LocalDate birthDate,
 
         @Pattern(regexp = "^[FM]$", message = "Sexo deve ser M ou F")
         String sex,
 
-        @Min(50) @Max(300)
+        @Min(value = 50, message = "Altura deve ter no mínimo 50 cm")
+        @Max(value = 300, message = "Altura deve ter no máximo 300 cm")
         Integer heightCm,
 
-        @Size(max = 30)
+        @Size(max = 30, message = "WhatsApp deve ter no máximo 30 caracteres")
         String whatsapp,
 
         @NotBlank(message = "Objetivo é obrigatório")
         String objective,
 
-        @DecimalMin("0") @DecimalMax("500")
+        @DecimalMin(value = "0.1", message = "O peso deve ser maior que zero")
+        @DecimalMax(value = "500.0", message = "O peso deve ser de no máximo 500 kg")
         BigDecimal weight,
 
         @AssertTrue(message = "Consentimento LGPD é obrigatório")

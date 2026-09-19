@@ -95,6 +95,8 @@ export function NewBiometryModal({ createMutation, onSuccess, onClose }: NewBiom
         },
       },
       bodyFatPercent: {
+        required: true,
+        requiredMessage: '% de gordura é obrigatório.',
         custom: (v: string) => {
           if (!v.trim()) return undefined;
           const n = parseNumberInput(v);
@@ -264,7 +266,13 @@ export function NewBiometryModal({ createMutation, onSuccess, onClose }: NewBiom
 
   const isSubmitting = createMutation.isPending;
   const parsedWeight = parseDecimal(form.weight);
-  const canSubmit = Boolean(form.assessmentDate) && parsedWeight != null && parsedWeight > 0;
+  const parsedBodyFat = parseDecimal(form.bodyFatPercent);
+  const canSubmit =
+    Boolean(form.assessmentDate) &&
+    parsedWeight != null &&
+    parsedWeight > 0 &&
+    parsedBodyFat != null &&
+    parsedBodyFat > 0;
   const containerRef = React.useRef<HTMLDivElement>(null);
   useModalA11y({ onClose, containerRef });
 

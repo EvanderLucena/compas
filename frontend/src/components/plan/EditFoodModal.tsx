@@ -4,6 +4,7 @@ import { FOOD_UNIT_SYMBOLS } from '../../types/food';
 import { IconX, IconCheck } from '../icons';
 import { useValidation } from '../../hooks/useValidation';
 import { useModalA11y } from '../../hooks/useModalA11y';
+import { parseNumberInput } from '../../utils/numberInput';
 
 interface EditFoodModalProps {
   item: MealFood;
@@ -41,7 +42,7 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
         required: true,
         requiredMessage: 'Quantidade é obrigatória.',
         custom: (v) => {
-          const n = Number(v.replace(',', '.'));
+          const n = parseNumberInput(v);
           if (!Number.isFinite(n) || n <= 0) return 'Quantidade deve ser maior que zero.';
           return undefined;
         },
@@ -49,7 +50,7 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
       kcal: {
         custom: (v) => {
           if (!v.trim()) return undefined;
-          const n = Number(v.replace(',', '.'));
+          const n = parseNumberInput(v);
           if (!Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
           return undefined;
@@ -58,7 +59,7 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
       prot: {
         custom: (v) => {
           if (!v.trim()) return undefined;
-          const n = Number(v.replace(',', '.'));
+          const n = parseNumberInput(v);
           if (!Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
           return undefined;
@@ -67,7 +68,7 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
       carb: {
         custom: (v) => {
           if (!v.trim()) return undefined;
-          const n = Number(v.replace(',', '.'));
+          const n = parseNumberInput(v);
           if (!Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
           return undefined;
@@ -76,7 +77,7 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
       fat: {
         custom: (v) => {
           if (!v.trim()) return undefined;
-          const n = Number(v.replace(',', '.'));
+          const n = parseNumberInput(v);
           if (!Number.isFinite(n)) return 'Valor numérico inválido.';
           if (n < 0) return 'Valor não pode ser negativo.';
           return undefined;
@@ -91,11 +92,11 @@ export function EditFoodModal({ item, onClose, onSave }: EditFoodModalProps) {
       ...item,
       foodName: form.foodName.trim(),
       prep,
-      referenceAmount: Number(form.referenceAmount) || 0,
-      kcal: Number(form.kcal) || 0,
-      prot: Number(form.prot) || 0,
-      carb: Number(form.carb) || 0,
-      fat: Number(form.fat) || 0,
+      referenceAmount: parseNumberInput(form.referenceAmount) || 0,
+      kcal: parseNumberInput(form.kcal) || 0,
+      prot: parseNumberInput(form.prot) || 0,
+      carb: parseNumberInput(form.carb) || 0,
+      fat: parseNumberInput(form.fat) || 0,
     });
   };
 
