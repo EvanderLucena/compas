@@ -64,6 +64,13 @@ nutriai:
     enabled: ${NUTRIAI_WHISPER_ENABLED:true}
     timeout-seconds: ${NUTRIAI_WHISPER_TIMEOUT:30}
 
+  jev:
+    api-url: ${NUTRIAI_JEV_API_URL:https://api.typesafe.ai/v1/systemone}
+    model: ${NUTRIAI_JEV_MODEL:jev-latest}
+    api-key: ${NUTRIAI_JEV_API_KEY:}
+    enabled: ${NUTRIAI_JEV_ENABLED:true}
+    timeout-seconds: ${NUTRIAI_JEV_TIMEOUT_SECONDS:5}
+
   evolution:
     api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
     api-key: ${EVOLUTION_API_KEY:}

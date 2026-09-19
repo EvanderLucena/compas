@@ -46,6 +46,14 @@ public class FoodController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @GetMapping("/suggest")
+    public ResponseEntity<ApiResponse<com.nutriai.api.dto.jev.JevFoodCategorizationDecision>> suggest(
+            @RequestParam String name
+    ) {
+        var decision = foodService.suggestFoodCategorization(name);
+        return ResponseEntity.ok(ApiResponse.ok(decision));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<FoodResponse>> get(@PathVariable UUID id) {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();

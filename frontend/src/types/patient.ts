@@ -64,6 +64,7 @@ export interface Patient {
   weightDelta: number;
   tag: string;
   active?: boolean;
+  aiAdherenceInsight?: string | null;
 }
 
 export interface PatientApiResponse {
@@ -82,6 +83,7 @@ export interface PatientApiResponse {
   weightDelta: number;
   tag: string;
   active: boolean;
+  aiAdherenceInsight?: string | null;
 }
 
 export interface PatientListApiResponse {
@@ -109,6 +111,7 @@ export function mapPatientFromApi(p: PatientApiResponse): Patient {
     weightDelta: p.weightDelta,
     tag: p.tag,
     active: p.active,
+    aiAdherenceInsight: p.aiAdherenceInsight,
   };
 }
 

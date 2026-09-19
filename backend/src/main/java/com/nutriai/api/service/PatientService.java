@@ -1,14 +1,19 @@
 package com.nutriai.api.service;
 
+import com.nutriai.api.dto.jev.JevAdherenceDecision;
 import com.nutriai.api.dto.patient.*;
 import com.nutriai.api.exception.ResourceNotFoundException;
 import com.nutriai.api.model.Episode;
 import com.nutriai.api.model.EpisodeHistoryEvent;
+import com.nutriai.api.model.MealExtraction;
+import com.nutriai.api.model.MealPlan;
 import com.nutriai.api.model.Patient;
 import com.nutriai.api.model.PatientObjective;
 import com.nutriai.api.model.PatientStatus;
 import com.nutriai.api.repository.EpisodeHistoryEventRepository;
 import com.nutriai.api.repository.EpisodeRepository;
+import com.nutriai.api.repository.MealExtractionRepository;
+import com.nutriai.api.repository.MealPlanRepository;
 import com.nutriai.api.repository.NutritionistRepository;
 import com.nutriai.api.repository.PatientRepository;
 import org.slf4j.Logger;
@@ -24,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -38,19 +44,28 @@ public class PatientService {
     private final MealPlanService mealPlanService;
     private final EpisodeHistoryEventRepository historyEventRepository;
     private final PhoneNormalizationService phoneNormalizationService;
+    private final MealExtractionRepository mealExtractionRepository;
+    private final MealPlanRepository mealPlanRepository;
+    private final JevService jevService;
 
     public PatientService(PatientRepository patientRepository,
                            EpisodeRepository episodeRepository,
                            NutritionistRepository nutritionistRepository,
                            MealPlanService mealPlanService,
                            EpisodeHistoryEventRepository historyEventRepository,
-                           PhoneNormalizationService phoneNormalizationService) {
+                           PhoneNormalizationService phoneNormalizationService,
+                           MealExtractionRepository mealExtractionRepository,
+                           MealPlanRepository mealPlanRepository,
+                           JevService jevService) {
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
         this.nutritionistRepository = nutritionistRepository;
         this.mealPlanService = mealPlanService;
         this.historyEventRepository = historyEventRepository;
         this.phoneNormalizationService = phoneNormalizationService;
+        this.mealExtractionRepository = mealExtractionRepository;
+        this.mealPlanRepository = mealPlanRepository;
+        this.jevService = jevService;
     }
 
     @Transactional
@@ -109,7 +124,8 @@ public class PatientService {
         PatientStatus statusEnum = status != null ? parseStatus(status) : null;
         PatientObjective objectiveEnum = objective != null ? parseObjective(objective) : null;
 
-        String escapedSearch = search != null ? escapeLike(search) : null;
+        String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String escapedSearch = cleanSearch != null ? escapeLike(cleanSearch) : null;
         boolean hasFilter = escapedSearch != null || statusEnum != null || objectiveEnum != null || active != null;
 
         if (hasFilter) {
@@ -286,5 +302,78 @@ public class PatientService {
         return phoneNormalizationService.normalize(raw)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Número de WhatsApp inválido"));
+    }
+
+    public JevAdherenceDecision evaluatePatientAdherence(UUID patientId, UUID nutritionistId) {
+        Patient patient = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
+
+        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime start = end.minusDays(7);
+        List<MealExtraction> extractions = mealExtractionRepository
+                .findByPatientIdAndNutritionistIdAndExtractedAtBetween(patientId, nutritionistId, start, end);
+
+        int loggedMeals = extractions.size();
+        int expectedMeals = 28; // standard 4 meals/day * 7 days
+        double totalKcal = 0.0;
+        for (MealExtraction me : extractions) {
+            if (me.getTotalKcal() != null) {
+                totalKcal += me.getTotalKcal().doubleValue();
+            }
+        }
+        double avgDailyKcal = loggedMeals > 0 ? (totalKcal / 7.0) : 0.0;
+        double targetDailyKcal = 2000.0;
+
+        try {
+            var activeEpisode = episodeRepository
+                    .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                            patientId, nutritionistId);
+            if (activeEpisode.isPresent()) {
+                var planOpt = mealPlanRepository.findByEpisodeIdAndNutritionistId(
+                        activeEpisode.get().getId(), nutritionistId);
+                if (planOpt.isPresent() && planOpt.get().getKcalTarget() != null) {
+                    targetDailyKcal = planOpt.get().getKcalTarget().doubleValue();
+                }
+            }
+        } catch (Exception ex) {
+            logger.warn("Could not retrieve plan target kcal for patient {}: {}", patientId, ex.getMessage());
+        }
+
+        String recentSummary = String.format(
+                "Últimos 7 dias: %d refeições registradas (esperado: %d). Média: %.0f kcal (meta: %.0f kcal).",
+                loggedMeals, expectedMeals, avgDailyKcal, targetDailyKcal
+        );
+
+        JevAdherenceDecision decision;
+        if (jevService != null && jevService.isAvailable()) {
+            decision = jevService.evaluatePatientAdherence(
+                    patient.getName(),
+                    patient.getObjective() != null ? patient.getObjective().getPortugueseLabel() : "Saúde geral",
+                    recentSummary
+            );
+        } else {
+            decision = JevAdherenceDecision.fallback();
+        }
+
+        if (decision != null && decision.success()) {
+            persistAdherenceInsight(patientId, nutritionistId, decision.clinicalInsight());
+        }
+
+        return decision;
+    }
+
+    @Transactional
+    public void persistAdherenceInsight(UUID patientId, UUID nutritionistId, String insight) {
+        patientRepository.findByIdAndNutritionistId(patientId, nutritionistId).ifPresent(p -> {
+            p.setAiAdherenceInsight(insight);
+            p.setAiAdherenceUpdatedAt(LocalDateTime.now());
+            patientRepository.save(p);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public com.nutriai.api.dto.jev.JevSubstitutionDecision evaluateSubstitution(
+            UUID nutritionistId, UUID patientId, String prescribedFood, String desiredFood) {
+        return mealPlanService.evaluateSubstitution(nutritionistId, patientId, prescribedFood, desiredFood);
     }
 }

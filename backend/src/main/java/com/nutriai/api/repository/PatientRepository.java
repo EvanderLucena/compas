@@ -52,7 +52,7 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
      * Combined filter query with name search (case-insensitive LIKE) + status + active (D-13).
      */
     @Query("SELECT p FROM Patient p WHERE p.nutritionistId = :nutritionistId " +
-           "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) ESCAPE '!') " +
+           "AND (CAST(:search AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) ESCAPE '!') " +
            "AND (:status IS NULL OR p.status = :status) " +
            "AND (:objective IS NULL OR p.objective = :objective) " +
            "AND (:active IS NULL OR p.active = :active)")

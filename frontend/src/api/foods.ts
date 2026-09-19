@@ -1,5 +1,10 @@
 import { apiClient } from './client';
-import type { FoodListApiResponse, FoodApiResponse, FoodCategoryKey, FoodUnit } from '../types/food';
+import type {
+  FoodListApiResponse,
+  FoodApiResponse,
+  FoodCategoryKey,
+  FoodUnit,
+} from '../types/food';
 
 export interface ListFoodsParams {
   page?: number;
@@ -25,20 +30,46 @@ export interface CreateFoodRequest {
 export type UpdateFoodRequest = Partial<CreateFoodRequest>;
 
 export async function listFoods(params: ListFoodsParams = {}): Promise<FoodListApiResponse> {
-  const response = await apiClient.get<{ success: boolean; data: FoodListApiResponse }>('/foods', { params });
+  const response = await apiClient.get<{ success: boolean; data: FoodListApiResponse }>('/foods', {
+    params,
+  });
   return response.data.data;
 }
 
 export async function createFood(data: CreateFoodRequest): Promise<FoodApiResponse> {
-  const response = await apiClient.post<{ success: boolean; data: FoodApiResponse }>('/foods', data);
+  const response = await apiClient.post<{ success: boolean; data: FoodApiResponse }>(
+    '/foods',
+    data,
+  );
   return response.data.data;
 }
 
 export async function updateFood(id: string, data: UpdateFoodRequest): Promise<FoodApiResponse> {
-  const response = await apiClient.patch<{ success: boolean; data: FoodApiResponse }>(`/foods/${id}`, data);
+  const response = await apiClient.patch<{ success: boolean; data: FoodApiResponse }>(
+    `/foods/${id}`,
+    data,
+  );
   return response.data.data;
 }
 
 export async function deleteFood(id: string): Promise<void> {
   await apiClient.delete(`/foods/${id}`);
+}
+
+export interface FoodSuggestion {
+  category: FoodCategoryKey;
+  unit: FoodUnit;
+  referenceAmount: number;
+  confidence: number;
+  success: boolean;
+}
+
+export async function suggestFood(name: string): Promise<FoodSuggestion> {
+  const response = await apiClient.get<{ success: boolean; data: FoodSuggestion }>(
+    '/foods/suggest',
+    {
+      params: { name },
+    },
+  );
+  return response.data.data;
 }

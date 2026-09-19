@@ -170,11 +170,9 @@ export function useValidation<T extends Record<string, string>>(
   );
 
   const hasErrors = Object.keys(errors).length > 0;
-  const canSubmit = !Object.keys(rules).some((field) => {
-    const fieldRules = rules[field];
-    if (fieldRules?.required && !(values[field] ?? '').trim()) return true;
-    return false;
-  });
+  const canSubmit = !Object.keys(rules).some(
+    (field) => rules[field]?.required && !(values[field] ?? '').trim(),
+  );
 
   return {
     values,

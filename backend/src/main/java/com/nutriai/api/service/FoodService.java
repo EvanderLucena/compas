@@ -28,9 +28,19 @@ public class FoodService {
     );
 
     private final FoodRepository foodRepository;
+    private final JevService jevService;
 
-    public FoodService(FoodRepository foodRepository) {
+    public FoodService(FoodRepository foodRepository, JevService jevService) {
         this.foodRepository = foodRepository;
+        this.jevService = jevService;
+    }
+
+    @Transactional(readOnly = true)
+    public com.nutriai.api.dto.jev.JevFoodCategorizationDecision suggestFoodCategorization(String foodName) {
+        if (foodName == null || foodName.isBlank() || jevService == null || !jevService.isAvailable()) {
+            return com.nutriai.api.dto.jev.JevFoodCategorizationDecision.fallback();
+        }
+        return jevService.categorizeFood(foodName.trim());
     }
 
     @Transactional
@@ -63,8 +73,11 @@ public class FoodService {
     public FoodListResponse listFoods(UUID nutritionistId, int page, int size, String search, String category) {
         PageRequest pageRequest = PageRequest.of(page, size);
 
-        String escapedSearch = search != null ? escapeLike(search) : null;
-        String upperCategory = category != null ? category.toUpperCase() : null;
+        String cleanSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String cleanCategory = (category != null && !category.trim().isEmpty()) ? category.trim() : null;
+
+        String escapedSearch = cleanSearch != null ? escapeLike(cleanSearch) : null;
+        String upperCategory = cleanCategory != null ? cleanCategory.toUpperCase() : null;
         boolean hasFilter = escapedSearch != null || upperCategory != null;
 
         Page<Food> result;

@@ -1,5 +1,6 @@
 package com.nutriai.api.service;
 
+import com.nutriai.api.dto.jev.JevDecision;
 import com.nutriai.api.dto.llm.ExtractionItemResult;
 import com.nutriai.api.dto.llm.ExtractionResult;
 import com.nutriai.api.dto.llm.LlmIntent;
@@ -43,6 +44,7 @@ class ConversationServiceTest {
     @Mock PlanExtraRepository planExtraRepository;
     @Mock NutritionistRepository nutritionistRepository;
     @Mock AudioTranscriptionService audioTranscriptionService;
+    @Mock JevService jevService;
 
     @InjectMocks
     ConversationService conversationService;
@@ -622,5 +624,87 @@ class ConversationServiceTest {
         // Verify WhatsApp message sent was friendly text without JSON
         verify(evolutionApiService).sendMessage(eq("11999998888"),
                 eq("Tudo certo! Registrei seu café e almoço."));
+    }
+
+    @Test
+    void processMessage_withJevAvailable_performsTriageAndSavesToMessage() {
+        conversationService.setJevService(jevService);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.analyzePatientMessage(anyString())).thenReturn(
+                new JevDecision("emotional_slip", 0.92, "guilty_or_struggling", 0.88, 0.85, true, true, "jev-1.13.0")
+        );
+
+        LlmResponse llmResponse = new LlmResponse(
+                "Te entendo perfeitamente, não se culpe!", LlmIntent.MISCELLANEOUS, null, true, null);
+        when(llmService.chat(any(LlmRequest.class))).thenReturn(llmResponse);
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        verify(jevService).analyzePatientMessage(eq(textMessage.getMessageContent()));
+        assertEquals("emotional_slip", textMessage.getJevIntent());
+        assertEquals("guilty_or_struggling", textMessage.getJevSentiment());
+        assertTrue(textMessage.getJevRequiresAttention());
+    }
+
+    @Test
+    void processMessage_greetingFastTrack_bypassesLlmAndRespondsImmediately() {
+        conversationService.setJevService(jevService);
+        textMessage.setMessageContent("Olá bom dia!");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.analyzePatientMessage(anyString())).thenReturn(
+                new JevDecision("greeting", 0.95, "neutral", 0.90, 0.10, false, true, "jev-1.13.0")
+        );
+
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        // Verify LLM was NOT called
+        verify(llmService, never()).chat(any());
+        // Verify greeting was sent
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("Olá, João Silva!"));
+        assertTrue(textMessage.getProcessed());
+    }
+
+    @Test
+    void processMessage_emergencyIntent_triggersSafetyNoticeWithoutLlm() {
+        conversationService.setJevService(jevService);
+        textMessage.setMessageContent("Estou sentindo muita dor e falta de ar");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.analyzePatientMessage(anyString())).thenReturn(
+                new JevDecision("emergency", 0.98, "urgent_distress", 0.95, 0.99, true, true, "jev-1.13.0")
+        );
+
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        // Verify LLM was NOT called
+        verify(llmService, never()).chat(any());
+        // Verify emergency notice sent
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("pronto atendimento"));
+        assertTrue(textMessage.getProcessed());
     }
 }

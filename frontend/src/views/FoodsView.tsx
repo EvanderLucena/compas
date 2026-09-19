@@ -29,6 +29,7 @@ import {
 import { useValidation } from '../hooks/useValidation';
 import { useToastStore } from '../stores/toastStore';
 import { resolveMutationErrorMessage } from '../stores/patientStore';
+import { suggestFood } from '../api/foods';
 
 function MiniMacro({
   label,
@@ -998,6 +999,11 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
   const [prep, setPrep] = useState('');
   const [portionLabel, setPortionLabel] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<{
+    category: FoodCategoryKey;
+    unit: FoodUnit;
+    referenceAmount: number;
+  } | null>(null);
   const createFood = useCreateFood();
 
   const {
@@ -1091,6 +1097,32 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
       },
     },
   );
+
+  useEffect(() => {
+    if (!form.name || form.name.trim().length < 3) {
+      setSuggestion(null);
+      return;
+    }
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await suggestFood(form.name.trim());
+        if (!isCancelled && res && res.success) {
+          setSuggestion({
+            category: res.category,
+            unit: res.unit,
+            referenceAmount: res.referenceAmount,
+          });
+        }
+      } catch {
+        // silent
+      }
+    }, 450);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.name]);
 
   const handleCreate = () => {
     setSubmitError(null);
@@ -1227,6 +1259,39 @@ function CreateFoodModal({ onClose }: { onClose: () => void }) {
               <p id="create-food-name-error" className="text-xs text-coral" role="alert">
                 {errors.name}
               </p>
+            )}
+            {suggestion && (
+              <div
+                data-testid="food-suggestion-pill"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12,
+                  color: 'var(--fg-muted)',
+                  background: 'var(--surface-2)',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  border: '1px solid var(--border)',
+                }}
+                onClick={() => {
+                  setCategory(suggestion.category);
+                  setUnit(suggestion.unit);
+                  if (suggestion.referenceAmount) {
+                    set('referenceAmount', String(suggestion.referenceAmount));
+                  }
+                  setSuggestion(null);
+                }}
+              >
+                <span>💡 Sugestão automática:</span>
+                <strong style={{ color: 'var(--fg)' }}>
+                  {FOOD_CATEGORY_LABELS[suggestion.category]} • {FOOD_UNIT_LABELS[suggestion.unit]}
+                </strong>
+                <span style={{ color: 'var(--lime)', marginLeft: 'auto', fontWeight: 600 }}>
+                  Aplicar
+                </span>
+              </div>
             )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
@@ -1435,7 +1500,7 @@ export function FoodsView() {
     editingFoodId,
     setEditingFoodId,
   } = useFoodUIStore();
-  const { data, isLoading } = useFoodCatalog();
+  const { data, isLoading, isError, refetch } = useFoodCatalog();
   const deleteFood = useDeleteFood();
   const [deletingFood, setDeletingFood] = useState<Food | null>(null);
 
@@ -1541,17 +1606,34 @@ export function FoodsView() {
             gap: 12,
           }}
         >
-          {isLoading
-            ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-            : foods.map((f) => (
-                <FoodCard
-                  key={f.id}
-                  food={f}
-                  onEdit={() => setEditingFoodId(f.id)}
-                  onDelete={() => setDeletingFood(f)}
-                />
-              ))}
-          {!isLoading && foods.length === 0 && (
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+          ) : isError ? (
+            <div
+              style={{
+                gridColumn: '1 / -1',
+                padding: 40,
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ color: 'var(--coral)', marginBottom: 12, fontSize: 14 }}>
+                Erro ao carregar catálogo de alimentos.
+              </p>
+              <button type="button" className="btn btn-secondary" onClick={() => refetch()}>
+                Tentar novamente
+              </button>
+            </div>
+          ) : (
+            foods.map((f) => (
+              <FoodCard
+                key={f.id}
+                food={f}
+                onEdit={() => setEditingFoodId(f.id)}
+                onDelete={() => setDeletingFood(f)}
+              />
+            ))
+          )}
+          {!isLoading && !isError && foods.length === 0 && (
             <div
               style={{
                 gridColumn: '1 / -1',

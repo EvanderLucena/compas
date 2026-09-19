@@ -65,6 +65,13 @@ public class MealExtraction {
     @Column(name = "total_fat", precision = 5, scale = 1)
     private BigDecimal totalFat;
 
+    @Column(name = "sanity_status", length = 30)
+    @Builder.Default
+    private String sanityStatus = "VERIFIED";
+
+    @Column(name = "sanity_note", length = 255)
+    private String sanityNote;
+
     @NotNull
     @Builder.Default
     @Column(name = "extracted_at", nullable = false)

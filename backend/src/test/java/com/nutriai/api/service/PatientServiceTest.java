@@ -5,6 +5,8 @@ import com.nutriai.api.exception.ResourceNotFoundException;
 import com.nutriai.api.model.*;
 import com.nutriai.api.repository.EpisodeHistoryEventRepository;
 import com.nutriai.api.repository.EpisodeRepository;
+import com.nutriai.api.repository.MealExtractionRepository;
+import com.nutriai.api.repository.MealPlanRepository;
 import com.nutriai.api.repository.NutritionistRepository;
 import com.nutriai.api.repository.PatientRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,15 @@ class PatientServiceTest {
 
     @Mock
     private PhoneNormalizationService phoneNormalizationService;
+
+    @Mock
+    private MealExtractionRepository mealExtractionRepository;
+
+    @Mock
+    private MealPlanRepository mealPlanRepository;
+
+    @Mock
+    private JevService jevService;
 
     @InjectMocks
     private PatientService patientService;
@@ -436,5 +447,33 @@ class PatientServiceTest {
         assertNotEquals(resp1.id(), resp2.id());
         assertEquals(resp1.name(), resp2.name());
         verify(patientRepository, times(2)).save(any(Patient.class));
+    }
+
+    @Test
+    void evaluatePatientAdherence_calculatesAdherenceAndSavesInsight() {
+        UUID patientId = UUID.randomUUID();
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId))
+                .thenReturn(Optional.of(samplePatient));
+        when(mealExtractionRepository.findByPatientIdAndNutritionistIdAndExtractedAtBetween(
+                eq(patientId), eq(nutritionistId), any(), any()))
+                .thenReturn(List.of(
+                        MealExtraction.builder().totalKcal(new BigDecimal("500")).build(),
+                        MealExtraction.builder().totalKcal(new BigDecimal("600")).build()
+                ));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        when(jevService.isAvailable()).thenReturn(true);
+        when(jevService.evaluatePatientAdherence(anyString(), anyString(), anyString()))
+                .thenReturn(new com.nutriai.api.dto.jev.JevAdherenceDecision(
+                        PatientStatus.ONTRACK, 0.15, 0.85, "Excelente adesão aos registros e macros.", true
+                ));
+
+        var decision = patientService.evaluatePatientAdherence(patientId, nutritionistId);
+
+        assertNotNull(decision);
+        assertEquals(PatientStatus.ONTRACK, decision.suggestedStatus());
+        assertEquals("Excelente adesão aos registros e macros.", samplePatient.getAiAdherenceInsight());
+        verify(patientRepository).save(samplePatient);
     }
 }

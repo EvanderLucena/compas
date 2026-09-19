@@ -2,8 +2,10 @@ package com.nutriai.api.config;
 
 import com.nutriai.api.service.AudioTranscriptionService;
 import com.nutriai.api.service.EvolutionApiService;
+import com.nutriai.api.service.JevService;
 import com.nutriai.api.service.LlmService;
 import com.nutriai.api.service.OllamaCloudLlmService;
+import com.nutriai.api.service.TypeSafeJevService;
 import com.nutriai.api.service.WhisperAudioTranscriptionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -55,6 +57,21 @@ public class OllamaConfig {
     @Value("${nutriai.evolution.instance-name:nutriai}")
     private String evolutionInstanceName;
 
+    @Value("${nutriai.jev.api-url:https://api.typesafe.ai/v1/systemone}")
+    private String jevApiUrl;
+
+    @Value("${nutriai.jev.model:jev-latest}")
+    private String jevModel;
+
+    @Value("${nutriai.jev.api-key:}")
+    private String jevApiKey;
+
+    @Value("${nutriai.jev.enabled:true}")
+    private boolean jevEnabled;
+
+    @Value("${nutriai.jev.timeout-seconds:5}")
+    private int jevTimeoutSeconds;
+
     @Bean
     LlmService ollamaCloudLlmService() {
         return new OllamaCloudLlmService(llmBaseUrl, llmModel, llmApiKey, llmTimeoutSeconds);
@@ -76,4 +93,17 @@ public class OllamaConfig {
     EvolutionApiService evolutionApiService() {
         return new EvolutionApiService(evolutionApiUrl, evolutionApiKey, evolutionInstanceName);
     }
+
+    @Bean
+    JevService jevService() {
+        return new TypeSafeJevService(
+                jevApiUrl,
+                jevApiKey,
+                jevModel,
+                jevEnabled,
+                jevTimeoutSeconds
+        );
+    }
 }
+
+

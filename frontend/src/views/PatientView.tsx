@@ -105,7 +105,7 @@ export function PatientView() {
     weekAdherence: [],
     weekMacroFill: [],
     timeline: [],
-    aiSummary: '',
+    aiSummary: mappedApiData?.aiAdherenceInsight || '',
   };
 
   const fallbackLatestBiometryWeight = patient.weight;
@@ -349,7 +349,7 @@ export function PatientView() {
       )}
       {tab === 'plan' && <PlansView patientId={patientId} />}
       {tab === 'biometry' && <BiometryTab patientId={patientId} patientStatus={patient.status} />}
-      {tab === 'insights' && <InsightsTab />}
+      {tab === 'insights' && <InsightsTab adherenceInsight={patient.aiSummary} />}
       {tab === 'history' && <HistoryTab patientId={patientId} />}
 
       {editOpen && <EditPatientModal patient={patient} onClose={() => setEditOpen(false)} />}
@@ -1423,9 +1423,38 @@ function BioCell({
   );
 }
 
-function InsightsTab() {
+function InsightsTab({ adherenceInsight }: { adherenceInsight?: string | null }) {
   return (
     <div style={{ padding: '24px 28px' }}>
+      {adherenceInsight && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 20,
+            borderLeft: '4px solid var(--lime)',
+            background: 'var(--surface)',
+          }}
+        >
+          <div className="card-h">
+            <div className="title">Diagnóstico Clínico de Adesão</div>
+            <div className="spacer" />
+            <div
+              className="mono"
+              style={{
+                fontSize: 10.5,
+                color: 'var(--lime-dim)',
+                letterSpacing: '0.06em',
+                fontWeight: 600,
+              }}
+            >
+              AVALIAÇÃO CLÍNICA
+            </div>
+          </div>
+          <div className="card-b" style={{ fontSize: 13.5, color: 'var(--fg)', lineHeight: 1.6 }}>
+            {adherenceInsight}
+          </div>
+        </div>
+      )}
       <div className="card">
         <div className="card-h">
           <div className="title">Padrões observados no consumo</div>

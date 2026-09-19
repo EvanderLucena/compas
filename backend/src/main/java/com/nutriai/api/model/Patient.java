@@ -79,6 +79,12 @@ public class Patient {
     @Builder.Default
     private Boolean active = true;
 
+    @Column(name = "ai_adherence_insight", length = 500)
+    private String aiAdherenceInsight;
+
+    @Column(name = "ai_adherence_updated_at")
+    private LocalDateTime aiAdherenceUpdatedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
