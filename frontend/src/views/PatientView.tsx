@@ -18,6 +18,7 @@ import {
   StatusReviewModal,
   WhatsAppActivationRow,
   InsightsTab,
+  BiometryEvolutionCard,
 } from '../components/patient';
 import { MacroRings, WeekBars, LineChart } from '../components/viz';
 import {
@@ -1090,6 +1091,9 @@ function BiometryTab({
           </button>
         </div>
       </div>
+
+      {/* Card de Inteligência da Evolução Corporal */}
+      <BiometryEvolutionCard patientId={patientId} />
 
       {/* Evolução chart */}
       {list.length >= 2 && (

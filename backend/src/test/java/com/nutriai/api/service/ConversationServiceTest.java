@@ -45,6 +45,7 @@ class ConversationServiceTest {
     @Mock NutritionistRepository nutritionistRepository;
     @Mock AudioTranscriptionService audioTranscriptionService;
     @Mock JevService jevService;
+    @Mock BiometryService biometryService;
 
     @InjectMocks
     ConversationService conversationService;
@@ -706,5 +707,18 @@ class ConversationServiceTest {
         // Verify emergency notice sent
         verify(evolutionApiService).sendMessage(eq("11999998888"), contains("pronto atendimento"));
         assertTrue(textMessage.getProcessed());
+    }
+
+    @Test
+    void buildClassifyingPrompt_includesBiometryContext_whenBiometryServiceAvailable() {
+        conversationService.setBiometryService(biometryService);
+        when(biometryService.getBiometryContextForWhatsApp(patient.getId(), nutritionist.getId()))
+                .thenReturn("EVOLUÇÃO BIOMÉTRICA: - Peso inicial 85kg -> atual 80kg");
+
+        String prompt = conversationService.buildClassifyingPrompt(patient, nutritionist, textMessage);
+
+        assertNotNull(prompt);
+        assertTrue(prompt.contains("EVOLUÇÃO BIOMÉTRICA: - Peso inicial 85kg -> atual 80kg"));
+        assertTrue(prompt.contains("Se o paciente perguntar sobre peso, emagrecimento"));
     }
 }

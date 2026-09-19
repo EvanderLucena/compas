@@ -43,10 +43,16 @@ public class ConversationService {
     private final NutritionistRepository nutritionistRepository;
     private final AudioTranscriptionService audioTranscriptionService;
     private JevService jevService;
+    private BiometryService biometryService;
 
     @Autowired(required = false)
     public void setJevService(JevService jevService) {
         this.jevService = jevService;
+    }
+
+    @Autowired(required = false)
+    public void setBiometryService(BiometryService biometryService) {
+        this.biometryService = biometryService;
     }
 
     public ConversationService(
@@ -401,6 +407,7 @@ public class ConversationService {
             - NUNCA reprove o paciente por comer algo fora do plano.
             - Se o paciente relatou uma refeição: confirme o registro com simpatia e dê uma palavra rápida de incentivo (máximo 2 a 3 frases).
             - Se o paciente estiver complementando ou detalhando uma refeição já mencionada no histórico recente, consolide todos os alimentos da refeição no JSON e use o mesmo mealLabel.
+            - Se o paciente perguntar sobre peso, emagrecimento, medidas ou evolução física: responda com base nos dados biométricos reais presentes no contexto do paciente de forma empática e motivadora.
             - Interprete pratos do dia a dia, gírias e lanches populares brasileiros (ex: 'x-frango', 'xfrango', 'x-tudo', 'x-salada', 'x-bacon' são sanduíches/lanches completos com pão, proteína e queijo; 'misto quente', 'pastel', 'coxinha', etc.). Se o paciente citar frações (ex: 'metade de um xfrango'), estime os macros proporcionais àquela fatia do sanduíche (pão + recheio).
             - Responda em português brasileiro.
 
@@ -563,6 +570,19 @@ public class ConversationService {
             }
         } catch (Exception e) {
             log.warn("Could not load extras for patient {}: {}", patient.getId(), e.getMessage());
+        }
+
+        // Add biometry context if available
+        try {
+            if (biometryService != null && patient.getId() != null && patient.getNutritionistId() != null) {
+                String biometryCtx = biometryService.getBiometryContextForWhatsApp(
+                        patient.getId(), patient.getNutritionistId());
+                if (biometryCtx != null && !biometryCtx.isBlank()) {
+                    sb.append("\n").append(biometryCtx).append("\n");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not load biometry context for patient {}: {}", patient.getId(), e.getMessage());
         }
 
         return sb.toString();

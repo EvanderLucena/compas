@@ -1,9 +1,33 @@
 package com.nutriai.api.service;
 
-import com.nutriai.api.dto.biometry.*;
+import com.nutriai.api.dto.biometry.BiometryAssessmentResponse;
+import com.nutriai.api.dto.biometry.BiometryEvolutionSummaryResponse;
+import com.nutriai.api.dto.biometry.BiometryHistoryEpisodeResponse;
+import com.nutriai.api.dto.biometry.BiometryHistorySnapshotResponse;
+import com.nutriai.api.dto.biometry.CreateBiometryAssessmentRequest;
+import com.nutriai.api.dto.biometry.EpisodeHistoryEventResponse;
+import com.nutriai.api.dto.biometry.PerimetryDeltaResponse;
+import com.nutriai.api.dto.biometry.UpdateBiometryAssessmentRequest;
 import com.nutriai.api.exception.ResourceNotFoundException;
-import com.nutriai.api.model.*;
-import com.nutriai.api.repository.*;
+import com.nutriai.api.model.BiometryAssessment;
+import com.nutriai.api.model.BiometryPerimetry;
+import com.nutriai.api.model.BiometrySkinfold;
+import com.nutriai.api.model.Episode;
+import com.nutriai.api.model.EpisodeHistoryEvent;
+import com.nutriai.api.model.MealOption;
+import com.nutriai.api.model.MealPlan;
+import com.nutriai.api.model.MealSlot;
+import com.nutriai.api.model.Patient;
+import com.nutriai.api.model.PatientObjective;
+import com.nutriai.api.repository.BiometryAssessmentRepository;
+import com.nutriai.api.repository.BiometryPerimetryRepository;
+import com.nutriai.api.repository.BiometrySkinfoldRepository;
+import com.nutriai.api.repository.EpisodeHistoryEventRepository;
+import com.nutriai.api.repository.EpisodeRepository;
+import com.nutriai.api.repository.MealOptionRepository;
+import com.nutriai.api.repository.MealPlanRepository;
+import com.nutriai.api.repository.MealSlotRepository;
+import com.nutriai.api.repository.PatientRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +36,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -30,6 +56,18 @@ public class BiometryService {
     private static final Logger logger = LoggerFactory.getLogger(BiometryService.class);
     private static final Pattern OBJECTIVE_METADATA_PATTERN =
             Pattern.compile("\"objective\"\\s*:\\s*\"([A-Z_]+)\"");
+    private static final Map<String, String> PERIMETRY_LABELS = Map.ofEntries(
+            Map.entry("cintura", "Cintura"),
+            Map.entry("abdomen", "Abdômen"),
+            Map.entry("quadril", "Quadril"),
+            Map.entry("braco_d", "Braço Direito"),
+            Map.entry("braco_e", "Braço Esquerdo"),
+            Map.entry("coxa_d", "Coxa Direita"),
+            Map.entry("coxa_e", "Coxa Esquerda"),
+            Map.entry("panturrilha_d", "Panturrilha Direita"),
+            Map.entry("panturrilha_e", "Panturrilha Esquerda"),
+            Map.entry("torax", "Tórax")
+    );
 
     private final BiometryAssessmentRepository assessmentRepository;
     private final BiometrySkinfoldRepository skinfoldRepository;
@@ -367,7 +405,14 @@ public class BiometryService {
         return merged;
     }
 
-    private void emitHistoryEvent(UUID episodeId, UUID nutritionistId, String eventType, String title, String sourceRef, UUID sourceId) {
+    private void emitHistoryEvent(
+            UUID episodeId,
+            UUID nutritionistId,
+            String eventType,
+            String title,
+            String sourceRef,
+            UUID sourceId
+    ) {
         EpisodeHistoryEvent event = EpisodeHistoryEvent.builder()
                 .episodeId(episodeId)
                 .nutritionistId(nutritionistId)
@@ -377,5 +422,314 @@ public class BiometryService {
                 .sourceRef(sourceRef + ":" + sourceId)
                 .build();
         historyEventRepository.save(event);
+    }
+
+    @Transactional(readOnly = true)
+    public BiometryEvolutionSummaryResponse getBiometryEvolutionSummary(UUID nutritionistId, UUID patientId) {
+        Patient patient = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
+
+        Optional<Episode> activeEpisode = episodeRepository
+                .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId);
+        if (activeEpisode.isEmpty()) {
+            return emptySummary();
+        }
+
+        List<BiometryAssessment> assessments = assessmentRepository
+                .findByEpisodeIdAndPatientIdAndNutritionistIdOrderByAssessmentDateAsc(
+                        activeEpisode.get().getId(), patientId, nutritionistId);
+
+        if (assessments.isEmpty()) {
+            return emptySummary();
+        }
+        if (assessments.size() == 1) {
+            return singleAssessmentSummary(patient, assessments.get(0), nutritionistId);
+        }
+        return multiAssessmentSummary(patient, assessments, nutritionistId);
+    }
+
+    @Transactional(readOnly = true)
+    public String getBiometryContextForWhatsApp(UUID patientId, UUID nutritionistId) {
+        try {
+            BiometryEvolutionSummaryResponse summary = getBiometryEvolutionSummary(nutritionistId, patientId);
+            if (summary.assessmentCount() == 0) {
+                return "EVOLUÇÃO BIOMÉTRICA DO PACIENTE:\nNenhuma avaliação física cadastrada no momento.\n";
+            }
+            return buildWhatsAppBiometryContext(summary);
+        } catch (Exception e) {
+            logger.warn("Could not retrieve biometry context for patient {}: {}", patientId, e.getMessage());
+            return "";
+        }
+    }
+
+    private String buildWhatsAppBiometryContext(BiometryEvolutionSummaryResponse summary) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("EVOLUÇÃO BIOMÉTRICA E COMPOSIÇÃO CORPORAL DO PACIENTE:\n");
+        sb.append(String.format("- Período: de %s até %s (%d avaliações)\n",
+                summary.initialAssessmentDate(), summary.latestAssessmentDate(), summary.assessmentCount()));
+        sb.append(String.format("- Peso: inicial %.1f kg -> atual %.1f kg (variação: %+.1f kg)\n",
+                summary.initialWeight(), summary.currentWeight(),
+                summary.weightDelta() != null ? summary.weightDelta() : BigDecimal.ZERO));
+        sb.append(String.format("- Gordura corporal: inicial %.1f%% -> atual %.1f%% (variação: %+.1f%%)\n",
+                summary.initialBodyFatPercent(), summary.currentBodyFatPercent(),
+                summary.bodyFatDelta() != null ? summary.bodyFatDelta() : BigDecimal.ZERO));
+
+        if (summary.initialFatMassKg() != null && summary.currentFatMassKg() != null) {
+            sb.append(String.format("- Massa gorda estimada: %.1f kg -> %.1f kg (%+.1f kg de gordura)\n",
+                    summary.initialFatMassKg(), summary.currentFatMassKg(),
+                    summary.fatMassDelta() != null ? summary.fatMassDelta() : BigDecimal.ZERO));
+        }
+        if (summary.initialLeanMassKg() != null && summary.currentLeanMassKg() != null) {
+            sb.append(String.format("- Massa magra: %.1f kg -> %.1f kg (%+.1f kg de massa magra)\n",
+                    summary.initialLeanMassKg(), summary.currentLeanMassKg(),
+                    summary.leanMassDelta() != null ? summary.leanMassDelta() : BigDecimal.ZERO));
+        }
+        if (!summary.perimetryDeltas().isEmpty()) {
+            sb.append("- Medidas corporais (circunferências):\n");
+            for (PerimetryDeltaResponse p : summary.perimetryDeltas()) {
+                sb.append(String.format("  • %s: %.1f cm -> %.1f cm (%+.1f cm)\n",
+                        p.label(), p.initialCm(), p.currentCm(),
+                        p.deltaCm() != null ? p.deltaCm() : BigDecimal.ZERO));
+            }
+        }
+        sb.append("DIRETRIZES DE RESPOSTA BIOMÉTRICA:\n");
+        sb.append("Quando o paciente perguntar sobre seu peso, emagrecimento, medidas corporais ou evolução:\n");
+        sb.append("- Use com total exatidão os dados biométricos reais acima.\n");
+        sb.append("- Seja caloroso, empático e encorajador em no máximo 2 a 3 frases.\n");
+        sb.append("- Celebre o progresso real conquistado (diminuição de gordura, redução de cintura, etc.).\n");
+        return sb.toString();
+    }
+
+    private BiometryEvolutionSummaryResponse emptySummary() {
+        return new BiometryEvolutionSummaryResponse(
+                0, null, null,
+                null, null, null,
+                null, null, null,
+                null, null, null,
+                null, null, null,
+                List.of(),
+                "Nenhuma avaliação biométrica registrada ainda.",
+                "Olá! Ainda não temos avaliações biométricas registradas no seu acompanhamento."
+        );
+    }
+
+    private BigDecimal computeFatMass(BigDecimal weight, BigDecimal bodyFatPercent) {
+        if (weight == null || bodyFatPercent == null) {
+            return null;
+        }
+        return weight.multiply(bodyFatPercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal computeDelta(BigDecimal current, BigDecimal initial) {
+        if (current == null || initial == null) {
+            return null;
+        }
+        return current.subtract(initial);
+    }
+
+    private BiometryEvolutionSummaryResponse singleAssessmentSummary(
+            Patient patient, BiometryAssessment initial, UUID nutritionistId) {
+        BigDecimal fatMass = computeFatMass(initial.getWeight(), initial.getBodyFatPercent());
+        List<PerimetryDeltaResponse> perimetries = buildPerimetryDeltas(
+                initial.getId(), initial.getId(), nutritionistId);
+
+        String leanMassText = initial.getLeanMassKg() != null
+                ? String.format(", massa magra %.1f kg", initial.getLeanMassKg()) : "";
+        String clinicalSynthesis = String.format(
+                "Marco zero estabelecido em %s: peso %.1f kg, gordura %.1f%% (%.1f kg de gordura)%s. "
+                        + "Os deltas comparativos serão calculados na próxima avaliação.",
+                initial.getAssessmentDate(),
+                initial.getWeight(),
+                initial.getBodyFatPercent(),
+                fatMass != null ? fatMass : BigDecimal.ZERO,
+                leanMassText
+        );
+        String whatsappMsg = String.format(
+                "Olá, %s! Sua avaliação física inicial foi registrada com sucesso (%.1f kg e %.1f%% de gordura). "
+                        + "Esse é o nosso marco de partida para acompanhar sua evolução! Tamo junto! 💪🚀",
+                patient.getName(),
+                initial.getWeight(),
+                initial.getBodyFatPercent()
+        );
+
+        return new BiometryEvolutionSummaryResponse(
+                1, initial.getAssessmentDate(), initial.getAssessmentDate(),
+                initial.getWeight(), initial.getWeight(), BigDecimal.ZERO,
+                initial.getBodyFatPercent(), initial.getBodyFatPercent(), BigDecimal.ZERO,
+                initial.getLeanMassKg(), initial.getLeanMassKg(), BigDecimal.ZERO,
+                fatMass, fatMass, BigDecimal.ZERO,
+                perimetries, clinicalSynthesis, whatsappMsg
+        );
+    }
+
+    private BiometryEvolutionSummaryResponse multiAssessmentSummary(
+            Patient patient, List<BiometryAssessment> assessments, UUID nutritionistId) {
+        BiometryAssessment initial = assessments.get(0);
+        BiometryAssessment latest = assessments.get(assessments.size() - 1);
+
+        BigDecimal initialFatMass = computeFatMass(initial.getWeight(), initial.getBodyFatPercent());
+        BigDecimal currentFatMass = computeFatMass(latest.getWeight(), latest.getBodyFatPercent());
+
+        BigDecimal weightDelta = computeDelta(latest.getWeight(), initial.getWeight());
+        BigDecimal bodyFatDelta = computeDelta(latest.getBodyFatPercent(), initial.getBodyFatPercent());
+        BigDecimal leanMassDelta = computeDelta(latest.getLeanMassKg(), initial.getLeanMassKg());
+        BigDecimal fatMassDelta = computeDelta(currentFatMass, initialFatMass);
+
+        List<PerimetryDeltaResponse> perimetryDeltas = buildPerimetryDeltas(
+                initial.getId(), latest.getId(), nutritionistId);
+
+        String clinicalSynthesis = generateClinicalSynthesis(initial, latest, perimetryDeltas);
+        String whatsappMsg = generateWhatsAppFeedbackMessage(patient.getName(), initial, latest, perimetryDeltas);
+
+        return new BiometryEvolutionSummaryResponse(
+                assessments.size(),
+                initial.getAssessmentDate(),
+                latest.getAssessmentDate(),
+                initial.getWeight(),
+                latest.getWeight(),
+                weightDelta,
+                initial.getBodyFatPercent(),
+                latest.getBodyFatPercent(),
+                bodyFatDelta,
+                initial.getLeanMassKg(),
+                latest.getLeanMassKg(),
+                leanMassDelta,
+                initialFatMass,
+                currentFatMass,
+                fatMassDelta,
+                perimetryDeltas,
+                clinicalSynthesis,
+                whatsappMsg
+        );
+    }
+
+    private List<PerimetryDeltaResponse> buildPerimetryDeltas(
+            UUID initialAssessmentId, UUID latestAssessmentId, UUID nutritionistId) {
+        List<BiometryPerimetry> initialList = perimetryRepository
+                .findByAssessmentIdAndNutritionistIdOrderBySortOrder(initialAssessmentId, nutritionistId);
+        List<BiometryPerimetry> latestList = perimetryRepository
+                .findByAssessmentIdAndNutritionistIdOrderBySortOrder(latestAssessmentId, nutritionistId);
+
+        Map<String, BigDecimal> initialMap = new HashMap<>();
+        for (BiometryPerimetry p : initialList) {
+            initialMap.put(p.getMeasureKey(), p.getValueCm());
+        }
+
+        List<PerimetryDeltaResponse> deltas = new ArrayList<>();
+        for (BiometryPerimetry curr : latestList) {
+            BigDecimal initVal = initialMap.getOrDefault(curr.getMeasureKey(), curr.getValueCm());
+            BigDecimal delta = curr.getValueCm().subtract(initVal);
+            deltas.add(new PerimetryDeltaResponse(
+                    curr.getMeasureKey(),
+                    resolvePerimetryLabel(curr.getMeasureKey()),
+                    initVal,
+                    curr.getValueCm(),
+                    delta
+            ));
+        }
+        return deltas;
+    }
+
+    private String resolvePerimetryLabel(String measureKey) {
+        if (measureKey == null) {
+            return "";
+        }
+        return PERIMETRY_LABELS.getOrDefault(measureKey.toLowerCase(), measureKey);
+    }
+
+    private String generateClinicalSynthesis(
+            BiometryAssessment initial,
+            BiometryAssessment latest,
+            List<PerimetryDeltaResponse> perimetries
+    ) {
+        StringBuilder sb = new StringBuilder();
+        appendBodyCompositionSynthesis(sb, initial, latest);
+        appendPerimetrySynthesis(sb, perimetries);
+        return sb.toString();
+    }
+
+    private void appendBodyCompositionSynthesis(
+            StringBuilder sb, BiometryAssessment initial, BiometryAssessment latest) {
+        BigDecimal weightDelta = computeDelta(latest.getWeight(), initial.getWeight());
+        BigDecimal initialFat = computeFatMass(initial.getWeight(), initial.getBodyFatPercent());
+        BigDecimal currentFat = computeFatMass(latest.getWeight(), latest.getBodyFatPercent());
+        BigDecimal fatMassDelta = computeDelta(currentFat, initialFat);
+        BigDecimal leanMassDelta = computeDelta(latest.getLeanMassKg(), initial.getLeanMassKg());
+
+        if (fatMassDelta != null && fatMassDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format(
+                    "Evolução altamente favorável da composição corporal: redução de %.1f kg de massa gorda",
+                    fatMassDelta.abs()));
+            if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) >= 0) {
+                sb.append(String.format(" com ganho de %.1f kg de massa magra (recomposição corporal positiva).",
+                        leanMassDelta));
+            } else if (leanMassDelta != null) {
+                sb.append(String.format(" com preservação consistente da massa muscular (variação de %.1f kg).",
+                        leanMassDelta));
+            } else {
+                sb.append(".");
+            }
+        } else if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) > 0) {
+            sb.append(String.format("Excelente ganho de massa magra: +%.1f kg conquistados no período.",
+                    leanMassDelta));
+        } else if (weightDelta != null && weightDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("Redução ponderal de %.1f kg com adesão ao plano nutricional.",
+                    weightDelta.abs()));
+        } else {
+            sb.append("Manutenção da estabilidade de peso e composição corporal no período avaliado.");
+        }
+    }
+
+    private void appendPerimetrySynthesis(StringBuilder sb, List<PerimetryDeltaResponse> perimetries) {
+        for (PerimetryDeltaResponse p : perimetries) {
+            if ("cintura".equalsIgnoreCase(p.measureKey()) && p.deltaCm() != null
+                    && p.deltaCm().compareTo(BigDecimal.ZERO) < 0) {
+                sb.append(String.format(" Notável redução de %.1f cm na circunferência da cintura.",
+                        p.deltaCm().abs()));
+                break;
+            }
+        }
+    }
+
+    private String generateWhatsAppFeedbackMessage(
+            String patientName,
+            BiometryAssessment initial,
+            BiometryAssessment latest,
+            List<PerimetryDeltaResponse> perimetries
+    ) {
+        BigDecimal weightDelta = computeDelta(latest.getWeight(), initial.getWeight());
+        BigDecimal initialFat = computeFatMass(initial.getWeight(), initial.getBodyFatPercent());
+        BigDecimal currentFat = computeFatMass(latest.getWeight(), latest.getBodyFatPercent());
+        BigDecimal fatMassDelta = computeDelta(currentFat, initialFat);
+        BigDecimal leanMassDelta = computeDelta(latest.getLeanMassKg(), initial.getLeanMassKg());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Olá, ").append(patientName).append("! ");
+        sb.append("Passando para celebrar seus resultados na reavaliação! 🎉\n");
+
+        if (fatMassDelta != null && fatMassDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("Você já eliminou %.1f kg de gordura corporal", fatMassDelta.abs()));
+            if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) >= 0) {
+                sb.append(String.format(" e ganhou %.1f kg de massa magra", leanMassDelta));
+            }
+            sb.append("! ");
+        } else if (weightDelta != null && weightDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("Você já perdeu %.1f kg no total! ", weightDelta.abs()));
+        }
+
+        appendWhatsAppPerimetryHighlight(sb, perimetries);
+        sb.append("Parabéns pelo comprometimento e dedicação ao processo. Seguimos juntos rumo ao seu objetivo! 💪✨");
+        return sb.toString();
+    }
+
+    private void appendWhatsAppPerimetryHighlight(StringBuilder sb, List<PerimetryDeltaResponse> perimetries) {
+        for (PerimetryDeltaResponse p : perimetries) {
+            if ("cintura".equalsIgnoreCase(p.measureKey()) && p.deltaCm() != null
+                    && p.deltaCm().compareTo(BigDecimal.ZERO) < 0) {
+                sb.append(String.format("Além disso, sua cintura reduziu %.1f cm! 👏 ", p.deltaCm().abs()));
+                break;
+            }
+        }
     }
 }

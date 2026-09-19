@@ -470,4 +470,149 @@ class BiometryServiceTest {
         assertThrows(ResourceNotFoundException.class,
                 () -> biometryService.getHistorySnapshot(nutritionistId, patientId, randomId));
     }
+
+    @Test
+    void getBiometryEvolutionSummary_returnsEmptySummary_whenNoAssessments() {
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(assessmentRepository.findByEpisodeIdAndPatientIdAndNutritionistIdOrderByAssessmentDateAsc(
+                activeEpisode.getId(), patientId, nutritionistId)).thenReturn(List.of());
+
+        BiometryEvolutionSummaryResponse summary = biometryService.getBiometryEvolutionSummary(nutritionistId, patientId);
+
+        assertNotNull(summary);
+        assertEquals(0, summary.assessmentCount());
+        assertTrue(summary.perimetryDeltas().isEmpty());
+    }
+
+    @Test
+    void getBiometryEvolutionSummary_returnsSingleAssessmentSummary_whenOneAssessment() {
+        UUID assessmentId = UUID.randomUUID();
+        BiometryAssessment a1 = BiometryAssessment.builder()
+                .id(assessmentId)
+                .episodeId(activeEpisode.getId())
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 1, 10))
+                .weight(new BigDecimal("80.00"))
+                .bodyFatPercent(new BigDecimal("20.00"))
+                .leanMassKg(new BigDecimal("64.00"))
+                .build();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(assessmentRepository.findByEpisodeIdAndPatientIdAndNutritionistIdOrderByAssessmentDateAsc(
+                activeEpisode.getId(), patientId, nutritionistId)).thenReturn(List.of(a1));
+        when(perimetryRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(
+                assessmentId, nutritionistId)).thenReturn(List.of());
+
+        BiometryEvolutionSummaryResponse summary = biometryService.getBiometryEvolutionSummary(nutritionistId, patientId);
+
+        assertNotNull(summary);
+        assertEquals(1, summary.assessmentCount());
+        assertEquals(new BigDecimal("80.00"), summary.currentWeight());
+        assertEquals(new BigDecimal("20.00"), summary.currentBodyFatPercent());
+        assertEquals(new BigDecimal("64.00"), summary.currentLeanMassKg());
+        assertEquals(new BigDecimal("16.00"), summary.currentFatMassKg());
+        assertTrue(summary.clinicalSynthesis().contains("Marco zero"));
+        assertTrue(summary.whatsappFeedbackMessage().contains("Maria"));
+    }
+
+    @Test
+    void getBiometryEvolutionSummary_returnsComparativeSummary_whenMultipleAssessments() {
+        UUID a1Id = UUID.randomUUID();
+        UUID a2Id = UUID.randomUUID();
+
+        BiometryAssessment a1 = BiometryAssessment.builder()
+                .id(a1Id)
+                .episodeId(activeEpisode.getId())
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 1, 10))
+                .weight(new BigDecimal("85.00"))
+                .bodyFatPercent(new BigDecimal("25.00"))
+                .leanMassKg(new BigDecimal("63.75"))
+                .build();
+
+        BiometryAssessment a2 = BiometryAssessment.builder()
+                .id(a2Id)
+                .episodeId(activeEpisode.getId())
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 2, 10))
+                .weight(new BigDecimal("81.00"))
+                .bodyFatPercent(new BigDecimal("20.00"))
+                .leanMassKg(new BigDecimal("64.80"))
+                .build();
+
+        BiometryPerimetry p1 = BiometryPerimetry.builder()
+                .assessment(a1)
+                .measureKey("cintura")
+                .valueCm(new BigDecimal("90.00"))
+                .sortOrder(1)
+                .build();
+
+        BiometryPerimetry p2 = BiometryPerimetry.builder()
+                .assessment(a2)
+                .measureKey("cintura")
+                .valueCm(new BigDecimal("85.00"))
+                .sortOrder(1)
+                .build();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(assessmentRepository.findByEpisodeIdAndPatientIdAndNutritionistIdOrderByAssessmentDateAsc(
+                activeEpisode.getId(), patientId, nutritionistId)).thenReturn(List.of(a1, a2));
+        when(perimetryRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(
+                a1Id, nutritionistId)).thenReturn(List.of(p1));
+        when(perimetryRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(
+                a2Id, nutritionistId)).thenReturn(List.of(p2));
+
+        BiometryEvolutionSummaryResponse summary = biometryService.getBiometryEvolutionSummary(nutritionistId, patientId);
+
+        assertNotNull(summary);
+        assertEquals(2, summary.assessmentCount());
+        assertEquals(new BigDecimal("-4.00"), summary.weightDelta());
+        assertEquals(new BigDecimal("-5.00"), summary.bodyFatDelta());
+        assertEquals(new BigDecimal("1.05"), summary.leanMassDelta());
+        assertEquals(1, summary.perimetryDeltas().size());
+        assertEquals("Cintura", summary.perimetryDeltas().get(0).label());
+        assertEquals(new BigDecimal("-5.00"), summary.perimetryDeltas().get(0).deltaCm());
+        assertTrue(summary.clinicalSynthesis().contains("massa gorda"));
+        assertTrue(summary.clinicalSynthesis().contains("cintura"));
+        assertTrue(summary.whatsappFeedbackMessage().contains("gordura corporal"));
+    }
+
+    @Test
+    void getBiometryContextForWhatsApp_returnsFormattedString_whenDataExists() {
+        UUID a1Id = UUID.randomUUID();
+        BiometryAssessment a1 = BiometryAssessment.builder()
+                .id(a1Id)
+                .episodeId(activeEpisode.getId())
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 1, 10))
+                .weight(new BigDecimal("80.00"))
+                .bodyFatPercent(new BigDecimal("20.00"))
+                .leanMassKg(new BigDecimal("64.00"))
+                .build();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                patientId, nutritionistId)).thenReturn(Optional.of(activeEpisode));
+        when(assessmentRepository.findByEpisodeIdAndPatientIdAndNutritionistIdOrderByAssessmentDateAsc(
+                activeEpisode.getId(), patientId, nutritionistId)).thenReturn(List.of(a1));
+        when(perimetryRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(
+                a1Id, nutritionistId)).thenReturn(List.of());
+
+        String context = biometryService.getBiometryContextForWhatsApp(patientId, nutritionistId);
+
+        assertNotNull(context);
+        assertTrue(context.contains("EVOLUÇÃO BIOMÉTRICA"));
+        assertTrue(context.contains("80") && context.contains("kg"));
+        assertTrue(context.contains("20") && context.contains("%"));
+    }
 }
