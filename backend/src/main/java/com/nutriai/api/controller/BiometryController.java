@@ -87,6 +87,7 @@ public class BiometryController {
     }
 
     @GetMapping("/evolution-summary")
+    @PreAuthorize("hasRole('NUTRITIONIST')")
     public ResponseEntity<ApiResponse<BiometryEvolutionSummaryResponse>> getEvolutionSummary(
             @PathVariable UUID patientId
     ) {

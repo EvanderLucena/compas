@@ -467,12 +467,16 @@ public class BiometryService {
         sb.append("EVOLUÇÃO BIOMÉTRICA E COMPOSIÇÃO CORPORAL DO PACIENTE:\n");
         sb.append(String.format("- Período: de %s até %s (%d avaliações)\n",
                 summary.initialAssessmentDate(), summary.latestAssessmentDate(), summary.assessmentCount()));
-        sb.append(String.format("- Peso: inicial %.1f kg -> atual %.1f kg (variação: %+.1f kg)\n",
-                summary.initialWeight(), summary.currentWeight(),
-                summary.weightDelta() != null ? summary.weightDelta() : BigDecimal.ZERO));
-        sb.append(String.format("- Gordura corporal: inicial %.1f%% -> atual %.1f%% (variação: %+.1f%%)\n",
-                summary.initialBodyFatPercent(), summary.currentBodyFatPercent(),
-                summary.bodyFatDelta() != null ? summary.bodyFatDelta() : BigDecimal.ZERO));
+        if (summary.initialWeight() != null && summary.currentWeight() != null) {
+            sb.append(String.format("- Peso: inicial %.1f kg -> atual %.1f kg (variação: %+.1f kg)\n",
+                    summary.initialWeight(), summary.currentWeight(),
+                    summary.weightDelta() != null ? summary.weightDelta() : BigDecimal.ZERO));
+        }
+        if (summary.initialBodyFatPercent() != null && summary.currentBodyFatPercent() != null) {
+            sb.append(String.format("- Gordura corporal: inicial %.1f%% -> atual %.1f%% (variação: %+.1f%%)\n",
+                    summary.initialBodyFatPercent(), summary.currentBodyFatPercent(),
+                    summary.bodyFatDelta() != null ? summary.bodyFatDelta() : BigDecimal.ZERO));
+        }
 
         if (summary.initialFatMassKg() != null && summary.currentFatMassKg() != null) {
             sb.append(String.format("- Massa gorda estimada: %.1f kg -> %.1f kg (%+.1f kg de gordura)\n",
@@ -487,9 +491,11 @@ public class BiometryService {
         if (!summary.perimetryDeltas().isEmpty()) {
             sb.append("- Medidas corporais (circunferências):\n");
             for (PerimetryDeltaResponse p : summary.perimetryDeltas()) {
-                sb.append(String.format("  • %s: %.1f cm -> %.1f cm (%+.1f cm)\n",
-                        p.label(), p.initialCm(), p.currentCm(),
-                        p.deltaCm() != null ? p.deltaCm() : BigDecimal.ZERO));
+                if (p.initialCm() != null && p.currentCm() != null) {
+                    sb.append(String.format("  • %s: %.1f cm -> %.1f cm (%+.1f cm)\n",
+                            p.label(), p.initialCm(), p.currentCm(),
+                            p.deltaCm() != null ? p.deltaCm() : BigDecimal.ZERO));
+                }
             }
         }
         sb.append("DIRETRIZES DE RESPOSTA BIOMÉTRICA:\n");
@@ -530,6 +536,8 @@ public class BiometryService {
 
     private BiometryEvolutionSummaryResponse singleAssessmentSummary(
             Patient patient, BiometryAssessment initial, UUID nutritionistId) {
+        BigDecimal weight = initial.getWeight() != null ? initial.getWeight() : BigDecimal.ZERO;
+        BigDecimal bodyFat = initial.getBodyFatPercent() != null ? initial.getBodyFatPercent() : BigDecimal.ZERO;
         BigDecimal fatMass = computeFatMass(initial.getWeight(), initial.getBodyFatPercent());
         List<PerimetryDeltaResponse> perimetries = buildPerimetryDeltas(
                 initial.getId(), initial.getId(), nutritionistId);
@@ -540,8 +548,8 @@ public class BiometryService {
                 "Marco zero estabelecido em %s: peso %.1f kg, gordura %.1f%% (%.1f kg de gordura)%s. "
                         + "Os deltas comparativos serão calculados na próxima avaliação.",
                 initial.getAssessmentDate(),
-                initial.getWeight(),
-                initial.getBodyFatPercent(),
+                weight,
+                bodyFat,
                 fatMass != null ? fatMass : BigDecimal.ZERO,
                 leanMassText
         );
@@ -549,8 +557,8 @@ public class BiometryService {
                 "Olá, %s! Sua avaliação física inicial foi registrada com sucesso (%.1f kg e %.1f%% de gordura). "
                         + "Esse é o nosso marco de partida para acompanhar sua evolução! Tamo junto! 💪🚀",
                 patient.getName(),
-                initial.getWeight(),
-                initial.getBodyFatPercent()
+                weight,
+                bodyFat
         );
 
         return new BiometryEvolutionSummaryResponse(
