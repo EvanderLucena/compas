@@ -67,8 +67,13 @@ describe('AttentionCard', () => {
     expect(mockResolve).toHaveBeenCalledWith('msg-1');
   });
 
-  it('renders correct WhatsApp link with country code 55', () => {
-    render(<AttentionCard item={baseItem} isResolving={false} onResolve={vi.fn()} />);
+  it('renders correct WhatsApp link prepending country code 55 when missing', () => {
+    const itemWithoutCountryCode = {
+      ...baseItem,
+      patientWhatsapp: '(11) 99999-8888',
+    };
+
+    render(<AttentionCard item={itemWithoutCountryCode} isResolving={false} onResolve={vi.fn()} />);
 
     const waLink = screen.getByRole('link', { name: /abrir whatsapp/i });
     expect(waLink).toHaveAttribute('href', 'https://wa.me/5511999998888');
