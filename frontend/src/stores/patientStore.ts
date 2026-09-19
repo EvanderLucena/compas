@@ -159,3 +159,65 @@ export function useReactivatePatient() {
     },
   });
 }
+
+// TanStack Query hook for consumption patterns
+export function useConsumptionPatterns(patientId: string | null) {
+  return useQuery({
+    queryKey: ['consumption-patterns', patientId],
+    queryFn: () => {
+      if (!patientId) throw new Error('Patient ID is required');
+      return patientApi.getConsumptionPatterns(patientId);
+    },
+    enabled: !!patientId,
+  });
+}
+
+// Mutation hook to evaluate adherence on-demand
+export function useEvaluateAdherence() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patientId: string) => patientApi.evaluateAdherence(patientId),
+    onSuccess: (_, patientId) => {
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['consumption-patterns', patientId] });
+      useToastStore
+        .getState()
+        .showSuccess('Adesão reavaliada com sucesso com base nas últimas refeições!');
+    },
+    onError: () => {
+      useToastStore.getState().showError('Não foi possível reavaliar a adesão no momento.');
+    },
+  });
+}
+
+// Mutation hook to adopt frequent off-plan food as alternative option
+export function useAdoptFrequentFood() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      patientId,
+      mealId,
+      data,
+    }: {
+      patientId: string;
+      mealId: string;
+      data: import('../api/plans').AdoptFrequentFoodRequest;
+    }) => {
+      const plansApi = await import('../api/plans');
+      return plansApi.adoptFrequentFood(patientId, mealId, data);
+    },
+    onSuccess: (_, { patientId }) => {
+      queryClient.invalidateQueries({ queryKey: ['plan', patientId] });
+      queryClient.invalidateQueries({ queryKey: ['consumption-patterns', patientId] });
+      useToastStore
+        .getState()
+        .showSuccess(
+          'Opção alternativa adicionada com sucesso ao plano! A prescrição base permanece 100% preservada.',
+        );
+    },
+    onError: () => {
+      useToastStore.getState().showError('Erro ao adicionar opção alternativa ao plano.');
+    },
+  });
+}

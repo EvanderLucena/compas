@@ -6,3 +6,4 @@ export { MultiLineChart } from './MultiLineChart';
 export { StatusReviewModal } from './StatusReviewModal';
 export { WhatsAppActivationRow } from './WhatsAppActivationRow';
 export { WhatsAppActivationModal } from './WhatsAppActivationModal';
+export { InsightsTab } from './InsightsTab';

@@ -85,3 +85,23 @@ export async function reactivatePatient(id: string): Promise<PatientApiResponse>
   );
   return response.data.data;
 }
+
+export async function getConsumptionPatterns(
+  id: string,
+): Promise<import('../types/patient').PatientConsumptionPatterns> {
+  const response = await apiClient.get<{
+    success: boolean;
+    data: import('../types/patient').PatientConsumptionPatterns;
+  }>(`/patients/${id}/consumption-patterns`);
+  return response.data.data;
+}
+
+export async function evaluateAdherence(
+  id: string,
+): Promise<{ suggestedStatus: PatientStatus; clinicalInsight: string }> {
+  const response = await apiClient.post<{
+    success: boolean;
+    data: { suggestedStatus: PatientStatus; clinicalInsight: string };
+  }>(`/patients/${id}/evaluate-adherence`);
+  return response.data.data;
+}

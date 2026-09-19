@@ -384,6 +384,15 @@ public class MealPlanService {
         return slot;
     }
 
+    private MealSlot findSlotForPatientAndVerifyOwnership(UUID nutritionistId, UUID patientId, UUID slotId) {
+        MealPlan plan = getPlanAndVerifyOwnership(nutritionistId, patientId);
+        MealSlot slot = findSlotAndVerifyOwnership(nutritionistId, slotId);
+        if (!slot.getPlanId().equals(plan.getId())) {
+            throw new ResourceNotFoundException("Refeição", slotId);
+        }
+        return slot;
+    }
+
     private MealOption findOptionAndVerifyOwnership(UUID nutritionistId, UUID optionId) {
         MealOption option = mealOptionRepository.findById(optionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Opção", optionId));
@@ -462,5 +471,69 @@ public class MealPlanService {
 
         String objective = patient.getObjective() != null ? patient.getObjective().getPortugueseLabel() : "Saúde geral";
         return jevService.evaluateSubstitution(prescribedFood.trim(), desiredFood.trim(), objective);
+    }
+
+    @Transactional
+    public MealOptionResponse adoptFrequentFoodAsAlternativeOption(
+            UUID nutritionistId, UUID patientId, UUID mealSlotId, AdoptFrequentFoodRequest req) {
+        MealSlot slot = findSlotForPatientAndVerifyOwnership(nutritionistId, patientId, mealSlotId);
+
+        List<MealOption> existingOptions = mealOptionRepository.findByMealSlotIdOrderBySortOrder(slot.getId());
+        int maxSort = existingOptions.stream().mapToInt(MealOption::getSortOrder).max().orElse(-1);
+        int optionNumber = existingOptions.size() + 1;
+
+        MealOption option = MealOption.builder()
+                .mealSlotId(slot.getId())
+                .name("Opção " + optionNumber + " · Preferência (" + req.foodName() + ")")
+                .sortOrder(maxSort + 1)
+                .build();
+        MealOption savedOption = mealOptionRepository.save(option);
+
+        UUID matchedFoodId = null;
+        String prep = "conforme hábito";
+        try {
+            var searchResults = foodRepository.findAvailableByNutritionistIdWithFilters(
+                    nutritionistId, req.foodName(), null, org.springframework.data.domain.PageRequest.of(0, 1));
+            if (!searchResults.isEmpty()) {
+                Food matched = searchResults.getContent().get(0);
+                if (matched.getName().equalsIgnoreCase(req.foodName().trim())) {
+                    matchedFoodId = matched.getId();
+                    if (matched.getPrep() != null && !matched.getPrep().isBlank()) {
+                        prep = matched.getPrep();
+                    }
+                    foodRepository.incrementUsedCount(matchedFoodId);
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not match catalog food for '{}': {}", req.foodName(), e.getMessage());
+        }
+
+        BigDecimal grams = (req.typicalGrams() != null && req.typicalGrams().compareTo(BigDecimal.ZERO) > 0)
+                ? req.typicalGrams()
+                : new BigDecimal("100");
+        BigDecimal kcal = req.typicalKcal() != null ? req.typicalKcal() : BigDecimal.ZERO;
+        BigDecimal prot = req.typicalProt() != null ? req.typicalProt() : BigDecimal.ZERO;
+        BigDecimal carb = req.typicalCarb() != null ? req.typicalCarb() : BigDecimal.ZERO;
+        BigDecimal fat = req.typicalFat() != null ? req.typicalFat() : BigDecimal.ZERO;
+
+        MealFood item = MealFood.builder()
+                .optionId(savedOption.getId())
+                .foodId(matchedFoodId)
+                .foodName(req.foodName())
+                .referenceAmount(grams)
+                .unit("g")
+                .prep(prep)
+                .kcal(kcal)
+                .prot(prot)
+                .carb(carb)
+                .fat(fat)
+                .sortOrder(0)
+                .build();
+        MealFood savedFood = mealFoodRepository.save(item);
+
+        logger.info("Adopted frequent off-plan food '{}' as option {} in slot {} for patient {}",
+                req.foodName(), savedOption.getId(), slot.getId(), patientId);
+
+        return MealOptionResponse.from(savedOption, List.of(savedFood));
     }
 }

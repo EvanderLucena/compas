@@ -404,4 +404,79 @@ class MealPlanServiceTest {
         assertTrue(decision.sameGroup());
         assertTrue(decision.success());
     }
+
+    @Test
+    void adoptFrequentFoodAsAlternativeOption_createsOptionAndFoodItem() {
+        UUID slotId = UUID.randomUUID();
+        MealSlot slot = MealSlot.builder().id(slotId).planId(plan.getId()).build();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId))
+                .thenReturn(Optional.of(episode));
+        when(mealPlanRepository.findByEpisodeIdAndNutritionistId(episodeId, nutritionistId))
+                .thenReturn(Optional.of(plan));
+        when(mealSlotRepository.findById(slotId)).thenReturn(Optional.of(slot));
+        when(mealPlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+
+        when(mealOptionRepository.findByMealSlotIdOrderBySortOrder(slotId)).thenReturn(List.of(
+                MealOption.builder().id(UUID.randomUUID()).name("Opção 1 · Clássico").sortOrder(0).build()
+        ));
+        when(mealOptionRepository.save(any(MealOption.class))).thenAnswer(inv -> {
+            MealOption o = inv.getArgument(0);
+            o.setId(UUID.randomUUID());
+            return o;
+        });
+        when(mealFoodRepository.save(any(MealFood.class))).thenAnswer(inv -> {
+            MealFood f = inv.getArgument(0);
+            f.setId(UUID.randomUUID());
+            return f;
+        });
+
+        com.nutriai.api.dto.plan.AdoptFrequentFoodRequest req = new com.nutriai.api.dto.plan.AdoptFrequentFoodRequest(
+                "Iogurte grego",
+                new BigDecimal("150"),
+                new BigDecimal("180"),
+                new BigDecimal("12"),
+                new BigDecimal("8"),
+                new BigDecimal("4")
+        );
+
+        var resp = mealPlanService.adoptFrequentFoodAsAlternativeOption(nutritionistId, patientId, slotId, req);
+
+        assertNotNull(resp);
+        assertTrue(resp.name().contains("Opção 2 · Preferência (Iogurte grego)"));
+        assertEquals(1, resp.items().size());
+        assertEquals("Iogurte grego", resp.items().get(0).foodName());
+        assertEquals(new BigDecimal("150"), resp.items().get(0).referenceAmount());
+        assertEquals(new BigDecimal("180"), resp.items().get(0).kcal());
+    }
+
+    @Test
+    void adoptFrequentFoodAsAlternativeOption_throwsWhenSlotBelongsToAnotherPatient() {
+        UUID slotId = UUID.randomUUID();
+        UUID otherPlanId = UUID.randomUUID();
+        MealSlot slotFromOtherPatient = MealSlot.builder().id(slotId).planId(otherPlanId).build();
+        MealPlan otherPlan = MealPlan.builder().id(otherPlanId).nutritionistId(nutritionistId).build();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId))
+                .thenReturn(Optional.of(episode));
+        when(mealPlanRepository.findByEpisodeIdAndNutritionistId(episodeId, nutritionistId))
+                .thenReturn(Optional.of(plan));
+
+        when(mealSlotRepository.findById(slotId)).thenReturn(Optional.of(slotFromOtherPatient));
+        when(mealPlanRepository.findById(otherPlanId)).thenReturn(Optional.of(otherPlan));
+
+        com.nutriai.api.dto.plan.AdoptFrequentFoodRequest req = new com.nutriai.api.dto.plan.AdoptFrequentFoodRequest(
+                "Banana",
+                new BigDecimal("100"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+        );
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                mealPlanService.adoptFrequentFoodAsAlternativeOption(nutritionistId, patientId, slotId, req));
+    }
 }
