@@ -17,10 +17,15 @@ export function DeltaBadge({
   const isBad = invertColor ? val < 0 : val > 0;
   const color = isGood ? 'var(--sage)' : isBad ? 'var(--coral)' : 'var(--fg-muted)';
   const bg = isGood
-    ? 'rgba(92, 184, 92, 0.12)'
+    ? 'rgba(92, 184, 92, 0.15)'
     : isBad
-      ? 'rgba(235, 87, 87, 0.12)'
-      : 'rgba(255, 255, 255, 0.05)';
+      ? 'rgba(235, 87, 87, 0.15)'
+      : 'color-mix(in srgb, var(--fg-muted) 15%, transparent)';
+  const border = isGood
+    ? '1px solid rgba(92, 184, 92, 0.25)'
+    : isBad
+      ? '1px solid rgba(235, 87, 87, 0.25)'
+      : '1px solid var(--border)';
 
   return (
     <span
@@ -28,6 +33,7 @@ export function DeltaBadge({
       style={{
         color,
         background: bg,
+        border,
         fontSize: 11,
         fontWeight: 600,
         padding: '2px 7px',
@@ -58,7 +64,7 @@ export function EvolutionHeader({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '16px 20px',
-        borderBottom: '1px solid var(--paper-3)',
+        borderBottom: '1px solid var(--border)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -87,7 +93,8 @@ export function EvolutionHeader({
       <span
         className="badge"
         style={{
-          background: 'var(--paper-2)',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
           color: 'var(--fg)',
           fontSize: 11,
           padding: '3px 8px',
@@ -120,16 +127,18 @@ export function MetricBox({
   return (
     <div
       style={{
-        background: 'var(--paper-2)',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
         padding: 12,
         borderRadius: 6,
       }}
     >
-      <div className="eyebrow" style={{ fontSize: 10 }}>
+      <div className="eyebrow" style={{ fontSize: 10, color: 'var(--fg-muted)' }}>
         {title}
       </div>
-      <div className="serif" style={{ fontSize: 20, margin: '2px 0' }}>
-        {value?.toFixed(1) ?? '—'} <span style={{ fontSize: 12 }}>{unit}</span>
+      <div className="serif" style={{ fontSize: 20, margin: '2px 0', color: 'var(--fg)' }}>
+        {value?.toFixed(1) ?? '—'}{' '}
+        <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{unit}</span>
       </div>
       {showDelta && <DeltaBadge val={delta} unit={unit} invertColor={invertColor} />}
     </div>

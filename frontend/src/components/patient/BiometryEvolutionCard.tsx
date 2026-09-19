@@ -25,7 +25,7 @@ export function BiometryEvolutionCard({ patientId }: BiometryEvolutionCardProps)
       data-testid="biometry-evolution-card"
       style={{
         marginBottom: 16,
-        border: '1px solid var(--paper-3)',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         overflow: 'hidden',
       }}

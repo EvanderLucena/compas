@@ -11,10 +11,10 @@ export function PerimetryDeltasGrid({ deltas }: { deltas: PerimetryDelta[] }) {
       style={{
         marginTop: 14,
         paddingTop: 14,
-        borderTop: '1px solid var(--paper-3)',
+        borderTop: '1px solid var(--border)',
       }}
     >
-      <div className="eyebrow" style={{ marginBottom: 8 }}>
+      <div className="eyebrow" style={{ marginBottom: 8, color: 'var(--fg-muted)' }}>
         CIRCUNFERÊNCIAS CORPORAIS (MARCO INICIAL → ATUAL)
       </div>
       <div
@@ -28,7 +28,8 @@ export function PerimetryDeltasGrid({ deltas }: { deltas: PerimetryDelta[] }) {
           <div
             key={p.measureKey}
             style={{
-              background: 'var(--paper-2)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
               borderRadius: 6,
               padding: '8px 12px',
               display: 'flex',
@@ -63,8 +64,9 @@ export function EvolutionSynthesisBox({ clinicalSynthesis }: { clinicalSynthesis
     <div
       style={{
         marginTop: 16,
-        background: 'rgba(168, 204, 82, 0.06)',
-        borderLeft: '3px solid var(--lime)',
+        background: 'color-mix(in srgb, var(--lime) 8%, var(--surface))',
+        border: '1px solid color-mix(in srgb, var(--lime) 28%, var(--border))',
+        borderLeft: '4px solid var(--lime)',
         padding: '12px 14px',
         borderRadius: '0 6px 6px 0',
       }}
