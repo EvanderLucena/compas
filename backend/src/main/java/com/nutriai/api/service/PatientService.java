@@ -304,7 +304,6 @@ public class PatientService {
                         HttpStatus.BAD_REQUEST, "Número de WhatsApp inválido"));
     }
 
-    @Transactional
     public JevAdherenceDecision evaluatePatientAdherence(UUID patientId, UUID nutritionistId) {
         Patient patient = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
@@ -357,12 +356,19 @@ public class PatientService {
         }
 
         if (decision != null && decision.success()) {
-            patient.setAiAdherenceInsight(decision.clinicalInsight());
-            patient.setAiAdherenceUpdatedAt(LocalDateTime.now());
-            patientRepository.save(patient);
+            persistAdherenceInsight(patientId, nutritionistId, decision.clinicalInsight());
         }
 
         return decision;
+    }
+
+    @Transactional
+    public void persistAdherenceInsight(UUID patientId, UUID nutritionistId, String insight) {
+        patientRepository.findByIdAndNutritionistId(patientId, nutritionistId).ifPresent(p -> {
+            p.setAiAdherenceInsight(insight);
+            p.setAiAdherenceUpdatedAt(LocalDateTime.now());
+            patientRepository.save(p);
+        });
     }
 
     @Transactional(readOnly = true)

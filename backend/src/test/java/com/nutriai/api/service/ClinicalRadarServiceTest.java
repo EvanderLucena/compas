@@ -80,9 +80,8 @@ class ClinicalRadarServiceTest {
                 .jevAttentionResolved(false)
                 .build();
 
-        when(whatsAppMessageRepository
-                .findByNutritionistIdAndJevRequiresAttentionTrueAndJevAttentionResolvedFalseOrderByCreatedAtDesc(
-                        nutritionistId)).thenReturn(List.of(msg));
+        when(whatsAppMessageRepository.findUnresolvedAttentionMessages(nutritionistId))
+                .thenReturn(List.of(msg));
 
         Patient patient = Patient.builder()
                 .id(patientId)

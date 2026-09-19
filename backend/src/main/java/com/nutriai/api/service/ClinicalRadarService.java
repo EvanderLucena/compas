@@ -49,8 +49,7 @@ public class ClinicalRadarService {
         long totalPatients = patientRepository.countByNutritionistIdAndActiveTrue(nutritionistId);
 
         List<WhatsAppMessage> attentionMsgs = whatsAppMessageRepository
-                .findByNutritionistIdAndJevRequiresAttentionTrueAndJevAttentionResolvedFalseOrderByCreatedAtDesc(
-                        nutritionistId);
+                .findUnresolvedAttentionMessages(nutritionistId);
 
         List<AttentionItemDTO> attentionQueue = buildAttentionQueue(attentionMsgs, nutritionistId);
 

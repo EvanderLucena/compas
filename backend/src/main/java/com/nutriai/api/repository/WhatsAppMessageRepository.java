@@ -83,15 +83,20 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
     );
 
     /**
-     * Find messages flagged as requiring human attention that are unresolved for a nutritionist, newest first.
+     * Find messages flagged as requiring human attention or emergency that are unresolved for a nutritionist, newest first.
      */
-    List<WhatsAppMessage> findByNutritionistIdAndJevRequiresAttentionTrueAndJevAttentionResolvedFalseOrderByCreatedAtDesc(
-            UUID nutritionistId);
+    @Query("SELECT m FROM WhatsAppMessage m WHERE m.nutritionistId = :nutritionistId "
+            + "AND (m.jevRequiresAttention = true OR m.jevIntent = 'emergency') "
+            + "AND m.jevAttentionResolved = false ORDER BY m.createdAt DESC")
+    List<WhatsAppMessage> findUnresolvedAttentionMessages(@Param("nutritionistId") UUID nutritionistId);
 
     /**
-     * Count unresolved messages flagged as requiring human attention for a nutritionist.
+     * Count unresolved messages flagged as requiring human attention or emergency for a nutritionist.
      */
-    long countByNutritionistIdAndJevRequiresAttentionTrueAndJevAttentionResolvedFalse(UUID nutritionistId);
+    @Query("SELECT COUNT(m) FROM WhatsAppMessage m WHERE m.nutritionistId = :nutritionistId "
+            + "AND (m.jevRequiresAttention = true OR m.jevIntent = 'emergency') "
+            + "AND m.jevAttentionResolved = false")
+    long countUnresolvedAttentionMessages(@Param("nutritionistId") UUID nutritionistId);
 
     /**
      * Find message by id and nutritionistId for tenant-isolated updates.

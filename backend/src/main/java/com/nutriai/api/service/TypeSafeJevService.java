@@ -123,7 +123,11 @@ public class TypeSafeJevService implements JevService {
 
             JsonNode attentionResp = answers.path("requires_human_attention");
             double attentionScore = attentionResp.path("noul").asDouble(0.0);
-            boolean requiresAttention = attentionScore >= 0.70;
+            boolean isEmergency = "emergency".equalsIgnoreCase(intent);
+            if (isEmergency) {
+                attentionScore = Math.max(attentionScore, 1.0);
+            }
+            boolean requiresAttention = attentionScore >= 0.70 || isEmergency;
 
             return new JevDecision(
                     intent,

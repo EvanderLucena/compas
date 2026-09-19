@@ -185,6 +185,9 @@ public class ConversationService {
             if (transcribedOpt.isPresent() && !transcribedOpt.get().isBlank()) {
                 userMessage = transcribedOpt.get();
                 runJevTriageIfAvailable(message, userMessage);
+                if (handleEmergencyEscalationIfTriggered(messageId, message, patient, nutritionist)) {
+                    return;
+                }
                 systemPrompt = buildClassifyingPrompt(patient, nutritionist, message);
                 responseType = "CONVERSATION";
             } else {
@@ -208,6 +211,9 @@ public class ConversationService {
             } else if (message.getMessageContent() != null && !message.getMessageContent().isBlank()) {
                 // Image with caption but no image URL → classify from caption (D-05)
                 runJevTriageIfAvailable(message, userMessage);
+                if (handleEmergencyEscalationIfTriggered(messageId, message, patient, nutritionist)) {
+                    return;
+                }
                 systemPrompt = buildClassifyingPromptWithImageAck(patient, nutritionist, message);
                 responseType = "CONVERSATION";
             } else {
@@ -219,25 +225,7 @@ public class ConversationService {
             // Text message → classify and respond
             runJevTriageIfAvailable(message, userMessage);
 
-            if (shouldTriggerSafetyNotice(message)) {
-                String emergencyNotice = "Olá, " + patient.getName() + ". Notei seu relato de desconforto ou urgência. " +
-                        "Sua saúde é prioridade total! Notifiquei o(a) nutricionista " + nutritionist.getName() + " com alerta imediato. " +
-                        "Se você estiver sentindo dor forte ou mal-estar agudo, por favor procure um serviço de pronto atendimento médico agora mesmo.";
-                WhatsAppResponse waResponse = WhatsAppResponse.builder()
-                        .messageId(messageId)
-                        .nutritionistId(nutritionist.getId())
-                        .patientId(patient.getId())
-                        .responseType("EMERGENCY_ESCALATION")
-                        .responseContent(emergencyNotice)
-                        .build();
-                whatsAppResponseRepository.save(waResponse);
-                boolean sent = evolutionApiService.sendMessage(message.getSenderPhoneNormalized(), emergencyNotice);
-                if (sent) {
-                    waResponse.setSentAt(LocalDateTime.now());
-                    whatsAppResponseRepository.save(waResponse);
-                }
-                markProcessed(message);
-                log.warn("Emergency alert triggered via Jev triage for message {}", messageId);
+            if (handleEmergencyEscalationIfTriggered(messageId, message, patient, nutritionist)) {
                 return;
             }
 
@@ -448,6 +436,46 @@ public class ConversationService {
                .replace("{{conversationContext}}", escape(conversationContext))
                .replace("{{emotionalContext}}", emotionalContext)
                .replace("{{substitutionContext}}", substitutionContext);
+    }
+
+    private boolean handleEmergencyEscalationIfTriggered(
+            UUID messageId,
+            WhatsAppMessage message,
+            Patient patient,
+            Nutritionist nutritionist
+    ) {
+        if (!shouldTriggerSafetyNotice(message)) {
+            return false;
+        }
+
+        message.setJevRequiresAttention(true);
+        message.setJevAttentionResolved(false);
+        message.setJevAttentionScore(java.math.BigDecimal.ONE);
+        whatsAppMessageRepository.save(message);
+
+        String emergencyNotice = "Olá, " + patient.getName() + ". Notei seu relato de desconforto ou urgência. "
+                + "Sua saúde é prioridade total! Notifiquei o(a) nutricionista " + nutritionist.getName()
+                + " com alerta imediato. "
+                + "Se você estiver sentindo dor forte ou mal-estar agudo, por favor procure um serviço de pronto "
+                + "atendimento médico agora mesmo.";
+
+        WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                .messageId(messageId)
+                .nutritionistId(nutritionist.getId())
+                .patientId(patient.getId())
+                .responseType("EMERGENCY_ESCALATION")
+                .responseContent(emergencyNotice)
+                .build();
+        whatsAppResponseRepository.save(waResponse);
+
+        boolean sent = evolutionApiService.sendMessage(message.getSenderPhoneNormalized(), emergencyNotice);
+        if (sent) {
+            waResponse.setSentAt(LocalDateTime.now());
+            whatsAppResponseRepository.save(waResponse);
+        }
+        markProcessed(message);
+        log.warn("Emergency alert triggered via Jev triage for message {}", messageId);
+        return true;
     }
 
     private boolean shouldTriggerSafetyNotice(WhatsAppMessage message) {
