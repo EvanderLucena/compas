@@ -6,6 +6,7 @@ import type {
   HistoryEpisodeListItem,
   HistorySnapshot,
 } from '../types/patient';
+import type { BiometryEvolutionSummary } from '../types/biometry';
 
 export async function listBiometryAssessments(patientId: string): Promise<BiometryAssessmentDTO[]> {
   const response = await apiClient.get<{ success: boolean; data: BiometryAssessmentDTO[] }>(
@@ -50,6 +51,15 @@ export async function getHistorySnapshot(
 ): Promise<HistorySnapshot> {
   const response = await apiClient.get<{ success: boolean; data: HistorySnapshot }>(
     `/patients/${patientId}/biometry/history/episodes/${episodeId}`,
+  );
+  return response.data.data;
+}
+
+export async function getBiometryEvolutionSummary(
+  patientId: string,
+): Promise<BiometryEvolutionSummary> {
+  const response = await apiClient.get<{ success: boolean; data: BiometryEvolutionSummary }>(
+    `/patients/${patientId}/biometry/evolution-summary`,
   );
   return response.data.data;
 }

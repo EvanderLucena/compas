@@ -360,4 +360,27 @@ class BiometryControllerTest {
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void getEvolutionSummary_returns200WithEnvelope() throws Exception {
+        assessmentRepository.save(BiometryAssessment.builder()
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 1, 10))
+                .weight(new BigDecimal("80.00"))
+                .bodyFatPercent(new BigDecimal("20.00"))
+                .leanMassKg(new BigDecimal("64.00"))
+                .build());
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/biometry/evolution-summary", patientId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.assessmentCount").value(1))
+                .andExpect(jsonPath("$.data.currentWeight").value(80.00))
+                .andExpect(jsonPath("$.data.currentBodyFatPercent").value(20.00))
+                .andExpect(jsonPath("$.data.clinicalSynthesis").isString())
+                .andExpect(jsonPath("$.data.whatsappFeedbackMessage").isString());
+    }
 }
