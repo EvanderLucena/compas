@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { IconCompas } from '../components/ui/CompasLogo';
 
 const FEATURES = [
   {
@@ -179,17 +180,10 @@ const FAQ_ITEMS = [
 
 function BrandLogo() {
   return (
-    <Link to="/" className="landing-logo" aria-label="NutriAI - Início">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-          style={{ stroke: 'var(--lime)' }}
-          strokeWidth="1.6"
-        />
-        <circle cx="12" cy="14" r="1.4" style={{ fill: 'var(--lime)' }} />
-      </svg>
+    <Link to="/" className="landing-logo" aria-label="Compas - Início">
+      <IconCompas size={22} />
       <span>
-        Nutri<span style={{ color: 'var(--lime-dim)' }}>AI</span>
+        compas<span style={{ color: 'var(--lime-dim)' }}>.</span>
       </span>
     </Link>
   );
@@ -201,7 +195,7 @@ function ChatMockup() {
       <div className="mockup-chat-header">
         <div className="mockup-chat-dot" />
         <div>
-          <div className="mockup-chat-name">NutriAI · Ana</div>
+          <div className="mockup-chat-name">Compas · Ana</div>
           <div className="mockup-chat-status">online</div>
         </div>
       </div>
@@ -938,13 +932,13 @@ export function LandingView() {
         <div className="landing-footer-inner">
           <div className="landing-footer-brand">
             <BrandLogo />
-            <p className="landing-footer-copy">© 2026 NutriAI. Todos os direitos reservados.</p>
+            <p className="landing-footer-copy">© 2026 Compas. Todos os direitos reservados.</p>
           </div>
           <div className="landing-footer-links">
             <a href="#privacidade">Termos de uso</a>
             <a href="#privacidade">Privacidade</a>
             <a href="#privacidade">LGPD</a>
-            <a href="mailto:contato@nutriai.com.br">Contato</a>
+            <a href="mailto:contato@compas.app.br">Contato</a>
           </div>
         </div>
       </footer>

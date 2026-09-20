@@ -3,6 +3,7 @@ import type { ViewType } from '../../stores/navigationStore';
 import { useNavigationStore } from '../../stores/navigationStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { IconHome, IconUsers, IconFood, IconInsight, IconSettings } from '../icons';
+import { IconCompas } from '../ui/CompasLogo';
 
 const RAIL_ITEMS: { id: ViewType; path: string; label: string; Icon: typeof IconHome }[] = [
   { id: 'home', path: '/home', label: 'Visão geral', Icon: IconHome },
@@ -19,15 +20,8 @@ export function Rail() {
 
   return (
     <aside className="rail">
-      <div className="rail-logo" title="NutriAI">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-            stroke="var(--lime)"
-            strokeWidth="1.6"
-          />
-          <circle cx="12" cy="14" r="1.4" fill="var(--lime)" />
-        </svg>
+      <div className="rail-logo" title="Compas">
+        <IconCompas size={20} />
       </div>
       {RAIL_ITEMS.map((it) => {
         const isActive = location.pathname.startsWith(it.path);

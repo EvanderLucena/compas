@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import { completeOnboarding, getCurrentUser } from '../api/auth';
 import type { AuthUser } from '../types';
 import { useNavigate, Link } from 'react-router';
+import { IconCompas } from '../components/ui/CompasLogo';
 import { useToastStore } from '../stores/toastStore';
 import { usePatientUIStore, resolveMutationErrorMessage } from '../stores/patientStore';
 
@@ -87,7 +88,7 @@ function Step1WhatsApp({ onNext }: { onNext: () => void }) {
             className="mono"
             style={{ fontSize: 10, color: 'var(--fg-subtle)', textTransform: 'uppercase' }}
           >
-            WhatsApp · NutriAI
+            WhatsApp · Compas
           </span>
           <span className="chip ai" style={{ fontSize: 9.5, padding: '1px 6px' }}>
             Privacidade LGPD
@@ -596,16 +597,9 @@ export function OnboardingView() {
     <div className="onboard-page">
       <header className="onboard-header">
         <Link to="/" className="auth-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 2c0 6-6 7-6 13a6 6 0 0 0 12 0c0-6-6-7-6-13Z"
-              style={{ stroke: 'var(--lime-dim)' }}
-              strokeWidth="1.6"
-            />
-            <circle cx="12" cy="14" r="1.4" style={{ fill: 'var(--lime-dim)' }} />
-          </svg>
+          <IconCompas size={22} color="var(--lime-dim)" />
           <span className="auth-brand-name">
-            Nutri<span style={{ color: 'var(--lime-dim)' }}>AI</span>
+            compas<span style={{ color: 'var(--lime-dim)' }}>.</span>
           </span>
         </Link>
         <button
