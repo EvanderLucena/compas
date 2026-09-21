@@ -34,7 +34,13 @@ describe('authStore', () => {
     it('sets isAuthenticated and user on successful signup', async () => {
       mockSignup.mockResolvedValue({
         accessToken: 'test-token',
-        user: { id: '1', name: 'Dra. Teste', email: 'test@test.com', role: 'NUTRITIONIST', onboardingCompleted: false },
+        user: {
+          id: '1',
+          name: 'Dra. Teste',
+          email: 'test@test.com',
+          role: 'NUTRITIONIST',
+          onboardingCompleted: false,
+        },
       });
 
       await useAuthStore.getState().signup({
@@ -111,15 +117,33 @@ describe('authStore', () => {
     });
 
     it('sets isLoading true during signup', async () => {
-      mockSignup.mockImplementation(() => new Promise((resolve) => {
-        setTimeout(() => resolve({
-          accessToken: 'token', user: { id: '1', name: 'Test', email: 'test@test.com', role: 'NUTRITIONIST', onboardingCompleted: false },
-        }), 0);
-      }));
+      mockSignup.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  accessToken: 'token',
+                  user: {
+                    id: '1',
+                    name: 'Test',
+                    email: 'test@test.com',
+                    role: 'NUTRITIONIST',
+                    onboardingCompleted: false,
+                  },
+                }),
+              0,
+            );
+          }),
+      );
 
       const promise = useAuthStore.getState().signup({
-        name: 'Test', email: 'test@test.com', password: '12345678',
-        crn: '12345', crnRegional: 'SP', terms: true,
+        name: 'Test',
+        email: 'test@test.com',
+        password: '12345678',
+        crn: '12345',
+        crnRegional: 'SP',
+        terms: true,
       });
 
       expect(useAuthStore.getState().isLoading).toBe(true);
@@ -134,7 +158,13 @@ describe('authStore', () => {
     it('sets isAuthenticated and user on successful login', async () => {
       mockLogin.mockResolvedValue({
         accessToken: 'login-token',
-        user: { id: '1', name: 'Dra. Login', email: 'login@test.com', role: 'NUTRITIONIST', onboardingCompleted: true },
+        user: {
+          id: '1',
+          name: 'Dra. Login',
+          email: 'login@test.com',
+          role: 'NUTRITIONIST',
+          onboardingCompleted: true,
+        },
       });
 
       await useAuthStore.getState().login('login@test.com', 'Senha123!');
@@ -186,7 +216,13 @@ describe('authStore', () => {
     it('clears auth state on logout', async () => {
       useAuthStore.setState({
         isAuthenticated: true,
-        user: { id: '1', name: 'Test', email: 'test@test.com', role: 'NUTRITIONIST', onboardingCompleted: true },
+        user: {
+          id: '1',
+          name: 'Test',
+          email: 'test@test.com',
+          role: 'NUTRITIONIST',
+          onboardingCompleted: true,
+        },
         accessToken: 'token',
       });
 
@@ -203,7 +239,13 @@ describe('authStore', () => {
     it('clears auth state even when logout API call fails', async () => {
       useAuthStore.setState({
         isAuthenticated: true,
-        user: { id: '1', name: 'Test', email: 'test@test.com', role: 'NUTRITIONIST', onboardingCompleted: true },
+        user: {
+          id: '1',
+          name: 'Test',
+          email: 'test@test.com',
+          role: 'NUTRITIONIST',
+          onboardingCompleted: true,
+        },
         accessToken: 'token',
       });
 
@@ -214,13 +256,28 @@ describe('authStore', () => {
       expect(state.isAuthenticated).toBe(false);
       expect(state.user).toBeNull();
     });
+
+    it('removes legacy nutriai-auth from localStorage on logout', async () => {
+      localStorage.setItem('nutriai-auth', '{"state":{"isAuthenticated":true}}');
+      mockLogout.mockResolvedValue();
+
+      await useAuthStore.getState().logout();
+
+      expect(localStorage.getItem('nutriai-auth')).toBeNull();
+    });
   });
 
   describe('refreshAuth', () => {
     it('refreshes token successfully', async () => {
       mockRefreshAuth.mockResolvedValue({
         accessToken: 'refreshed-token',
-        user: { id: '1', name: 'Test', email: 'test@test.com', role: 'NUTRITIONIST', onboardingCompleted: true },
+        user: {
+          id: '1',
+          name: 'Test',
+          email: 'test@test.com',
+          role: 'NUTRITIONIST',
+          onboardingCompleted: true,
+        },
       });
 
       const token = await useAuthStore.getState().refreshAuth();

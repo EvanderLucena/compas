@@ -40,11 +40,13 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   statusFilter: 'all' as StatusFilter,
   setView: (view) => {
     localStorage.setItem('compas.view', view);
+    localStorage.removeItem('nutriai.view');
     set({ activeView: view });
   },
   setActivePatientId: (id) => {
     if (id) {
       localStorage.setItem('compas.patient', id);
+      localStorage.removeItem('nutriai.patient');
     } else {
       localStorage.removeItem('compas.patient');
       localStorage.removeItem('nutriai.patient');

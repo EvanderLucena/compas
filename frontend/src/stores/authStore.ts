@@ -30,6 +30,7 @@ if (typeof window !== 'undefined' && !localStorage.getItem('compas-auth')) {
   const legacyAuth = localStorage.getItem('nutriai-auth');
   if (legacyAuth) {
     localStorage.setItem('compas-auth', legacyAuth);
+    localStorage.removeItem('nutriai-auth');
   }
 }
 
@@ -120,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           error: null,
         });
+        localStorage.removeItem('nutriai-auth');
       },
 
       refreshAuth: async () => {

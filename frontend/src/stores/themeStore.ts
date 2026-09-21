@@ -18,6 +18,7 @@ function getInitialTheme(): Theme {
 function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('compas.theme', theme);
+  localStorage.removeItem('nutriai.theme');
 }
 
 export const useThemeStore = create<ThemeState>((set) => {
