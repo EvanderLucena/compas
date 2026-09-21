@@ -63,13 +63,13 @@ public class DataInitializer implements CommandLineRunner {
     private final EpisodeHistoryEventRepository historyEventRepository;
     private final TransactionTemplate transactionTemplate;
 
-    @Value("${nutriai.seed.admin.email:admin@nutriai.com}")
+    @Value("${compas.seed.admin.email:${nutriai.seed.admin.email:admin@compas.app}}")
     private String adminEmail;
 
-    @Value("${nutriai.seed.admin.password:Admin123!}")
+    @Value("${compas.seed.admin.password:${nutriai.seed.admin.password:Admin123!}}")
     private String adminPassword;
 
-    @Value("${nutriai.seed.admin.name:Admin NutriAI}")
+    @Value("${compas.seed.admin.name:${nutriai.seed.admin.name:Admin Compas}}")
     private String adminName;
 
     public DataInitializer(
@@ -123,6 +123,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private Nutritionist ensureDemoNutritionist() {
         return nutritionistRepository.findByEmail(adminEmail)
+                .or(() -> nutritionistRepository.findByEmail("admin@nutriai.com"))
                 .map(this::normalizeDemoNutritionist)
                 .orElseGet(() -> nutritionistRepository.save(Nutritionist.builder()
                         .name(adminName)
@@ -139,6 +140,10 @@ public class DataInitializer implements CommandLineRunner {
 
     private Nutritionist normalizeDemoNutritionist(Nutritionist nutritionist) {
         boolean changed = false;
+        if ("Admin NutriAI".equals(nutritionist.getName())) {
+            nutritionist.setName(adminName);
+            changed = true;
+        }
         if (nutritionist.getRole() != UserRole.NUTRITIONIST) {
             nutritionist.setRole(UserRole.NUTRITIONIST);
             changed = true;

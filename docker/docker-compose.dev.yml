@@ -15,4 +15,4 @@ services:
 
   evolution-api:
     volumes:
-      - nutriai-evolution-data:/evolution-instance
+      - compas-evolution-data:/evolution-instance

@@ -19,7 +19,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Value("${nutriai.jwt.cookie.name:nutriai_refresh}")
+    @Value("${compas.jwt.cookie.name:${nutriai.jwt.cookie.name:compas_refresh}}")
     private String cookieName;
 
     @Value("${nutriai.jwt.cookie.path:/api/v1/auth}")
@@ -119,6 +119,14 @@ public class AuthController {
 
         // Clear refresh token cookie
         setRefreshTokenCookie(response, "", 0);
+        if (!"nutriai_refresh".equals(cookieName)) {
+            response.addHeader(
+                    "Set-Cookie",
+                    "nutriai_refresh=; Path=" + cookiePath + "; Max-Age=0; HttpOnly"
+                            + (cookieSecure ? "; Secure" : "")
+                            + "; SameSite=" + cookieSameSite
+            );
+        }
 
         return ResponseEntity.ok(Map.of("success", true, "message", "Logout realizado com sucesso"));
     }
@@ -144,6 +152,12 @@ public class AuthController {
         if (cookies != null) {
             for (Cookie cookie : cookies) {
                 if (cookieName.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+            // Fallback for sessions with legacy cookie name
+            for (Cookie cookie : cookies) {
+                if ("nutriai_refresh".equals(cookie.getName())) {
                     return cookie.getValue();
                 }
             }

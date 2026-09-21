@@ -1,15 +1,15 @@
 spring:
   application:
-    name: nutriai-api
+    name: ${COMPAS_APP_NAME:${SPRING_APPLICATION_NAME:compas-api}}
 
   threads:
     virtual:
       enabled: true
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/nutriai}
-    username: ${SPRING_DATASOURCE_USERNAME:nutriai}
-    password: ${SPRING_DATASOURCE_PASSWORD:changeme}
+    url: ${SPRING_DATASOURCE_URL:${COMPAS_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/nutriai}}
+    username: ${SPRING_DATASOURCE_USERNAME:${COMPAS_DATASOURCE_USERNAME:nutriai}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${COMPAS_DATASOURCE_PASSWORD:${NUTRIAI_DATASOURCE_PASSWORD:changeme}}}
     hikari:
       maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:15}
       minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:5}
@@ -37,13 +37,13 @@ server:
   port: 8080
 
 nutriai:
-  version: 0.2.0
+  version: 0.5.0
   jwt:
-    secret: ${NUTRIAI_JWT_SECRET}
+    secret: ${COMPAS_JWT_SECRET:${NUTRIAI_JWT_SECRET}}
     access-token-expiration: 900000    # 15 minutes in ms
     refresh-token-expiration: 604800000 # 7 days in ms
     cookie:
-      name: nutriai_refresh
+      name: ${COMPAS_REFRESH_COOKIE_NAME:compas_refresh}
       path: /api/v1/auth
       max-age: 604800   # 7 days in seconds
       http-only: true
@@ -51,37 +51,37 @@ nutriai:
       same-site: Lax    # Lax for dev (cross-port), Strict for production
 
   llm:
-    base-url: ${NUTRIAI_LLM_BASE_URL:https://ollama.com/v1}
-    model: ${NUTRIAI_LLM_MODEL:deepseek-v4.1-flash}
-    api-key: ${NUTRIAI_LLM_API_KEY:}
-    timeout-seconds: ${NUTRIAI_LLM_TIMEOUT:30}
+    base-url: ${COMPAS_LLM_BASE_URL:${NUTRIAI_LLM_BASE_URL:https://ollama.com/v1}}
+    model: ${COMPAS_LLM_MODEL:${NUTRIAI_LLM_MODEL:deepseek-v4.1-flash}}
+    api-key: ${COMPAS_LLM_API_KEY:${NUTRIAI_LLM_API_KEY:}}
+    timeout-seconds: ${COMPAS_LLM_TIMEOUT:${NUTRIAI_LLM_TIMEOUT:30}}
 
   whisper:
-    base-url: ${NUTRIAI_WHISPER_BASE_URL:https://api.openai.com/v1}
-    model: ${NUTRIAI_WHISPER_MODEL:whisper-1}
-    api-key: ${NUTRIAI_WHISPER_API_KEY:}
-    language: ${NUTRIAI_WHISPER_LANGUAGE:pt}
-    enabled: ${NUTRIAI_WHISPER_ENABLED:true}
-    timeout-seconds: ${NUTRIAI_WHISPER_TIMEOUT:30}
+    base-url: ${COMPAS_WHISPER_BASE_URL:${NUTRIAI_WHISPER_BASE_URL:https://api.openai.com/v1}}
+    model: ${COMPAS_WHISPER_MODEL:${NUTRIAI_WHISPER_MODEL:whisper-1}}
+    api-key: ${COMPAS_WHISPER_API_KEY:${NUTRIAI_WHISPER_API_KEY:}}
+    language: ${COMPAS_WHISPER_LANGUAGE:${NUTRIAI_WHISPER_LANGUAGE:pt}}
+    enabled: ${COMPAS_WHISPER_ENABLED:${NUTRIAI_WHISPER_ENABLED:true}}
+    timeout-seconds: ${COMPAS_WHISPER_TIMEOUT:${NUTRIAI_WHISPER_TIMEOUT:30}}
 
   jev:
-    api-url: ${NUTRIAI_JEV_API_URL:https://api.typesafe.ai/v1/systemone}
-    model: ${NUTRIAI_JEV_MODEL:jev-latest}
-    api-key: ${NUTRIAI_JEV_API_KEY:}
-    enabled: ${NUTRIAI_JEV_ENABLED:true}
-    timeout-seconds: ${NUTRIAI_JEV_TIMEOUT_SECONDS:5}
+    api-url: ${COMPAS_JEV_API_URL:${NUTRIAI_JEV_API_URL:https://api.typesafe.ai/v1/systemone}}
+    model: ${COMPAS_JEV_MODEL:${NUTRIAI_JEV_MODEL:jev-latest}}
+    api-key: ${COMPAS_JEV_API_KEY:${NUTRIAI_JEV_API_KEY:}}
+    enabled: ${COMPAS_JEV_ENABLED:${NUTRIAI_JEV_ENABLED:true}}
+    timeout-seconds: ${COMPAS_JEV_TIMEOUT_SECONDS:${NUTRIAI_JEV_TIMEOUT_SECONDS:5}}
 
   evolution:
     api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
     api-key: ${EVOLUTION_API_KEY:}
 
   whatsapp:
-    central-number: ${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}
-    unknown-response-enabled: ${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_ENABLED:true}
-    unknown-response-template: "${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_TEMPLATE:Olá! Sou a assistente inteligente da NutriAI 🥗. Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\nPor favor, peça ao seu nutricionista para cadastrar seu número no painel NutriAI para que possamos começar a acompanhar seu plano alimentar!}"
+    central-number: ${COMPAS_WHATSAPP_CENTRAL_NUMBER:${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}}
+    unknown-response-enabled: ${COMPAS_WHATSAPP_UNKNOWN_RESPONSE_ENABLED:${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_ENABLED:true}}
+    unknown-response-template: "${COMPAS_WHATSAPP_UNKNOWN_RESPONSE_TEMPLATE:${NUTRIAI_WHATSAPP_UNKNOWN_RESPONSE_TEMPLATE:Olá! Sou a assistente inteligente do Compas 🧭. Ainda não localizei seu WhatsApp cadastrado com nenhum nutricionista na nossa plataforma.\n\nPor favor, peça ao seu nutricionista para cadastrar seu número no painel Compas para que possamos começar a acompanhar seu plano alimentar!}}"
     worker:
-      max-concurrent: ${NUTRIAI_WHATSAPP_WORKER_CONCURRENT:5}
+      max-concurrent: ${COMPAS_WHATSAPP_WORKER_CONCURRENT:${NUTRIAI_WHATSAPP_WORKER_CONCURRENT:5}}
 
   webhook:
     # Secret for authenticating inbound webhook requests (X-Webhook-Secret, apikey, or Bearer)
-    secret: ${NUTRIAI_WEBHOOK_SECRET:}
+    secret: ${COMPAS_WEBHOOK_SECRET:${NUTRIAI_WEBHOOK_SECRET:}}
