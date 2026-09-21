@@ -25,6 +25,15 @@ interface AuthState {
   initializeAuth: () => Promise<void>;
 }
 
+// Backward-compatible migration from legacy nutriai-auth to compas-auth
+if (typeof window !== 'undefined' && !localStorage.getItem('compas-auth')) {
+  const legacyAuth = localStorage.getItem('nutriai-auth');
+  if (legacyAuth) {
+    localStorage.setItem('compas-auth', legacyAuth);
+    localStorage.removeItem('nutriai-auth');
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -112,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           error: null,
         });
+        localStorage.removeItem('nutriai-auth');
       },
 
       refreshAuth: async () => {
@@ -170,7 +180,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'nutriai-auth',
+      name: 'compas-auth',
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         user: state.user,

@@ -16,7 +16,7 @@ interface NavigationState {
 }
 
 function getInitialView(): ViewType {
-  const stored = localStorage.getItem('nutriai.view');
+  const stored = localStorage.getItem('compas.view') || localStorage.getItem('nutriai.view');
   if (
     stored === 'home' ||
     stored === 'patients' ||
@@ -29,7 +29,7 @@ function getInitialView(): ViewType {
 }
 
 function getInitialPatientId(): string | null {
-  return localStorage.getItem('nutriai.patient') || null;
+  return localStorage.getItem('compas.patient') || localStorage.getItem('nutriai.patient') || null;
 }
 
 export const useNavigationStore = create<NavigationState>((set) => ({
@@ -39,12 +39,18 @@ export const useNavigationStore = create<NavigationState>((set) => ({
     typeof window !== 'undefined' ? !window.matchMedia('(max-width: 1200px)').matches : true,
   statusFilter: 'all' as StatusFilter,
   setView: (view) => {
-    localStorage.setItem('nutriai.view', view);
+    localStorage.setItem('compas.view', view);
+    localStorage.removeItem('nutriai.view');
     set({ activeView: view });
   },
   setActivePatientId: (id) => {
-    if (id) localStorage.setItem('nutriai.patient', id);
-    else localStorage.removeItem('nutriai.patient');
+    if (id) {
+      localStorage.setItem('compas.patient', id);
+      localStorage.removeItem('nutriai.patient');
+    } else {
+      localStorage.removeItem('compas.patient');
+      localStorage.removeItem('nutriai.patient');
+    }
     set({ activePatientId: id });
   },
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),

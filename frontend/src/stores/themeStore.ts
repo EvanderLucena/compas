@@ -10,16 +10,15 @@ interface ThemeState {
 
 function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'light';
-  const stored = localStorage.getItem('nutriai.theme');
+  const stored = localStorage.getItem('compas.theme') || localStorage.getItem('nutriai.theme');
   if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('nutriai.theme', theme);
+  localStorage.setItem('compas.theme', theme);
+  localStorage.removeItem('nutriai.theme');
 }
 
 export const useThemeStore = create<ThemeState>((set) => {

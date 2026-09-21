@@ -1,131 +1,139 @@
-# NutriAI
+# Compas — Sistema Clínico
 
-Painel clínico para nutricionistas solo (Brasil) que gerencia pacientes, planos alimentares, catálogo de alimentos e insights — com IA respondendo ao paciente via WhatsApp com base no plano alimentar.
+> **O compasso clínico do nutricionista de alta performance.**  
+> Plataforma de acompanhamento nutricional com prescrição de planos, catálogo TACO, prontuário biométrico e inteligência artificial que acolhe o paciente via WhatsApp com total respeito à privacidade (LGPD).
 
-## Stack
+---
 
-| Camada | Tecnologia |
-|--------|-----------|
-| Frontend | React 19 + TypeScript + Vite + Tailwind CSS 4 |
-| Backend | Java 21 + Spring Boot 3.5 + PostgreSQL |
-| Auth | JWT (jjwt 0.12) + Spring Security |
-| DB Migrations | Flyway |
-| Testes Front | Vitest + Testing Library + Playwright |
-| Testes Back | JUnit 5 + Mockito + Testcontainers |
-| CI | GitHub Actions (lint, typecheck, test, E2E) |
-| WhatsApp | Evolution API (planejado) |
+## 🧭 Visão Geral
 
-## Estrutura
+O **Compas** resolve o maior atrito do acompanhamento nutricional: **a adesão do paciente ao diário alimentar**. 
+
+Em vez de forçar o paciente a instalar aplicativos pesados ou preencher formulários cansativos, o paciente relata suas refeições naturalmente no WhatsApp por **áudio**, **foto** ou **texto**. A IA do Compas analisa o relato com base exclusiva no plano prescrito pelo nutricionista, orienta o paciente em reduções de danos e extrai gramas, calorias e macronutrientes diretamente para o prontuário clínico.
+
+### Pilares Fundamentais
+1. **Zero Apps pro Paciente:** Interface 100% conversacional no WhatsApp.
+2. **Radar de Aderência:** Identificação proativa dos pacientes *No Compasso*, em *Ajuste* ou em *Descompasso*.
+3. **Conduta Inviolável:** A IA nunca inventa recomendações; utiliza estritamente as opções e diretrizes prescritas pelo nutricionista.
+4. **Privacidade por Design (LGPD):** O nutricionista visualiza dados estruturados de alimentação no painel, sem invasão das conversas pessoais do paciente.
+
+---
+
+## 🚀 Stack Tecnológica
+
+| Camada | Tecnologia | Detalhes |
+|---|---|---|
+| **Frontend** | React 19 + TypeScript + Vite | Tailwind CSS 4, Zustand, TanStack Query |
+| **Backend** | Java 21 + Spring Boot 3.5 | Spring Security, Spring Data JPA, Virtual Threads |
+| **Banco de Dados** | PostgreSQL 17 + Flyway | Migrações versionadas, isolamento por nutricionista |
+| **Cache & Filas** | Redis 7 | Controle de rate limiting e filas assíncronas |
+| **WhatsApp Gateway** | Evolution API | Gateway open-source para envio e recebimento de mensagens |
+| **Inteligência Artificial** | Ollama Cloud + DeepSeek / OpenAI Whisper | Processamento de linguagem natural e transcrição de áudio |
+| **Testes Frontend** | Vitest + Testing Library + Playwright | 100% dos testes unitários e testes E2E |
+| **Testes Backend** | JUnit 5 + Mockito + Testcontainers + ArchUnit | Validação de arquitetura e cobertura Jacoco |
+| **CI/CD** | GitHub Actions | Pipelines automatizados com AI Reviewer integrado |
+
+---
+
+## 📁 Estrutura do Monorepo
 
 ```
-frontend/          React + TypeScript + Vite
-backend/           Spring Boot + Gradle
-docker/            Docker Compose para dev
-scripts/           Utilitários
-.planning/         Roadmap, planos por fase, research
-brainstorms/       Documentos de ideiação
+compas/
+├── frontend/             # SPA React 19 + TypeScript + Vite + Tailwind 4
+│   ├── src/
+│   │   ├── api/          # Integração REST envelope { success, data }
+│   │   ├── components/   # Componentes modulares (UI, shell, paciente, plano)
+│   │   ├── stores/       # Gerenciamento de estado (Zustand)
+│   │   └── views/        # Telas da aplicação (Landing, Home, Pacientes, Planos, etc.)
+│   └── e2e/              # Testes end-to-end com Playwright
+├── backend/              # API REST Java 21 + Spring Boot 3.5
+│   ├── src/main/java/    # Código de produção (controller → service → repository)
+│   ├── src/main/resources/
+│   │   └── db/migration/ # Scripts SQL versionados do Flyway
+│   └── src/test/java/    # Testes unitários, integração e regras de arquitetura
+├── docker/               # Definições Docker Compose para desenvolvimento e produção
+├── docs/                 # Documentação técnica e assets de marca
+└── .github/              # Workflows de CI/CD e regras do revisor de IA
 ```
 
-## Desenvolvimento
+---
+
+## 💻 Desenvolvimento Local
 
 ### Pré-requisitos
-
 - Node.js 20+
-- Java 21
-- Docker Desktop (para PostgreSQL e E2E)
-- Gradle (via wrapper incluído)
+- Java 21 JDK
+- Docker & Docker Compose
+- Gradle (wrapper `./gradlew` incluso no repositório)
 
-### Backend
-
+### 1. Subir a Infraestrutura (PostgreSQL & Redis)
 ```bash
-# PostgreSQL via Docker
 docker compose -f docker/docker-compose.dev.yml up -d postgres
-
-# Rodar o backend
-cd backend && ./gradlew bootRun
-
-# Testes unitários
-./gradlew test
-
-# Testes de integração (requer Docker)
-./gradlew integrationTest
 ```
 
-### Frontend
-
+### 2. Executar o Backend
 ```bash
-cd frontend && npm install
+cd backend
+./gradlew bootRun
+```
+A API estará acessível em `http://localhost:8080` (health check em `/api/v1/health`).
 
-# Dev server
-npm run dev
-
-# Build produção
-npm run build
-
-# Lint + typecheck
-npx tsc --noEmit && npm run lint
-
-# Testes unitários
-npm test
-
-# Testes E2E (requer backend + frontend rodando)
-npm run test:e2e
+Para rodar os testes e verificações do backend:
+```bash
+./gradlew test            # Testes unitários
+./gradlew compileJava     # Validação de compilação
+./gradlew check           # Checkstyle + Jacoco coverage
 ```
 
-## Variáveis de Ambiente
+### 3. Executar o Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+O frontend estará acessível em `http://localhost:5173`.
 
-Copie `.env.example` e preencha os valores. Nunca commite secrets.
+Para rodar os testes e validações do frontend:
+```bash
+npm test                  # Testes unitários com Vitest
+npx tsc --noEmit          # Verificação estrita de tipagem TypeScript
+npm run lint              # ESLint (limite máximo de warnings)
+npm run test:e2e          # Testes ponta a ponta com Playwright
+```
 
-| Variável | Uso |
-|----------|-----|
-| `NUTRIAI_DATASOURCE_PASSWORD` | Senha do PostgreSQL |
-| `NUTRIAI_JWT_SECRET` | Chave de assinatura JWT |
-| `NUTRIAI_SEED_ADMIN_PASSWORD` | Senha do admin de seed |
+---
 
-## Progresso
+## 🔒 Variáveis de Ambiente & Segurança
 
-| Fase | Status |
-|------|--------|
-| 1. Monorepo & Infra | ✅ |
-| 2. Frontend Migration | ✅ |
-| 3. Auth & Onboarding | ✅ |
-| 4. Patient Management | ✅ |
-| 5. Meal Plans & Food Catalog | ✅ |
-| 6. Dashboard & Biometry | 🔜 |
-| 7. WhatsApp Intelligence | Planejada |
-| 8. Billing & Subscriptions | Planejada |
-| 9. LGPD Compliance | Planejada |
-| 10. CI/CD & Deployment | ✅ (parcial — pipelines + AI reviewer) |
+Copie o arquivo de exemplo para seu ambiente de desenvolvimento:
+```bash
+cp .env.example .env
+```
 
-## CI/CD
+| Variável | Descrição |
+|---|---|
+| `NUTRIAI_DATASOURCE_PASSWORD` | Senha de acesso ao banco PostgreSQL |
+| `NUTRIAI_JWT_SECRET` | Chave secreta HMAC-SHA256 para assinatura dos tokens JWT |
+| `NUTRIAI_SEED_ADMIN_PASSWORD` | Senha padrão do administrador inicial |
+| `OLLAMA_API_KEY` | Chave de API para o serviço Ollama Cloud |
+| `EVOLUTION_INSTANCE_TOKEN` | Token de autenticação da instância do WhatsApp |
 
-Toda PR para `main` passa por 3 validações automáticas:
+> **Nota de Segurança:** Chaves privadas, tokens JWT e senhas de banco nunca devem ser commitados no controle de versão.
 
-| Pipeline | O que faz |
-|----------|-----------|
-| **frontend-ci** | ESLint, TypeScript, Vitest, Build |
-| **backend-ci** | Checkstyle, Testes unitários, Jacoco |
-| **ai-review** | Review de código com IA (Ollama Cloud) |
+---
 
-E 1 validação condicional:
+## 🤖 Pipeline de CI/CD & AI Reviewer
 
-| Pipeline | O que faz |
-|----------|-----------|
-| **e2e** | Playwright end-to-end (roda só quando frontend ou backend mudam) |
+Todo Pull Request passa automaticamente pelas seguintes esteiras de validação no GitHub Actions:
 
-### AI Reviewer
+1. **`frontend-ci`:** Linting rigoroso, compilação TypeScript, suíte Vitest e build estático.
+2. **`backend-ci`:** Regras do Checkstyle, compilação Java 21, testes com Testcontainers e regras de arquitetura (ArchUnit).
+3. **`ai-review`:** Revisor de código com Inteligência Artificial que analisa segurança (isolamento multi-tenant, autorizações), convenções e conformidade clínica com base em `.github/review-rules.md`.
+4. **`e2e`:** Testes de fluxo ponta a ponta com Playwright simulando a experiência do usuário.
 
-- Usa Ollama Cloud: modelo `glm-5.1` para todos os diffs (até 3000 linhas; acima disso a parte restante NÃO é revisada e um warning é emitido)
-- Regras do projeto em `.github/review-rules.md` (editável sem mudar workflow)
-- Auto-aprova se APPROVE sem findings HIGH+, senão request changes
-- Branch protection: 3 checks obrigatórios (`ai-review`, `frontend`, `backend`) + 2 approvals (AI conta como 1ª)
+---
 
-### Branch Protection
+## 📄 Licença
 
-- `main` requer: checks passando + 2 approvals (AI conta como 1ª)
-- Stale reviews são dismissed automaticamente
-- Owner pode bypass com `--admin` (hotfixes)
-
-## Licença
-
-Proprietário. Todos os direitos reservados.
+Copyright © 2026 Compas Tecnologia em Saúde Ltda.  
+Todos os direitos reservados. Em conformidade com a Lei Geral de Proteção de Dados (LGPD).
