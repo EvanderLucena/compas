@@ -781,7 +781,7 @@ public class ConversationService {
                 for (WhatsAppResponse r : responses) {
                     String cleaned = cleanMessageForWhatsApp(r.getResponseContent());
                     if (!cleaned.isBlank()) {
-                        sb.append("- NutriAI: ").append(cleaned).append("\n");
+                        sb.append("- Compas: ").append(cleaned).append("\n");
                     }
                 }
             }

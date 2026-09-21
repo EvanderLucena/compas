@@ -16,6 +16,13 @@ const mockSignup = vi.mocked(authService.signup);
 const mockLogin = vi.mocked(authService.login);
 const mockLogout = vi.mocked(authService.logout);
 const mockRefreshAuth = vi.mocked(authService.refreshAuth);
+const mockUser = {
+  id: '1',
+  name: 'Test',
+  email: 'test@test.com',
+  role: 'NUTRITIONIST' as const,
+  onboardingCompleted: true,
+};
 
 describe('authStore', () => {
   beforeEach(() => {
@@ -124,13 +131,7 @@ describe('authStore', () => {
               () =>
                 resolve({
                   accessToken: 'token',
-                  user: {
-                    id: '1',
-                    name: 'Test',
-                    email: 'test@test.com',
-                    role: 'NUTRITIONIST',
-                    onboardingCompleted: false,
-                  },
+                  user: { ...mockUser, onboardingCompleted: false },
                 }),
               0,
             );
@@ -158,13 +159,7 @@ describe('authStore', () => {
     it('sets isAuthenticated and user on successful login', async () => {
       mockLogin.mockResolvedValue({
         accessToken: 'login-token',
-        user: {
-          id: '1',
-          name: 'Dra. Login',
-          email: 'login@test.com',
-          role: 'NUTRITIONIST',
-          onboardingCompleted: true,
-        },
+        user: { ...mockUser, name: 'Dra. Login', email: 'login@test.com' },
       });
 
       await useAuthStore.getState().login('login@test.com', 'Senha123!');
@@ -216,13 +211,7 @@ describe('authStore', () => {
     it('clears auth state on logout', async () => {
       useAuthStore.setState({
         isAuthenticated: true,
-        user: {
-          id: '1',
-          name: 'Test',
-          email: 'test@test.com',
-          role: 'NUTRITIONIST',
-          onboardingCompleted: true,
-        },
+        user: mockUser,
         accessToken: 'token',
       });
 
@@ -239,13 +228,7 @@ describe('authStore', () => {
     it('clears auth state even when logout API call fails', async () => {
       useAuthStore.setState({
         isAuthenticated: true,
-        user: {
-          id: '1',
-          name: 'Test',
-          email: 'test@test.com',
-          role: 'NUTRITIONIST',
-          onboardingCompleted: true,
-        },
+        user: mockUser,
         accessToken: 'token',
       });
 
@@ -271,13 +254,7 @@ describe('authStore', () => {
     it('refreshes token successfully', async () => {
       mockRefreshAuth.mockResolvedValue({
         accessToken: 'refreshed-token',
-        user: {
-          id: '1',
-          name: 'Test',
-          email: 'test@test.com',
-          role: 'NUTRITIONIST',
-          onboardingCompleted: true,
-        },
+        user: mockUser,
       });
 
       const token = await useAuthStore.getState().refreshAuth();
