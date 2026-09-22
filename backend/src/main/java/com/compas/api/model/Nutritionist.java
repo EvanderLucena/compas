@@ -50,6 +50,26 @@ public class Nutritionist {
     @Column
     private String whatsapp;
 
+    @Column(name = "professional_name")
+    private String professionalName;
+
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
+    @Column(name = "email_verification_token")
+    private String emailVerificationToken;
+
+    @Column(name = "email_verification_expires_at")
+    private LocalDateTime emailVerificationExpiresAt;
+
+    public String getDisplayName() {
+        if (professionalName != null && !professionalName.isBlank()) {
+            return professionalName.trim();
+        }
+        return name;
+    }
+
     @Column(name = "onboarding_completed")
     @Builder.Default
     private Boolean onboardingCompleted = false;

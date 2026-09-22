@@ -46,6 +46,7 @@ public class NutritionistService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Nutricionista não encontrado"));
 
         nutritionist.setName(request.name().trim());
+        nutritionist.setProfessionalName(request.professionalName() != null ? request.professionalName().trim() : null);
         nutritionist.setCrn(request.crn() != null ? request.crn().trim() : null);
         nutritionist.setCrnRegional(request.crnRegional() != null ? request.crnRegional().trim() : null);
         nutritionist.setSpecialty(request.specialty() != null ? request.specialty().trim() : null);
@@ -84,12 +85,14 @@ public class NutritionistService {
         return new NutritionistProfileResponse(
                 nutritionist.getId(),
                 nutritionist.getName(),
+                nutritionist.getProfessionalName(),
                 nutritionist.getEmail(),
                 nutritionist.getRole().name(),
                 nutritionist.getCrn(),
                 nutritionist.getCrnRegional(),
                 nutritionist.getSpecialty(),
                 nutritionist.getWhatsapp(),
+                nutritionist.getEmailVerified() != null ? nutritionist.getEmailVerified() : false,
                 nutritionist.getOnboardingCompleted(),
                 nutritionist.getTrialEndsAt(),
                 nutritionist.getSubscriptionTier(),

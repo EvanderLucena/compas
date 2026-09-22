@@ -71,6 +71,7 @@ export interface LoginRequest {
 
 export interface SignupRequest {
   name: string;
+  professionalName?: string;
   email: string;
   password: string;
   crn: string;
@@ -88,12 +89,14 @@ export interface AuthResponse {
 export interface MeResponse {
   id: string;
   name: string;
+  professionalName?: string | null;
   email: string;
   role: string;
   crn: string;
   crnRegional: string;
   specialty: string | null;
   whatsapp: string | null;
+  emailVerified?: boolean;
   onboardingCompleted: boolean;
   trialEndsAt: string;
   subscriptionTier: string;
@@ -103,12 +106,14 @@ export interface MeResponse {
 export interface NutritionistProfile {
   id: string;
   name: string;
+  professionalName?: string | null;
   email: string;
   role: string;
   crn: string | null;
   crnRegional: string | null;
   specialty: string | null;
   whatsapp: string | null;
+  emailVerified?: boolean;
   onboardingCompleted: boolean;
   trialEndsAt: string | null;
   subscriptionTier: string;
@@ -119,6 +124,7 @@ export interface NutritionistProfile {
 
 export interface UpdateProfileRequest {
   name: string;
+  professionalName?: string | null;
   crn?: string | null;
   crnRegional?: string | null;
   specialty?: string | null;

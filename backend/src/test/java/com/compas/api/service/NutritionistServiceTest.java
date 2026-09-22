@@ -108,6 +108,7 @@ class NutritionistServiceTest {
 
         UpdateProfileRequest request = new UpdateProfileRequest(
                 "Dra. Roberta Novaes",
+                "Nutri Roberta",
                 "54321",
                 "CRN-4",
                 "Clínica Geral",
@@ -117,6 +118,7 @@ class NutritionistServiceTest {
         NutritionistProfileResponse response = nutritionistService.updateProfile(nutritionistId, request);
 
         assertEquals("Dra. Roberta Novaes", response.name());
+        assertEquals("Nutri Roberta", response.professionalName());
         assertEquals("54321", response.crn());
         assertEquals("CRN-4", response.crnRegional());
         assertEquals("Clínica Geral", response.specialty());

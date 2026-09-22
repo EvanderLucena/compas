@@ -8,6 +8,9 @@ public record UpdateProfileRequest(
         @Size(max = 100, message = "O nome deve ter no máximo 100 caracteres")
         String name,
 
+        @Size(max = 100, message = "O nome profissional deve ter no máximo 100 caracteres")
+        String professionalName,
+
         @Size(max = 20, message = "O CRN deve ter no máximo 20 caracteres")
         String crn,
 
@@ -19,4 +22,14 @@ public record UpdateProfileRequest(
 
         @Size(max = 20, message = "O WhatsApp deve ter no máximo 20 caracteres")
         String whatsapp
-) {}
+) {
+    public UpdateProfileRequest(
+            String name,
+            String crn,
+            String crnRegional,
+            String specialty,
+            String whatsapp
+    ) {
+        this(name, null, crn, crnRegional, specialty, whatsapp);
+    }
+}
