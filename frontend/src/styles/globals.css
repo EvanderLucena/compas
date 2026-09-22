@@ -639,6 +639,7 @@ body {
 .auth-left {
   background: var(--ink);
   color: var(--paper);
+  --fg: var(--paper);
   padding: 48px;
   display: flex; align-items: center; justify-content: center;
   position: relative;

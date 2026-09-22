@@ -117,7 +117,7 @@ export function SignupView() {
       <div className="auth-left">
         <div className="auth-left-content">
           <div className="auth-brand">
-            <IconCompas size={28} />
+            <IconCompas size={28} color="var(--paper)" accentColor="var(--lime)" />
             <span className="auth-brand-name">
               compas<span>.</span>
             </span>
@@ -148,7 +148,7 @@ export function SignupView() {
         <div className="auth-form-wrap">
           <div className="auth-mobile-brand">
             <div className="auth-brand" style={{ marginBottom: 0 }}>
-              <IconCompas size={24} color="var(--lime-dim)" />
+              <IconCompas size={24} color="var(--fg)" accentColor="var(--lime-dim)" />
               <span className="auth-brand-name" style={{ color: 'var(--fg)' }}>
                 compas<span style={{ color: 'var(--lime-dim)' }}>.</span>
               </span>
