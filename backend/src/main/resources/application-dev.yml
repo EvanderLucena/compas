@@ -20,9 +20,10 @@ spring:
 
 logging:
   level:
+    com.compas: DEBUG
     com.nutriai: DEBUG
 
-nutriai:
+compas:
   jwt:
     secret: ${COMPAS_JWT_SECRET:${NUTRIAI_JWT_SECRET:local-dev-secret-do-not-use-in-production}}
     cookie:
@@ -35,3 +36,17 @@ nutriai:
       email: ${COMPAS_SEED_ADMIN_EMAIL:${NUTRIAI_SEED_ADMIN_EMAIL:admin@compas.app}}
       password: ${COMPAS_SEED_ADMIN_PASSWORD:${NUTRIAI_SEED_ADMIN_PASSWORD:Admin123!}}
       name: ${COMPAS_SEED_ADMIN_NAME:${NUTRIAI_SEED_ADMIN_NAME:Admin Compas}}
+
+nutriai:
+  jwt:
+    secret: ${compas.jwt.secret}
+    cookie:
+      secure: false
+      same-site: Lax
+  webhook:
+    secret: ${compas.webhook.secret}
+  seed:
+    admin:
+      email: ${compas.seed.admin.email}
+      password: ${compas.seed.admin.password}
+      name: ${compas.seed.admin.name}

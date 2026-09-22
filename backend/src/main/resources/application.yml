@@ -36,7 +36,7 @@ spring:
 server:
   port: 8080
 
-nutriai:
+compas:
   version: 0.5.0
   jwt:
     secret: ${COMPAS_JWT_SECRET:${NUTRIAI_JWT_SECRET}}
@@ -74,6 +74,7 @@ nutriai:
   evolution:
     api-url: ${EVOLUTION_API_URL:http://evolution-go:8080}
     api-key: ${EVOLUTION_API_KEY:}
+    instance-name: ${COMPAS_EVOLUTION_INSTANCE_NAME:${NUTRIAI_EVOLUTION_INSTANCE_NAME:compas}}
 
   whatsapp:
     central-number: ${COMPAS_WHATSAPP_CENTRAL_NUMBER:${NUTRIAI_WHATSAPP_CENTRAL_NUMBER:}}
@@ -85,3 +86,47 @@ nutriai:
   webhook:
     # Secret for authenticating inbound webhook requests (X-Webhook-Secret, apikey, or Bearer)
     secret: ${COMPAS_WEBHOOK_SECRET:${NUTRIAI_WEBHOOK_SECRET:}}
+
+nutriai:
+  version: ${compas.version}
+  jwt:
+    secret: ${compas.jwt.secret}
+    access-token-expiration: ${compas.jwt.access-token-expiration}
+    refresh-token-expiration: ${compas.jwt.refresh-token-expiration}
+    cookie:
+      name: ${compas.jwt.cookie.name}
+      path: ${compas.jwt.cookie.path}
+      max-age: ${compas.jwt.cookie.max-age}
+      http-only: ${compas.jwt.cookie.http-only}
+      secure: ${compas.jwt.cookie.secure}
+      same-site: ${compas.jwt.cookie.same-site}
+  llm:
+    base-url: ${compas.llm.base-url}
+    model: ${compas.llm.model}
+    api-key: ${compas.llm.api-key}
+    timeout-seconds: ${compas.llm.timeout-seconds}
+  whisper:
+    base-url: ${compas.whisper.base-url}
+    model: ${compas.whisper.model}
+    api-key: ${compas.whisper.api-key}
+    language: ${compas.whisper.language}
+    enabled: ${compas.whisper.enabled}
+    timeout-seconds: ${compas.whisper.timeout-seconds}
+  jev:
+    api-url: ${compas.jev.api-url}
+    model: ${compas.jev.model}
+    api-key: ${compas.jev.api-key}
+    enabled: ${compas.jev.enabled}
+    timeout-seconds: ${compas.jev.timeout-seconds}
+  evolution:
+    api-url: ${compas.evolution.api-url}
+    api-key: ${compas.evolution.api-key}
+    instance-name: ${compas.evolution.instance-name}
+  whatsapp:
+    central-number: ${compas.whatsapp.central-number}
+    unknown-response-enabled: ${compas.whatsapp.unknown-response-enabled}
+    unknown-response-template: ${compas.whatsapp.unknown-response-template}
+    worker:
+      max-concurrent: ${compas.whatsapp.worker.max-concurrent}
+  webhook:
+    secret: ${compas.webhook.secret}
