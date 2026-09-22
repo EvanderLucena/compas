@@ -46,10 +46,11 @@ class AuthServiceTest {
     void signup_createsNutritionistWithHashedPassword() {
         SignupRequest request = new SignupRequest(
                 "Dr. Test",
+                "Nutri Teste",
                 "test@nutriai.com",
                 "senha12345",
                 "12345",
-                "SP",
+                "CRN-3",
                 "Nutrição Esportiva",
                 "11999999999",
                 true
@@ -69,7 +70,11 @@ class AuthServiceTest {
         assertNotEquals("senha12345", saved.getPasswordHash());
         assertTrue(passwordEncoder.matches("senha12345", saved.getPasswordHash()));
 
-        // Verify trial defaults
+        // Verify professional fields and defaults
+        assertEquals("CRN-3", saved.getCrnRegional());
+        assertEquals("Nutri Teste", saved.getProfessionalName());
+        assertEquals("Nutri Teste", saved.getDisplayName());
+        assertFalse(saved.getEmailVerified());
         assertNotNull(saved.getTrialEndsAt());
         assertEquals("TRIAL", saved.getSubscriptionTier());
         assertEquals(15, saved.getPatientLimit());

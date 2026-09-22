@@ -47,12 +47,14 @@ public class AuthService {
 
         Nutritionist nutritionist = Nutritionist.builder()
                 .name(request.name())
+                .professionalName(request.professionalName())
                 .email(request.email())
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .crn(request.crn())
                 .crnRegional(request.crnRegional())
                 .specialty(request.specialty())
                 .whatsapp(request.whatsapp())
+                .emailVerified(false)
                 .onboardingCompleted(false)
                 .subscriptionTier("TRIAL")
                 .patientLimit(15)
@@ -169,12 +171,14 @@ public class AuthService {
         return new MeResponse(
                 nutritionist.getId(),
                 nutritionist.getName(),
+                nutritionist.getProfessionalName(),
                 nutritionist.getEmail(),
                 nutritionist.getRole().name(),
                 nutritionist.getCrn(),
                 nutritionist.getCrnRegional(),
                 nutritionist.getSpecialty(),
                 nutritionist.getWhatsapp(),
+                nutritionist.getEmailVerified() != null ? nutritionist.getEmailVerified() : false,
                 nutritionist.getOnboardingCompleted(),
                 nutritionist.getTrialEndsAt(),
                 nutritionist.getSubscriptionTier(),

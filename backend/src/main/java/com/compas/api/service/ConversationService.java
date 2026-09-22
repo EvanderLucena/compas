@@ -136,7 +136,7 @@ public class ConversationService {
             log.info("Patient {} is inactive/paused, sending direct contact message", patient.getId());
             String contactText = "Olá, " + patient.getName() + "! Para te orientar da melhor forma e tirar suas dúvidas, " +
                     "por favor entre em contato diretamente com seu(sua) nutricionista, " +
-                    nutritionist.getName() + ". Um abraço!";
+                    nutritionist.getDisplayName() + ". Um abraço!";
 
             WhatsAppResponse waResponse = WhatsAppResponse.builder()
                     .messageId(messageId)
@@ -170,7 +170,7 @@ public class ConversationService {
 
         if (isFirstMessage) {
             // First interaction → greeting prompt (D-17)
-            systemPrompt = buildGreetingPrompt(patient.getName(), nutritionist.getName());
+            systemPrompt = buildGreetingPrompt(patient.getName(), nutritionist.getDisplayName());
             responseType = "GREETING";
         } else if ("audio".equals(message.getMessageType())) {
             // Check if audio has already been transcribed or can be transcribed via Whisper
@@ -461,7 +461,7 @@ public class ConversationService {
         whatsAppMessageRepository.save(message);
 
         String emergencyNotice = "Olá, " + patient.getName() + ". Notei seu relato de desconforto ou urgência. "
-                + "Sua saúde é prioridade total! Notifiquei o(a) nutricionista " + nutritionist.getName()
+                + "Sua saúde é prioridade total! Notifiquei o(a) nutricionista " + nutritionist.getDisplayName()
                 + " com alerta imediato. "
                 + "Se você estiver sentindo dor forte ou mal-estar agudo, por favor procure um serviço de pronto "
                 + "atendimento médico agora mesmo.";

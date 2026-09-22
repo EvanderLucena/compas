@@ -96,6 +96,7 @@ class NutritionistControllerTest {
     void updateProfile_success_returns200() throws Exception {
         UpdateProfileRequest updateReq = new UpdateProfileRequest(
                 "Dra. Camila S. Oliveira",
+                "Nutri Camila",
                 "98765-P",
                 "CRN-4",
                 "Comportamental & Esportiva",
@@ -109,6 +110,7 @@ class NutritionistControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Dra. Camila S. Oliveira"))
+                .andExpect(jsonPath("$.data.professionalName").value("Nutri Camila"))
                 .andExpect(jsonPath("$.data.crn").value("98765-P"))
                 .andExpect(jsonPath("$.data.crnRegional").value("CRN-4"))
                 .andExpect(jsonPath("$.data.specialty").value("Comportamental & Esportiva"))

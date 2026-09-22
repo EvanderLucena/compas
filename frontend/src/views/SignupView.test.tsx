@@ -7,7 +7,9 @@ const mockNavigate = vi.fn();
 
 vi.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 
 vi.mock('../stores/authStore', () => ({
@@ -39,7 +41,9 @@ describe('SignupView', () => {
     it('advances to step 2 when step 1 fields are filled', () => {
       render(<SignupView />);
       fireEvent.change(screen.getByTestId('signup-name'), { target: { value: 'Dra. Helena' } });
-      fireEvent.change(screen.getByTestId('signup-email'), { target: { value: 'helena@test.com' } });
+      fireEvent.change(screen.getByTestId('signup-email'), {
+        target: { value: 'helena@test.com' },
+      });
       fireEvent.change(screen.getByTestId('signup-password'), { target: { value: 'Senha123!' } });
 
       const form = screen.getByRole('button', { name: /continuar/i }).closest('form')!;
@@ -61,7 +65,9 @@ describe('SignupView', () => {
     it('goes back to step 1 when back button clicked on step 2', () => {
       render(<SignupView />);
       fireEvent.change(screen.getByTestId('signup-name'), { target: { value: 'Dra. Helena' } });
-      fireEvent.change(screen.getByTestId('signup-email'), { target: { value: 'helena@test.com' } });
+      fireEvent.change(screen.getByTestId('signup-email'), {
+        target: { value: 'helena@test.com' },
+      });
       fireEvent.change(screen.getByTestId('signup-password'), { target: { value: 'Senha123!' } });
 
       const form = screen.getByRole('button', { name: /continuar/i }).closest('form')!;
@@ -78,7 +84,9 @@ describe('SignupView', () => {
     it('shows error when step 2 submitted without CRN and terms', () => {
       render(<SignupView />);
       fireEvent.change(screen.getByTestId('signup-name'), { target: { value: 'Dra. Helena' } });
-      fireEvent.change(screen.getByTestId('signup-email'), { target: { value: 'helena@test.com' } });
+      fireEvent.change(screen.getByTestId('signup-email'), {
+        target: { value: 'helena@test.com' },
+      });
       fireEvent.change(screen.getByTestId('signup-password'), { target: { value: 'Senha123!' } });
 
       const form = screen.getByRole('button', { name: /continuar/i }).closest('form')!;
@@ -88,6 +96,43 @@ describe('SignupView', () => {
       fireEvent.click(submitButton);
 
       expect(screen.getByText(/preencha o crn/i)).toBeInTheDocument();
+    });
+
+    it('submits step 2 with valid professional data including professionalName and crnRegional', () => {
+      render(<SignupView />);
+      fireEvent.change(screen.getByTestId('signup-name'), {
+        target: { value: 'Helena Maria Silva' },
+      });
+      fireEvent.change(screen.getByTestId('signup-email'), {
+        target: { value: 'helena@test.com' },
+      });
+      fireEvent.change(screen.getByTestId('signup-password'), { target: { value: 'Senha123!' } });
+
+      const form = screen.getByRole('button', { name: /continuar/i }).closest('form')!;
+      fireEvent.submit(form);
+
+      fireEvent.change(screen.getByTestId('signup-crn'), { target: { value: '12345' } });
+      fireEvent.change(screen.getByTestId('signup-crn-regional'), { target: { value: 'CRN-3' } });
+      fireEvent.change(screen.getByTestId('signup-professional-name'), {
+        target: { value: 'Nutri Helena' },
+      });
+      fireEvent.change(screen.getByTestId('signup-whatsapp'), { target: { value: '11999998888' } });
+      fireEvent.click(screen.getByTestId('signup-terms'));
+
+      const submitButton = screen.getByRole('button', { name: /criar conta/i });
+      fireEvent.click(submitButton);
+
+      expect(mockSignup).toHaveBeenCalledWith({
+        name: 'Helena Maria Silva',
+        professionalName: 'Nutri Helena',
+        email: 'helena@test.com',
+        password: 'Senha123!',
+        crn: '12345',
+        crnRegional: 'CRN-3',
+        specialty: undefined,
+        whatsapp: '(11) 99999-8888',
+        terms: true,
+      });
     });
   });
 

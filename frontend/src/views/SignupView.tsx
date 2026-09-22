@@ -2,52 +2,13 @@ import { useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate, Link } from 'react-router';
 import { IconCompas } from '../components/ui/CompasLogo';
-
-const UFS = [
-  'AC',
-  'AL',
-  'AP',
-  'AM',
-  'BA',
-  'CE',
-  'DF',
-  'ES',
-  'GO',
-  'MA',
-  'MT',
-  'MS',
-  'MG',
-  'PA',
-  'PB',
-  'PR',
-  'PE',
-  'PI',
-  'RJ',
-  'RN',
-  'RS',
-  'RO',
-  'RR',
-  'SC',
-  'SP',
-  'SE',
-  'TO',
-];
-
-const SPECIALTIES = [
-  { value: '', label: 'Selecione (opcional)' },
-  { value: 'clinica', label: 'Nutrição Clínica' },
-  { value: 'esportiva', label: 'Nutrição Esportiva' },
-  { value: 'funcional', label: 'Nutrição Funcional' },
-  { value: 'materno', label: 'Nutrição Materno-Infantil' },
-  { value: 'gerontologia', label: 'Nutrição em Gerontologia' },
-  { value: 'pediatria', label: 'Nutrição Pediátrica' },
-  { value: 'saude-coletiva', label: 'Saúde Coletiva' },
-];
+import { CRN_REGIONS, CLINICAL_SPECIALTIES, formatPhone } from '../constants/clinical';
 
 export function SignupView() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: '',
+    professionalName: '',
     email: '',
     password: '',
     crn: '',
@@ -84,13 +45,14 @@ export function SignupView() {
       setLocalError('');
       try {
         await signup({
-          name: form.name,
-          email: form.email,
+          name: form.name.trim(),
+          professionalName: form.professionalName.trim() || undefined,
+          email: form.email.trim(),
           password: form.password,
-          crn: form.crn,
+          crn: form.crn.trim(),
           crnRegional: form.crnRegional,
           specialty: form.specialty || undefined,
-          whatsapp: form.whatsapp || undefined,
+          whatsapp: form.whatsapp.trim() || undefined,
           terms: form.terms,
         });
         // After successful signup, redirect based on onboardingCompleted
@@ -264,14 +226,14 @@ export function SignupView() {
                     <input
                       data-testid="signup-crn"
                       className={'auth-input' + (fieldErrors.crn ? ' auth-input-error' : '')}
-                      placeholder="24781"
+                      placeholder="Ex: 12345"
                       value={form.crn}
                       onChange={(e) => set('crn', e.target.value)}
                     />
                     {fieldErrors.crn && <span className="auth-field-error">{fieldErrors.crn}</span>}
                   </div>
-                  <div className="auth-field" style={{ width: 140 }}>
-                    <label className="auth-label">Regional *</label>
+                  <div className="auth-field" style={{ flex: 1.3 }}>
+                    <label className="auth-label">Região do CRN *</label>
                     <select
                       data-testid="signup-crn-regional"
                       className={
@@ -281,10 +243,10 @@ export function SignupView() {
                       value={form.crnRegional}
                       onChange={(e) => set('crnRegional', e.target.value)}
                     >
-                      <option value="">UF</option>
-                      {UFS.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
+                      <option value="">Selecione...</option>
+                      {CRN_REGIONS.map((r) => (
+                        <option key={r.code} value={r.code}>
+                          {r.label}
                         </option>
                       ))}
                     </select>
@@ -293,29 +255,51 @@ export function SignupView() {
                     )}
                   </div>
                 </div>
+
                 <div className="auth-field">
-                  <label className="auth-label">Especialidade</label>
+                  <label className="auth-label">Como prefere ser chamado(a) pelo paciente?</label>
+                  <input
+                    data-testid="signup-professional-name"
+                    className="auth-input"
+                    placeholder="Ex: Dra. Helena ou Nutri Mari (opcional)"
+                    value={form.professionalName}
+                    onChange={(e) => set('professionalName', e.target.value)}
+                  />
+                  <span className="auth-hint">
+                    Usado pela IA nas mensagens do WhatsApp com seus pacientes.
+                  </span>
+                </div>
+
+                <div className="auth-field">
+                  <label className="auth-label">Área de Atuação Principal</label>
                   <select
                     className="auth-input auth-select"
                     value={form.specialty}
                     onChange={(e) => set('specialty', e.target.value)}
                   >
-                    {SPECIALTIES.map((s) => (
+                    <option value="">Selecione (opcional)...</option>
+                    {CLINICAL_SPECIALTIES.map((s) => (
                       <option key={s.value} value={s.value}>
                         {s.label}
                       </option>
                     ))}
                   </select>
                 </div>
+
                 <div className="auth-field">
-                  <label className="auth-label">WhatsApp (seu número) *</label>
+                  <label className="auth-label">WhatsApp Profissional</label>
                   <input
-                    className="auth-input"
+                    data-testid="signup-whatsapp"
+                    type="tel"
+                    className={'auth-input' + (fieldErrors.whatsapp ? ' auth-input-error' : '')}
                     placeholder="(11) 99999-9999"
                     value={form.whatsapp}
-                    onChange={(e) => set('whatsapp', e.target.value)}
+                    onChange={(e) => set('whatsapp', formatPhone(e.target.value))}
                   />
                   <span className="auth-hint">Seu número de contato — NÃO é o número da IA.</span>
+                  {fieldErrors.whatsapp && (
+                    <span className="auth-field-error">{fieldErrors.whatsapp}</span>
+                  )}
                 </div>
                 <label
                   className={

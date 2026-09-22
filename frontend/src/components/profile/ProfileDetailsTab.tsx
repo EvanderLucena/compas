@@ -2,21 +2,12 @@ import { useState } from 'react';
 import type { NutritionistProfile, UpdateProfileRequest } from '../../types';
 import { updateProfile } from '../../api/nutritionist';
 import { useAuthStore } from '../../stores/authStore';
-
-const CRN_REGIONS = [
-  'CRN-1 (DF, GO, MT, TO)',
-  'CRN-2 (RS)',
-  'CRN-3 (SP, MS)',
-  'CRN-4 (RJ, ES)',
-  'CRN-5 (BA, SE)',
-  'CRN-6 (AL, PB, PE, RN)',
-  'CRN-7 (AC, AM, AP, PA, RO, RR)',
-  'CRN-8 (PR)',
-  'CRN-9 (MG)',
-  'CRN-10 (SC)',
-  'CRN-11 (CE, MA, PI)',
-  'Outro',
-];
+import {
+  CRN_REGIONS,
+  CLINICAL_SPECIALTIES,
+  normalizeCrnRegion,
+  formatPhone,
+} from '../../constants/clinical';
 
 const INPUT_STYLE: React.CSSProperties = {
   padding: '8px 12px',
@@ -31,41 +22,78 @@ const INPUT_STYLE: React.CSSProperties = {
   outline: 'none',
 };
 
-function formatPhone(value: string): string {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length <= 2) return digits.length > 0 ? `(${digits}` : '';
-  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 11) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-  }
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
-}
-
 function BasicFields({
   name,
   setName,
+  professionalName,
+  setProfessionalName,
   email,
+  emailVerified,
 }: {
   name: string;
   setName: (v: string) => void;
+  professionalName: string;
+  setProfessionalName: (v: string) => void;
   email: string;
+  emailVerified?: boolean;
 }) {
   return (
     <>
-      <div>
-        <label className="eyebrow block mb-1">Nome Completo</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Dra. Seu Nome"
-          style={INPUT_STYLE}
-          required
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="eyebrow block mb-1">Nome Completo</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Dra. Seu Nome"
+            style={INPUT_STYLE}
+            required
+          />
+        </div>
+        <div>
+          <label className="eyebrow block mb-1">Nome no WhatsApp dos Pacientes</label>
+          <input
+            type="text"
+            value={professionalName}
+            onChange={(e) => setProfessionalName(e.target.value)}
+            placeholder="Ex: Dra. Helena ou Nutri Mari"
+            style={INPUT_STYLE}
+          />
+        </div>
       </div>
 
       <div>
-        <label className="eyebrow block mb-1">E-mail da Conta</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="eyebrow">E-mail da Conta</label>
+          {emailVerified ? (
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--sage)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontWeight: 600,
+              }}
+            >
+              ✓ E-mail verificado
+            </span>
+          ) : (
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--amber)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontWeight: 500,
+              }}
+            >
+              • Verificação pendente
+            </span>
+          )}
+        </div>
         <input
           type="email"
           value={email}
@@ -126,8 +154,8 @@ function CrnAndContactFields({
           >
             <option value="">Selecione a região...</option>
             {CRN_REGIONS.map((r) => (
-              <option key={r} value={r.split(' ')[0]}>
-                {r}
+              <option key={r.code} value={r.code}>
+                {r.label}
               </option>
             ))}
           </select>
@@ -139,11 +167,17 @@ function CrnAndContactFields({
           <label className="eyebrow block mb-1">Especialidade Principal</label>
           <input
             type="text"
+            list="clinical-specialties-list"
             value={specialty}
             onChange={(e) => setSpecialty(e.target.value)}
             placeholder="Ex: Nutrição Esportiva e Clínica"
             style={INPUT_STYLE}
           />
+          <datalist id="clinical-specialties-list">
+            {CLINICAL_SPECIALTIES.map((s) => (
+              <option key={s.value} value={s.value} />
+            ))}
+          </datalist>
         </div>
         <div>
           <label className="eyebrow block mb-1">WhatsApp Profissional</label>
@@ -168,8 +202,9 @@ interface ProfileDetailsTabProps {
 export function ProfileDetailsTab({ profile, onUpdated }: ProfileDetailsTabProps) {
   const updateUser = useAuthStore((s) => s.updateUser);
   const [name, setName] = useState(profile.name || '');
+  const [professionalName, setProfessionalName] = useState(profile.professionalName || '');
   const [crn, setCrn] = useState(profile.crn || '');
-  const [crnRegional, setCrnRegional] = useState(profile.crnRegional || '');
+  const [crnRegional, setCrnRegional] = useState(normalizeCrnRegion(profile.crnRegional));
   const [specialty, setSpecialty] = useState(profile.specialty || '');
   const [whatsapp, setWhatsapp] = useState(formatPhone(profile.whatsapp || ''));
   const [saving, setSaving] = useState(false);
@@ -186,6 +221,7 @@ export function ProfileDetailsTab({ profile, onUpdated }: ProfileDetailsTabProps
     try {
       const payload: UpdateProfileRequest = {
         name: name.trim(),
+        professionalName: professionalName.trim() || null,
         crn: crn.trim() || null,
         crnRegional: crnRegional.trim() || null,
         specialty: specialty.trim() || null,
@@ -221,7 +257,14 @@ export function ProfileDetailsTab({ profile, onUpdated }: ProfileDetailsTabProps
         </div>
       )}
 
-      <BasicFields name={name} setName={setName} email={profile.email} />
+      <BasicFields
+        name={name}
+        setName={setName}
+        professionalName={professionalName}
+        setProfessionalName={setProfessionalName}
+        email={profile.email}
+        emailVerified={profile.emailVerified}
+      />
       <CrnAndContactFields
         crn={crn}
         setCrn={setCrn}

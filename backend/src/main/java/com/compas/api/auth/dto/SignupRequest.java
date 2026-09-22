@@ -10,6 +10,9 @@ public record SignupRequest(
         @Size(max = 255, message = "Nome deve ter no máximo 255 caracteres")
         String name,
 
+        @Size(max = 100, message = "Nome profissional deve ter no máximo 100 caracteres")
+        String professionalName,
+
         @NotBlank(message = "Email é obrigatório")
         @Email(message = "Email inválido")
         String email,
@@ -23,10 +26,10 @@ public record SignupRequest(
         String crn,
 
         @NotBlank(message = "CRN regional é obrigatório")
-        @Size(min = 2, max = 2, message = "CRN regional deve ter 2 caracteres")
+        @Size(max = 10, message = "CRN regional deve ter no máximo 10 caracteres")
         String crnRegional,
 
-        @Size(max = 50, message = "Especialidade deve ter no máximo 50 caracteres")
+        @Size(max = 100, message = "Especialidade deve ter no máximo 100 caracteres")
         String specialty,
 
         @Size(max = 20, message = "WhatsApp deve ter no máximo 20 caracteres")
@@ -34,4 +37,17 @@ public record SignupRequest(
 
         @AssertTrue(message = "Você deve aceitar os termos")
         boolean terms
-) {}
+) {
+    public SignupRequest(
+            String name,
+            String email,
+            String password,
+            String crn,
+            String crnRegional,
+            String specialty,
+            String whatsapp,
+            boolean terms
+    ) {
+        this(name, null, email, password, crn, crnRegional, specialty, whatsapp, terms);
+    }
+}

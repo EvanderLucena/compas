@@ -127,11 +127,13 @@ public class DataInitializer implements CommandLineRunner {
                 .map(this::normalizeDemoNutritionist)
                 .orElseGet(() -> nutritionistRepository.save(Nutritionist.builder()
                         .name(adminName)
+                        .professionalName("Equipe Compas")
                         .email(adminEmail)
                         .passwordHash(passwordEncoder.encode(adminPassword))
                         .crn("00000")
-                        .crnRegional("SP")
+                        .crnRegional("CRN-3")
                         .role(UserRole.NUTRITIONIST)
+                        .emailVerified(true)
                         .onboardingCompleted(true)
                         .subscriptionTier("UNLIMITED")
                         .patientLimit(9999)
@@ -150,6 +152,10 @@ public class DataInitializer implements CommandLineRunner {
         }
         if (!Boolean.TRUE.equals(nutritionist.getOnboardingCompleted())) {
             nutritionist.setOnboardingCompleted(true);
+            changed = true;
+        }
+        if (!Boolean.TRUE.equals(nutritionist.getEmailVerified())) {
+            nutritionist.setEmailVerified(true);
             changed = true;
         }
         if (!"UNLIMITED".equals(nutritionist.getSubscriptionTier())) {
