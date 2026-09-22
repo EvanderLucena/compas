@@ -1,6 +1,6 @@
 export function IconCompas({
   size = 18,
-  color = 'var(--fg)',
+  color = 'currentColor',
   accentColor = 'var(--lime)',
   className,
 }: {
