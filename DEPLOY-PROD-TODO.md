@@ -6,30 +6,30 @@
 ## 1. Credenciais e secrets
 
 ### 1.1. `DataInitializer` vaza senha em log e tem default previsível
-**Arquivo:** `backend/src/main/java/com/nutriai/api/config/DataInitializer.java`
+**Arquivo:** `backend/src/main/java/com/compas/api/config/DataInitializer.java`
 
 Hoje:
 - Loga `"Admin seed created — email: {} | password: {}"` em INFO (linha ~51) — senha vai pra stdout/ELK em prod.
 - Sem `@Profile` → roda em todos ambientes.
-- Default `Admin123!` se `NUTRIAI_SEED_ADMIN_PASSWORD` ausente.
+- Default `Admin123!` se `COMPAS_SEED_ADMIN_PASSWORD` (ou legado `NUTRIAI_*`) ausente.
 
 **Ação em prod:** escolher UMA das opções:
 - (a) Adicionar `@Profile("dev")` e remover o log da senha (seed some em prod, admin vira cadastro manual).
-- (b) Deletar `DataInitializer` e mover seed para migração Flyway `R__seed_admin.sql` que leia de env var obrigatório (`${env.NUTRIAI_SEED_ADMIN_PASSWORD}`).
+- (b) Deletar `DataInitializer` e mover seed para migração Flyway `R__seed_admin.sql` que leia de env var obrigatório (`${env.COMPAS_SEED_ADMIN_PASSWORD}`).
 
 ### 1.2. `docker/docker-compose.yml` com defaults hardcoded
 Defaults que **entram no repo**:
 ```yaml
 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-NUTRIAI_JWT_SECRET: ${NUTRIAI_JWT_SECRET:-ci-dev-secret-minimum-32-chars-ok!}
-NUTRIAI_SEED_ADMIN_PASSWORD: ${NUTRIAI_SEED_ADMIN_PASSWORD:-admin123}
+COMPAS_JWT_SECRET: ${COMPAS_JWT_SECRET:-ci-dev-secret-minimum-32-chars-ok!}
+COMPAS_SEED_ADMIN_PASSWORD: ${COMPAS_SEED_ADMIN_PASSWORD:-admin123}
 ```
 
 **Ação em prod:** trocar `:-default` por `:?required` (docker-compose falha se var não vier):
 ```yaml
 POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-NUTRIAI_JWT_SECRET: ${NUTRIAI_JWT_SECRET:?required, min 32 chars}
-NUTRIAI_SEED_ADMIN_PASSWORD: ${NUTRIAI_SEED_ADMIN_PASSWORD:?required}
+COMPAS_JWT_SECRET: ${COMPAS_JWT_SECRET:?required, min 32 chars}
+COMPAS_SEED_ADMIN_PASSWORD: ${COMPAS_SEED_ADMIN_PASSWORD:?required}
 ```
 
 ### 1.3. `backend/src/main/resources/application.yml` com default `changeme`
@@ -42,7 +42,7 @@ password: ${SPRING_DATASOURCE_PASSWORD:changeme}
 password: ${SPRING_DATASOURCE_PASSWORD}
 ```
 
-### 1.4. Validar `NUTRIAI_JWT_SECRET` já NÃO tem default em `application.yml`
+### 1.4. Validar `COMPAS_JWT_SECRET` já NÃO tem default em `application.yml`
 Ok. Só garantir que ambiente de prod seta antes do startup.
 
 ## 2. Flyway clean em dev-profile

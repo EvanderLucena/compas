@@ -1,4 +1,4 @@
-# NutriAI — AI Agent Context
+# Compas — AI Agent Context
 
 > This file is the single source of truth for AI agents working on this project. It is read automatically by OpenAI Codex, Claude Code, and similar tools.
 
@@ -69,9 +69,9 @@ Diretrizes:
 
 | Secret | Environment variable | Where to set |
 |--------|---------------------|--------------|
-| PostgreSQL password | `NUTRIAI_DATASOURCE_PASSWORD` | `.env` or Docker env |
-| JWT signing key | `NUTRIAI_JWT_SECRET` | `.env` or Docker env |
-| Seed admin password | `NUTRIAI_SEED_ADMIN_PASSWORD` | `.env` or Docker env |
+| PostgreSQL password | `COMPAS_DATASOURCE_PASSWORD` (ou `NUTRIAI_*`) | `.env` or Docker env |
+| JWT signing key | `COMPAS_JWT_SECRET` (ou `NUTRIAI_*`) | `.env` or Docker env |
+| Seed admin password | `COMPAS_SEED_ADMIN_PASSWORD` (ou `NUTRIAI_*`) | `.env` or Docker env |
 | Ollama Cloud API key | `OLLAMA_API_KEY` | GitHub Actions repo secrets **and** Dependabot repo secrets |
 | OpenAI fallback review key | `OPENAI_API_KEY` | GitHub repo secrets |
 
@@ -190,7 +190,7 @@ Casos cobertos por testes em `.github/scripts/test-ai-review-filter.sh` — rode
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**NutriAI**
+**Compas** (anteriormente NutriAI)
 
 Painel clínico para nutricionistas solo (Brasil) que gerencia pacientes, planos alimentares, catálogo de alimentos e insights — com IA respondendo ao paciente via WhatsApp com base no plano alimentar. Hoje é um protótipo funcional (HTML/CSS/JS puro, React 18 via CDN, dados mockados) e precisa migrar para produção: monorepo com frontend moderno (React+TypeScript+Vite+Tailwind), backend real (Java 21+Spring Boot+PostgreSQL), e containers Docker para deploy em VPS.
 
@@ -629,7 +629,7 @@ cd C:\Users\evand\Documents\NutriAI\backend && ./gradlew bootRun
 # — OR — if you need a standalone jar:
 ./gradlew bootJar
 Start-Process -FilePath "C:\Program Files\Eclipse Adoptium\jdk-21.0.3.9-hotspot\bin\java.exe" `
-  -ArgumentList "-jar","C:\Users\evand\Documents\NutriAI\backend\build\libs\nutriai-api-0.1.0.jar" `
+  -ArgumentList "-jar","C:\Users\evand\Documents\NutriAI\backend\build\libs\compas-api-0.5.0.jar" `
   -RedirectStandardOutput "C:\Users\evand\Documents\NutriAI\backend\stdout.log" `
   -RedirectStandardError "C:\Users\evand\Documents\NutriAI\backend\stderr.log" `
   -WindowStyle Hidden
@@ -789,7 +789,7 @@ frontend/          React 19 + TypeScript + Vite + Tailwind CSS 4
     components/     Reusable UI components
     e2e/            Playwright end-to-end tests
 backend/           Java 21 + Spring Boot 3.5 + Gradle
-  src/main/java/com/nutriai/api/
+  src/main/java/com/compas/api/
     auth/           JWT auth, SecurityConfig, NutritionistAccess
     controller/     REST controllers (PatientController, FoodController, PlanController)
     service/        Business logic

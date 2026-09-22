@@ -1,4 +1,4 @@
-# NutriAI — Claude Code Context
+# Compas — Claude Code Context
 
 > **Single source of truth: `AGENTS.md`** — All project context, conventions, architecture, CI/CD, and development workflow are documented there. Read it fully before starting work.
 
