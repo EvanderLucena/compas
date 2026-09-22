@@ -64,7 +64,7 @@ tasks.named('check') {
     dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 
-group = 'com.nutriai'
+group = 'com.compas'
 version = '0.5.0'
 
 java {

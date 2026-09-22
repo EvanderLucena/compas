@@ -13,16 +13,30 @@ spring:
   flyway:
     enabled: false
 
-nutriai:
+compas:
   version: 0.2.0
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long-for-hmac-sha-256-algorithm-minimum
     access-token-expiration: 900000
     refresh-token-expiration: 604800000
     cookie:
-      name: nutriai_refresh
+      name: compas_refresh
       path: /api/v1/auth
       max-age: 604800
       http-only: true
       secure: false
       same-site: Lax
+
+nutriai:
+  version: ${compas.version}
+  jwt:
+    secret: ${compas.jwt.secret}
+    access-token-expiration: ${compas.jwt.access-token-expiration}
+    refresh-token-expiration: ${compas.jwt.refresh-token-expiration}
+    cookie:
+      name: nutriai_refresh
+      path: ${compas.jwt.cookie.path}
+      max-age: ${compas.jwt.cookie.max-age}
+      http-only: ${compas.jwt.cookie.http-only}
+      secure: ${compas.jwt.cookie.secure}
+      same-site: ${compas.jwt.cookie.same-site}
