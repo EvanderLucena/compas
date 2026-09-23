@@ -84,20 +84,20 @@
 ## Telas P1 — A fazer (Ordem de Execução Aprovada)
 
 ### 1. Documentos e PDFs do Paciente ("Trio de Ouro")
-- [ ] **Geração de PDFs Oficiais do Paciente** — motor de PDF no backend (ou frontend com headless/pdfkit/openhtmltopdf) para atender os três documentos mais solicitados:
+- [x] **Geração de PDFs Oficiais do Paciente** — Implementado via `PatientDocumentService` + `PatientDocumentController` (backend) e `documents.ts` + botões em `PlansView.tsx`/`PatientView.tsx` (frontend):
   - **1. Plano Alimentar Oficial:** Cabeçalho profissional com dados da nutri (nome, CRN/regional, especialidade, contato), divisões de refeições, horários, alimentos, porções em medidas caseiras, opções substitutas e orientações gerais.
   - **2. Lista de Compras da Semana:** Agrupada por setores de supermercado (Hortifrúti, Açougue/Proteínas, Laticínios, Mercearia/Grãos) calculada proporcionalmente ao plano prescrito.
   - **3. Relatório de Evolução Biométrica:** Gráfico de evolução de peso/%gordura, tabela com histórico de dobras cutâneas e perimetria, e deltas de evolução assinados pela nutri.
   - Disponível para download manual no prontuário do paciente e via envio automatizado sob demanda pelo WhatsApp quando o paciente solicitar.
 
 ### 2. Verificação de E-mail via Resend
-- [ ] **Confirmação de E-mail do Nutricionista** — integração com a API do Resend:
+- [x] **Confirmação de E-mail do Nutricionista** — integração com a API do Resend (implementado backend + frontend):
   - Backend: `ResendEmailService` com envio de e-mail transacional contendo token seguro com expiração de 24h. Fallback gracioso para log em ambiente de desenvolvimento local.
   - Endpoints: `POST /api/v1/auth/verify-email` e `POST /api/v1/auth/resend-verification`.
   - Frontend: Banner sutil no topo do dashboard enquanto `emailVerified = false` (com botão de reenviar) e página pública dedicada `/verify-email?token=...` para validação.
 
 ### 3. Portal Admin de Gestão da Frota WhatsApp (`/admin/whatsapp`)
-- [ ] **Painel Administrativo da Frota de Chips/Instâncias:**
+- [x] **Painel Administrativo da Frota de Chips/Instâncias:** (PR #165 backend + PR #167 frontend — merged)
   - **Tabela de Instâncias (`whatsapp_instances`):** Registro de instâncias da Evolution API com colunas para nome, telefone, status (`CONNECTED`, `CONNECTING`, `DISCONNECTED`, `BANNED`), flag `accepts_new_patients` e contadores de nutris e pacientes vinculados.
   - **Conexão Fácil com QR Code:** Botão "Adicionar Número" / "Reconectar" que solicita sessão à Evolution API e renderiza o QR Code em tempo real no navegador do admin para escaneamento imediato pelo celular.
   - **Vínculo Imutável (*Sticky Affinity*):** Todo paciente tem seu `whatsapp_instance_id` fixado no banco de dados. Uma vez vinculado a um número, o paciente nunca tem seu número alterado automaticamente, garantindo continuidade do histórico e zero confusão com a nutri.
@@ -421,8 +421,8 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 6. ~~Insights — hover no gráfico~~ ✅
 7. ~~Landing Page + Cadastro + Login + Onboarding~~ ✅
 8. ~~Landing iterada: pricing, mockups, IA, funcionalidades~~ ✅
-9. **Geração de Documentos e PDFs do Paciente** (Plano Oficial com CRN, Lista de Compras, Relatório Biométrico)
-10. **Verificação de E-mail via Resend** (Backend Resend service + endpoints + banner dashboard + tela pública de validação)
-11. **Portal Admin da Frota WhatsApp** (Gestão de instâncias, QR Code nativo, Sticky Routing, alertas de queda e limites)
+9. ~~Geração de Documentos e PDFs do Paciente~~ ✅ (PatientDocumentService + PatientDocumentController + frontend buttons)
+10. ~~Verificação de E-mail via Resend~~ ✅ (ResendEmailService + endpoints + banner dashboard + tela pública de validação)
+11. ~~Portal Admin da Frota WhatsApp~~ ✅ (PR #165 + PR #167)
 12. **Gestão de Planos, Modo Leitura (Read-Only) & Fallback Amigável da IA** (GET liberado, escrita bloqueada, corte de IA no WhatsApp com mensagem acolhedora e fallback universal)
 13. **Pagamentos Stripe, Deploys e VPS** (Checkout, Customer Portal, Webhooks, Docker em VPS)

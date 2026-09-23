@@ -30,6 +30,7 @@ class MealPlanServiceTest {
     @Mock private EpisodeRepository episodeRepository;
     @Mock private EpisodeHistoryEventRepository historyEventRepository;
     @Mock private JevService jevService;
+    @Mock private SubscriptionService subscriptionService;
 
     @InjectMocks
     private MealPlanService mealPlanService;
@@ -478,5 +479,18 @@ class MealPlanServiceTest {
 
         assertThrows(ResourceNotFoundException.class, () ->
                 mealPlanService.adoptFrequentFoodAsAlternativeOption(nutritionistId, patientId, slotId, req));
+    }
+
+    @Test
+    void updatePlan_whenSubscriptionInactive_throwsSubscriptionRequiredException() {
+        doThrow(new com.compas.api.exception.SubscriptionRequiredException("Modo Leitura ativo"))
+                .when(subscriptionService).assertSubscriptionActive(nutritionistId);
+
+        com.compas.api.dto.plan.UpdatePlanRequest req = new com.compas.api.dto.plan.UpdatePlanRequest(
+                "Novo Plano", null, null, null, null, null
+        );
+
+        assertThrows(com.compas.api.exception.SubscriptionRequiredException.class,
+                () -> mealPlanService.updatePlan(nutritionistId, patientId, req));
     }
 }

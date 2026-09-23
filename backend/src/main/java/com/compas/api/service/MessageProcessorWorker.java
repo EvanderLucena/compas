@@ -129,7 +129,8 @@ public class MessageProcessorWorker {
         }
 
         if (message.getRetryCount() >= MAX_RETRIES) {
-            log.warn("Message {} exceeded max retries ({}), skipping", messageId, MAX_RETRIES);
+            log.warn("Message {} exceeded max retries ({}), sending technical fallback", messageId, MAX_RETRIES);
+            conversationService.sendTechnicalFallback(messageId);
             return;
         }
 

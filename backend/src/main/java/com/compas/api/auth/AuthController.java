@@ -56,7 +56,9 @@ public class AuthController {
                         result.user().email(),
                         result.user().role(),
                         result.user().onboardingCompleted(),
-                        result.user().emailVerified()
+                        result.user().emailVerified(),
+                        result.user().subscriptionActive(),
+                        result.user().readOnly()
                 )
         ));
     }
@@ -78,7 +80,9 @@ public class AuthController {
                         result.user().email(),
                         result.user().role(),
                         result.user().onboardingCompleted(),
-                        result.user().emailVerified()
+                        result.user().emailVerified(),
+                        result.user().subscriptionActive(),
+                        result.user().readOnly()
                 )
         ));
     }
@@ -106,7 +110,9 @@ public class AuthController {
                         result.user().email(),
                         result.user().role(),
                         result.user().onboardingCompleted(),
-                        result.user().emailVerified()
+                        result.user().emailVerified(),
+                        result.user().subscriptionActive(),
+                        result.user().readOnly()
                 )
         ));
     }
@@ -171,7 +177,9 @@ public class AuthController {
             String email,
             String role,
             Boolean onboardingCompleted,
-            Boolean emailVerified
+            Boolean emailVerified,
+            Boolean subscriptionActive,
+            Boolean readOnly
     ) {
         return Map.of(
                 "id", id,
@@ -179,7 +187,9 @@ public class AuthController {
                 "email", email,
                 "role", role,
                 "onboardingCompleted", onboardingCompleted,
-                "emailVerified", emailVerified != null ? emailVerified : false
+                "emailVerified", emailVerified != null ? emailVerified : false,
+                "subscriptionActive", subscriptionActive != null ? subscriptionActive : true,
+                "readOnly", readOnly != null ? readOnly : false
         );
     }
 

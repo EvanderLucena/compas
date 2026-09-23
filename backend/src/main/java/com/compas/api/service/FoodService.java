@@ -29,10 +29,12 @@ public class FoodService {
 
     private final FoodRepository foodRepository;
     private final JevService jevService;
+    private final SubscriptionService subscriptionService;
 
-    public FoodService(FoodRepository foodRepository, JevService jevService) {
+    public FoodService(FoodRepository foodRepository, JevService jevService, SubscriptionService subscriptionService) {
         this.foodRepository = foodRepository;
         this.jevService = jevService;
+        this.subscriptionService = subscriptionService;
     }
 
     @Transactional(readOnly = true)
@@ -45,6 +47,7 @@ public class FoodService {
 
     @Transactional
     public FoodResponse createFood(UUID nutritionistId, CreateFoodRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         validateUnit(req.unit());
         validateCategory(req.category());
 
@@ -99,6 +102,7 @@ public class FoodService {
 
     @Transactional
     public FoodResponse updateFood(UUID nutritionistId, UUID foodId, UpdateFoodRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         Food food = foodRepository.findAvailableById(foodId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alimento", foodId));
 
@@ -133,6 +137,7 @@ public class FoodService {
 
     @Transactional
     public void deleteFood(UUID nutritionistId, UUID foodId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         Food food = foodRepository.findAvailableById(foodId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alimento", foodId));
 

@@ -37,6 +37,7 @@ class BiometryServiceTest {
     @Mock private MealPlanRepository mealPlanRepository;
     @Mock private MealSlotRepository mealSlotRepository;
     @Mock private MealOptionRepository mealOptionRepository;
+    @Mock private SubscriptionService subscriptionService;
 
     @InjectMocks
     private BiometryService biometryService;
@@ -614,5 +615,21 @@ class BiometryServiceTest {
         assertTrue(context.contains("EVOLUÇÃO BIOMÉTRICA"));
         assertTrue(context.contains("80") && context.contains("kg"));
         assertTrue(context.contains("20") && context.contains("%"));
+    }
+
+    @Test
+    void createAssessment_whenSubscriptionInactive_throwsSubscriptionRequiredException() {
+        doThrow(new com.compas.api.exception.SubscriptionRequiredException("Modo Leitura ativo"))
+                .when(subscriptionService).assertSubscriptionActive(nutritionistId);
+
+        com.compas.api.dto.biometry.CreateBiometryAssessmentRequest req =
+                new com.compas.api.dto.biometry.CreateBiometryAssessmentRequest(
+                        java.time.LocalDate.now(),
+                        new BigDecimal("75.5"),
+                        null, null, null, null, null, null, null, null
+                );
+
+        assertThrows(com.compas.api.exception.SubscriptionRequiredException.class,
+                () -> biometryService.createAssessment(nutritionistId, patientId, req));
     }
 }

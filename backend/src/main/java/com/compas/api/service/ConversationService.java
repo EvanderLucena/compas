@@ -159,6 +159,33 @@ public class ConversationService {
             return;
         }
 
+        // 3.2 If nutritionist subscription is inactive/expired → do not process with LLM, send friendly pause notification
+        if (!nutritionist.isSubscriptionActive()) {
+            log.info("Nutritionist {} subscription is inactive/expired, sending friendly pause notice to patient {}",
+                    nutritionist.getId(), patient.getId());
+            String pausedText = "Olá, " + patient.getName() + "! No momento, o atendimento da assistente virtual do consultório está temporariamente pausado. Por favor, entre em contato diretamente com o(a) seu(sua) nutricionista " + nutritionist.getDisplayName() + ". Tenha um ótimo dia!";
+
+            WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                    .messageId(messageId)
+                    .nutritionistId(nutritionist.getId())
+                    .patientId(patient.getId())
+                    .responseType("SUBSCRIPTION_INACTIVE")
+                    .responseContent(pausedText)
+                    .build();
+            whatsAppResponseRepository.save(waResponse);
+
+            boolean sent = evolutionApiService.sendMessage(
+                    message.getSenderPhoneNormalized(),
+                    pausedText
+            );
+            if (sent) {
+                waResponse.setSentAt(LocalDateTime.now());
+                whatsAppResponseRepository.save(waResponse);
+            }
+            markProcessed(message);
+            return;
+        }
+
         // 4. Check if this is the first message from this patient
         boolean isFirstMessage = isFirstMessageFromPatient(message.getPatientId());
 
@@ -260,11 +287,22 @@ public class ConversationService {
         }
 
         LlmRequest llmRequest = new LlmRequest(systemPrompt, userMessage, imageUrl, 0.3, 1500);
-        LlmResponse llmResponse = llmService.chat(llmRequest);
+        LlmResponse llmResponse;
+        try {
+            llmResponse = llmService.chat(llmRequest);
+        } catch (Exception e) {
+            log.error("LLM execution error for message {}: {}", messageId, e.getMessage(), e);
+            llmResponse = LlmResponse.failed(e.getMessage());
+        }
 
         if (!llmResponse.success()) {
             log.error("LLM call failed for message {}: {}", messageId, llmResponse.errorMessage());
-            // Don't mark as processed — message stays for retry
+            if (message.getRetryCount() != null && message.getRetryCount() >= 2) {
+                // Last retry attempt exhausted — send friendly technical fallback (D-12)
+                sendTechnicalFallback(message, patient, nutritionist);
+                return;
+            }
+            // Message stays unprocessed for retry
             return;
         }
 
@@ -833,6 +871,53 @@ public class ConversationService {
         return trimmed.startsWith("{") || trimmed.startsWith("[")
                 || trimmed.contains("\"meals\"") || trimmed.contains("\"mealLabel\"")
                 || trimmed.contains("\"items\"");
+    }
+
+    public void sendTechnicalFallback(UUID messageId) {
+        Optional<WhatsAppMessage> messageOpt = whatsAppMessageRepository.findById(messageId);
+        if (messageOpt.isEmpty()) {
+            return;
+        }
+        WhatsAppMessage message = messageOpt.get();
+        if (message.getPatientId() == null || message.getNutritionistId() == null) {
+            markProcessed(message);
+            return;
+        }
+        Optional<Patient> patientOpt = patientRepository.findByIdAndNutritionistId(
+                message.getPatientId(), message.getNutritionistId());
+        Optional<Nutritionist> nutritionistOpt = nutritionistRepository.findById(message.getNutritionistId());
+
+        if (patientOpt.isPresent() && nutritionistOpt.isPresent()) {
+            sendTechnicalFallback(message, patientOpt.get(), nutritionistOpt.get());
+        } else {
+            markProcessed(message);
+        }
+    }
+
+    public void sendTechnicalFallback(WhatsAppMessage message, Patient patient, Nutritionist nutritionist) {
+        log.info("Sending resilient technical fallback for message {} (patient {})", message.getId(), patient.getId());
+        String fallbackText = "Olá, " + patient.getName() + "! Tive uma breve oscilação na conexão ao processar sua mensagem agora. "
+                + "Já guardei o que você enviou, mas se for algo urgente, fique à vontade para falar diretamente com o(a) seu(sua) nutricionista "
+                + nutritionist.getDisplayName() + ". Tenha um excelente dia!";
+
+        WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                .messageId(message.getId())
+                .nutritionistId(nutritionist.getId())
+                .patientId(patient.getId())
+                .responseType("TECHNICAL_FALLBACK")
+                .responseContent(fallbackText)
+                .build();
+        whatsAppResponseRepository.save(waResponse);
+
+        boolean sent = evolutionApiService.sendMessage(
+                message.getSenderPhoneNormalized(),
+                fallbackText
+        );
+        if (sent) {
+            waResponse.setSentAt(LocalDateTime.now());
+            whatsAppResponseRepository.save(waResponse);
+        }
+        markProcessed(message);
     }
 
     private void markProcessed(WhatsAppMessage message) {

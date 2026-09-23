@@ -86,6 +86,27 @@ public class Nutritionist {
     @Builder.Default
     private Integer patientLimit = 15;
 
+    public boolean isSubscriptionActive() {
+        if (subscriptionTier == null) {
+            return false;
+        }
+        String tier = subscriptionTier.trim().toUpperCase(java.util.Locale.ROOT);
+        if ("UNLIMITED".equals(tier) || "PRO".equals(tier) || "STARTER".equals(tier)) {
+            return true;
+        }
+        if ("TRIAL".equals(tier)) {
+            if (trialEndsAt == null) {
+                return true;
+            }
+            return trialEndsAt.isAfter(LocalDateTime.now(ZoneOffset.UTC));
+        }
+        return false;
+    }
+
+    public boolean isReadOnly() {
+        return !isSubscriptionActive();
+    }
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

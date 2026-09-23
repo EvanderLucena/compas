@@ -33,6 +33,7 @@ public class MealPlanService {
     private final EpisodeRepository episodeRepository;
     private final EpisodeHistoryEventRepository historyEventRepository;
     private final JevService jevService;
+    private final SubscriptionService subscriptionService;
 
     public MealPlanService(MealPlanRepository mealPlanRepository,
                            MealSlotRepository mealSlotRepository,
@@ -43,7 +44,8 @@ public class MealPlanService {
                            PatientRepository patientRepository,
                            EpisodeRepository episodeRepository,
                            EpisodeHistoryEventRepository historyEventRepository,
-                           JevService jevService) {
+                           JevService jevService,
+                           SubscriptionService subscriptionService) {
         this.mealPlanRepository = mealPlanRepository;
         this.mealSlotRepository = mealSlotRepository;
         this.mealOptionRepository = mealOptionRepository;
@@ -54,6 +56,7 @@ public class MealPlanService {
         this.episodeRepository = episodeRepository;
         this.historyEventRepository = historyEventRepository;
         this.jevService = jevService;
+        this.subscriptionService = subscriptionService;
     }
 
     @Transactional
@@ -122,6 +125,7 @@ public class MealPlanService {
 
     @Transactional
     public PlanResponse updatePlan(UUID nutritionistId, UUID patientId, UpdatePlanRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealPlan plan = getPlanAndVerifyOwnership(nutritionistId, patientId);
 
         if (req.title() != null) plan.setTitle(req.title());
@@ -137,6 +141,7 @@ public class MealPlanService {
 
     @Transactional
     public MealSlotResponse addMealSlot(UUID nutritionistId, UUID patientId, AddMealSlotRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealPlan plan = getPlanAndVerifyOwnership(nutritionistId, patientId);
 
         int maxSort = mealSlotRepository.findByPlanIdOrderBySortOrder(plan.getId())
@@ -164,6 +169,7 @@ public class MealPlanService {
 
     @Transactional
     public MealSlotResponse updateMealSlot(UUID nutritionistId, UUID mealSlotId, String label, String time) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealSlot slot = findSlotAndVerifyOwnership(nutritionistId, mealSlotId);
 
         if (label != null) slot.setLabel(label);
@@ -180,6 +186,7 @@ public class MealPlanService {
 
     @Transactional
     public void deleteMealSlot(UUID nutritionistId, UUID mealSlotId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealSlot slot = findSlotAndVerifyOwnership(nutritionistId, mealSlotId);
 
         List<MealOption> options = mealOptionRepository.findByMealSlotIdOrderBySortOrder(slot.getId());
@@ -193,6 +200,7 @@ public class MealPlanService {
 
     @Transactional
     public MealOptionResponse addOption(UUID nutritionistId, UUID mealSlotId, AddOptionRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealSlot slot = findSlotAndVerifyOwnership(nutritionistId, mealSlotId);
 
         int maxSort = mealOptionRepository.findByMealSlotIdOrderBySortOrder(slot.getId())
@@ -210,6 +218,7 @@ public class MealPlanService {
 
     @Transactional
     public MealOptionResponse updateOption(UUID nutritionistId, UUID optionId, String name) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealOption option = findOptionAndVerifyOwnership(nutritionistId, optionId);
 
         if (name != null) option.setName(name);
@@ -221,6 +230,7 @@ public class MealPlanService {
 
     @Transactional
     public void deleteOption(UUID nutritionistId, UUID optionId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealOption option = findOptionAndVerifyOwnership(nutritionistId, optionId);
 
         mealFoodRepository.deleteAllByOptionId(optionId);
@@ -230,6 +240,7 @@ public class MealPlanService {
 
     @Transactional
     public MealFoodResponse addFoodItem(UUID nutritionistId, UUID optionId, AddFoodItemRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealOption option = findOptionAndVerifyOwnership(nutritionistId, optionId);
 
         Food food = foodRepository.findAvailableById(req.foodId(), nutritionistId)
@@ -269,6 +280,7 @@ public class MealPlanService {
 
     @Transactional
     public MealFoodResponse updateFoodItem(UUID nutritionistId, UUID itemId, UpdateFoodItemRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealFood item = findFoodItemAndVerifyOwnership(nutritionistId, itemId);
 
         if (req.referenceAmount() != null) {
@@ -294,6 +306,7 @@ public class MealPlanService {
 
     @Transactional
     public void deleteFoodItem(UUID nutritionistId, UUID itemId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealFood item = findFoodItemAndVerifyOwnership(nutritionistId, itemId);
         mealFoodRepository.delete(item);
         logger.info("Food item deleted: id={}", itemId);
@@ -301,6 +314,7 @@ public class MealPlanService {
 
     @Transactional
     public ExtraResponse addExtra(UUID nutritionistId, UUID patientId, AddExtraRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealPlan plan = getPlanAndVerifyOwnership(nutritionistId, patientId);
 
         int maxSort = planExtraRepository.findByPlanIdOrderBySortOrder(plan.getId())
@@ -323,6 +337,7 @@ public class MealPlanService {
 
     @Transactional
     public ExtraResponse updateExtra(UUID nutritionistId, UUID extraId, UpdateExtraRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         PlanExtra extra = findExtraAndVerifyOwnership(nutritionistId, extraId);
 
         if (req.name() != null) extra.setName(req.name());
@@ -338,6 +353,7 @@ public class MealPlanService {
 
     @Transactional
     public void deleteExtra(UUID nutritionistId, UUID extraId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         PlanExtra extra = findExtraAndVerifyOwnership(nutritionistId, extraId);
         planExtraRepository.delete(extra);
         logger.info("Extra deleted: id={}", extraId);
@@ -476,6 +492,7 @@ public class MealPlanService {
     @Transactional
     public MealOptionResponse adoptFrequentFoodAsAlternativeOption(
             UUID nutritionistId, UUID patientId, UUID mealSlotId, AdoptFrequentFoodRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         MealSlot slot = findSlotForPatientAndVerifyOwnership(nutritionistId, patientId, mealSlotId);
 
         List<MealOption> existingOptions = mealOptionRepository.findByMealSlotIdOrderBySortOrder(slot.getId());
