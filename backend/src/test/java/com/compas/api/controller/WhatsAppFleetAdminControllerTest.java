@@ -8,12 +8,14 @@ import com.compas.api.model.WhatsAppInstance;
 import com.compas.api.model.WhatsAppInstanceStatus;
 import com.compas.api.repository.NutritionistRepository;
 import com.compas.api.repository.WhatsAppInstanceRepository;
+import com.compas.api.service.EvolutionApiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -22,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -51,6 +55,9 @@ class WhatsAppFleetAdminControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @MockBean
+    private EvolutionApiService evolutionApiService;
 
     private String adminToken;
     private String nutriToken;
@@ -139,6 +146,8 @@ class WhatsAppFleetAdminControllerTest {
 
     @Test
     void deleteInstance_asAdmin_returns200() throws Exception {
+        when(evolutionApiService.deleteInstance(anyString())).thenReturn(true);
+
         WhatsAppInstance inst = instanceRepository.save(WhatsAppInstance.builder()
                 .name("to-delete-" + System.currentTimeMillis())
                 .status(WhatsAppInstanceStatus.DISCONNECTED)

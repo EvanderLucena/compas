@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -137,8 +138,32 @@ class WhatsAppFleetServiceTest {
                 "compas-chip-01", null, null, null);
         when(instanceRepository.findByName("compas-chip-01")).thenReturn(Optional.of(instance1));
 
-        assertThrows(ResponseStatusException.class, () -> fleetService.createInstance(req));
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> fleetService.createInstance(req));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
     }
+
+    @Test
+    void deleteInstance_gatewayFailure_throwsBadGateway() {
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(evolutionApiService.deleteInstance("compas-chip-01")).thenReturn(false);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> fleetService.deleteInstance(instanceId1));
+        assertEquals(HttpStatus.BAD_GATEWAY, ex.getStatusCode());
+    }
+
+    @Test
+    void migratePatients_targetInactive_throwsBadRequest() {
+        instance2.setActive(false);
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(instanceRepository.findById(instanceId2)).thenReturn(Optional.of(instance2));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> fleetService.migratePatients(instanceId1, instanceId2));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+    }
+
 
     @Test
     void connectInstance_returnsQrCodeWhenAvailable() {

@@ -36,6 +36,10 @@ compas:
       email: ${COMPAS_SEED_ADMIN_EMAIL:${NUTRIAI_SEED_ADMIN_EMAIL:admin@compas.app}}
       password: ${COMPAS_SEED_ADMIN_PASSWORD:${NUTRIAI_SEED_ADMIN_PASSWORD:Admin123!}}
       name: ${COMPAS_SEED_ADMIN_NAME:${NUTRIAI_SEED_ADMIN_NAME:Admin Compas}}
+    fleet-admin:
+      enabled: ${COMPAS_SEED_FLEET_ADMIN_ENABLED:true}
+      email: ${COMPAS_SEED_FLEET_ADMIN_EMAIL:fleet@compas.app}
+      password: ${COMPAS_SEED_FLEET_ADMIN_PASSWORD:${compas.seed.admin.password}}
 
 nutriai:
   jwt:

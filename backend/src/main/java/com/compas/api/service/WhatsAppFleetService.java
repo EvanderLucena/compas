@@ -239,8 +239,12 @@ public class WhatsAppFleetService {
     @Transactional
     public void deleteInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
+        boolean success = evolutionApiService.deleteInstance(instance.getName());
+        if (!success) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY, "Falha ao remover instância no gateway Evolution");
+        }
         patientRepository.clearInstanceFromPatients(id, null);
-        evolutionApiService.deleteInstance(instance.getName());
         instanceRepository.delete(instance);
     }
 
@@ -258,7 +262,14 @@ public class WhatsAppFleetService {
             );
         }
         findInstanceOrThrow(sourceId);
-        findInstanceOrThrow(targetId);
+        WhatsAppInstance target = findInstanceOrThrow(targetId);
+        if (!Boolean.TRUE.equals(target.getActive()) || target.getStatus() == WhatsAppInstanceStatus.BANNED
+                || target.getStatus() == WhatsAppInstanceStatus.DISABLED) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Instância de destino não está ativa para receber pacientes."
+            );
+        }
 
         int count = patientRepository.reassignPatients(sourceId, targetId, nutritionistId);
         log.info("Migrated {} patients from WhatsApp instance {} to {} (nutritionistId={})",

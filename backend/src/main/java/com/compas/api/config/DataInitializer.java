@@ -72,6 +72,9 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${compas.seed.admin.name:${nutriai.seed.admin.name:Admin Compas}}")
     private String adminName;
 
+    @Value("${compas.seed.fleet-admin.enabled:false}")
+    private boolean fleetAdminEnabled;
+
     @Value("${compas.seed.fleet-admin.email:${nutriai.seed.fleet-admin.email:fleet@compas.app}}")
     private String fleetAdminEmail;
 
@@ -174,6 +177,9 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void ensureDemoAdmin() {
+        if (!fleetAdminEnabled) {
+            return;
+        }
         if (nutritionistRepository.findByEmail(fleetAdminEmail).isEmpty()) {
             nutritionistRepository.save(Nutritionist.builder()
                     .name("Administrador Compas")
