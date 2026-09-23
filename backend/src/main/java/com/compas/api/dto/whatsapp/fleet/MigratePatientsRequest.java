@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record MigratePatientsRequest(
         @NotNull(message = "ID da instância de destino é obrigatório")
-        UUID targetInstanceId
+        UUID targetInstanceId,
+        UUID nutritionistId
 ) {
 }

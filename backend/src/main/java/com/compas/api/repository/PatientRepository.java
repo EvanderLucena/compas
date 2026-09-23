@@ -92,16 +92,21 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
     Page<Patient> findByWhatsappInstanceIdAndActiveTrue(UUID instanceId, Pageable pageable);
 
     /**
-     * Reassign all patients from one fleet instance to another.
+     * Reassign patients from one fleet instance to another, with optional nutritionist scope.
      */
     @org.springframework.data.jpa.repository.Modifying
-    @Query("UPDATE Patient p SET p.whatsappInstanceId = :targetInstanceId WHERE p.whatsappInstanceId = :sourceInstanceId")
-    int reassignAllPatients(@Param("sourceInstanceId") UUID sourceInstanceId, @Param("targetInstanceId") UUID targetInstanceId);
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = :targetInstanceId WHERE p.whatsappInstanceId = :sourceInstanceId AND (:nutritionistId IS NULL OR p.nutritionistId = :nutritionistId)")
+    int reassignPatients(
+            @Param("sourceInstanceId") UUID sourceInstanceId,
+            @Param("targetInstanceId") UUID targetInstanceId,
+            @Param("nutritionistId") UUID nutritionistId);
 
     /**
-     * Clear instance assignment from patients when an instance is removed.
+     * Clear instance assignment from patients when an instance is removed, with optional nutritionist scope.
      */
     @org.springframework.data.jpa.repository.Modifying
-    @Query("UPDATE Patient p SET p.whatsappInstanceId = NULL WHERE p.whatsappInstanceId = :instanceId")
-    int clearInstanceFromPatients(@Param("instanceId") UUID instanceId);
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = NULL WHERE p.whatsappInstanceId = :instanceId AND (:nutritionistId IS NULL OR p.nutritionistId = :nutritionistId)")
+    int clearInstanceFromPatients(
+            @Param("instanceId") UUID instanceId,
+            @Param("nutritionistId") UUID nutritionistId);
 }

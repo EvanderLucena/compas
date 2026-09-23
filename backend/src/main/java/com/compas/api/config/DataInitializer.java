@@ -72,6 +72,12 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${compas.seed.admin.name:${nutriai.seed.admin.name:Admin Compas}}")
     private String adminName;
 
+    @Value("${compas.seed.fleet-admin.email:${nutriai.seed.fleet-admin.email:fleet@compas.app}}")
+    private String fleetAdminEmail;
+
+    @Value("${compas.seed.fleet-admin.password:${compas.seed.admin.password:${nutriai.seed.admin.password:Admin123!}}}")
+    private String fleetAdminPassword;
+
     public DataInitializer(
             NutritionistRepository nutritionistRepository,
             PasswordEncoder passwordEncoder,
@@ -168,13 +174,12 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void ensureDemoAdmin() {
-        String fleetAdminEmail = "fleet@compas.app";
         if (nutritionistRepository.findByEmail(fleetAdminEmail).isEmpty()) {
             nutritionistRepository.save(Nutritionist.builder()
                     .name("Administrador Compas")
                     .professionalName("Compas Fleet")
                     .email(fleetAdminEmail)
-                    .passwordHash(passwordEncoder.encode(adminPassword))
+                    .passwordHash(passwordEncoder.encode(fleetAdminPassword))
                     .crn("00000")
                     .crnRegional("CRN-3")
                     .role(UserRole.ADMIN)
@@ -183,9 +188,10 @@ public class DataInitializer implements CommandLineRunner {
                     .subscriptionTier("UNLIMITED")
                     .patientLimit(9999)
                     .build());
-            logger.info("Demo Fleet Admin created: {}", fleetAdminEmail);
+            logger.info("Dev seed Fleet Admin created: {}", fleetAdminEmail);
         }
     }
+
 
     private List<Food> ensureDemoFoods(UUID nutritionistId) {
         if (foodRepository.findByNutritionistId(nutritionistId, PageRequest.of(0, 1)).hasContent()) {

@@ -101,7 +101,7 @@ public class WhatsAppFleetAdminController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> migratePatients(
             @PathVariable UUID id,
             @Valid @RequestBody MigratePatientsRequest request) {
-        int count = fleetService.migratePatients(id, request.targetInstanceId());
+        int count = fleetService.migratePatients(id, request.targetInstanceId(), request.nutritionistId());
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "message", count + " pacientes migrados com sucesso",
                 "migratedCount", count

@@ -167,13 +167,33 @@ class WhatsAppFleetServiceTest {
     void migratePatients_reassignsPatientsToTarget() {
         when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
         when(instanceRepository.findById(instanceId2)).thenReturn(Optional.of(instance2));
-        when(patientRepository.reassignAllPatients(instanceId1, instanceId2)).thenReturn(42);
+        when(patientRepository.reassignPatients(instanceId1, instanceId2, null)).thenReturn(42);
 
         int count = fleetService.migratePatients(instanceId1, instanceId2);
 
         assertEquals(42, count);
-        verify(patientRepository).reassignAllPatients(instanceId1, instanceId2);
+        verify(patientRepository).reassignPatients(instanceId1, instanceId2, null);
     }
+
+    @Test
+    void restartInstance_success_updatesStatus() {
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(evolutionApiService.restartInstance("compas-chip-01")).thenReturn(true);
+
+        fleetService.restartInstance(instanceId1);
+
+        assertEquals(WhatsAppInstanceStatus.CONNECTING, instance1.getStatus());
+        verify(instanceRepository).save(instance1);
+    }
+
+    @Test
+    void restartInstance_gatewayFailure_throwsBadGateway() {
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(evolutionApiService.restartInstance("compas-chip-01")).thenReturn(false);
+
+        assertThrows(ResponseStatusException.class, () -> fleetService.restartInstance(instanceId1));
+    }
+
 
     @Test
     void assignPatientToInstance_stickyAffinityPreservesExistingInstance() {

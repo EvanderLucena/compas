@@ -212,7 +212,11 @@ public class WhatsAppFleetService {
     @Transactional
     public void restartInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
-        evolutionApiService.restartInstance(instance.getName());
+        boolean success = evolutionApiService.restartInstance(instance.getName());
+        if (!success) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY, "Falha ao reiniciar instância no gateway Evolution");
+        }
         instance.setStatus(WhatsAppInstanceStatus.CONNECTING);
         instanceRepository.save(instance);
     }
@@ -220,7 +224,12 @@ public class WhatsAppFleetService {
     @Transactional
     public void disconnectInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
-        evolutionApiService.logoutInstance(instance.getName());
+        boolean success = evolutionApiService.logoutInstance(instance.getName());
+        if (!success) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY, "Falha ao desconectar instância no gateway Evolution");
+        }
+
         instance.setStatus(WhatsAppInstanceStatus.DISCONNECTED);
         instance.setDisconnectedAt(LocalDateTime.now());
         instance.setQrCodeBase64(null);
@@ -230,13 +239,18 @@ public class WhatsAppFleetService {
     @Transactional
     public void deleteInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
-        patientRepository.clearInstanceFromPatients(id);
+        patientRepository.clearInstanceFromPatients(id, null);
         evolutionApiService.deleteInstance(instance.getName());
         instanceRepository.delete(instance);
     }
 
     @Transactional
     public int migratePatients(UUID sourceId, UUID targetId) {
+        return migratePatients(sourceId, targetId, null);
+    }
+
+    @Transactional
+    public int migratePatients(UUID sourceId, UUID targetId, UUID nutritionistId) {
         if (sourceId.equals(targetId)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -246,8 +260,9 @@ public class WhatsAppFleetService {
         findInstanceOrThrow(sourceId);
         findInstanceOrThrow(targetId);
 
-        int count = patientRepository.reassignAllPatients(sourceId, targetId);
-        log.info("Migrated {} patients from WhatsApp instance {} to {}", count, sourceId, targetId);
+        int count = patientRepository.reassignPatients(sourceId, targetId, nutritionistId);
+        log.info("Migrated {} patients from WhatsApp instance {} to {} (nutritionistId={})",
+                count, sourceId, targetId, nutritionistId);
         return count;
     }
 
