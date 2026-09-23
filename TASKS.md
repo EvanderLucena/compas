@@ -83,8 +83,9 @@
 
 ## Telas P1 — A fazer
 
+- [ ] **Integração de Pagamento & Assinaturas Stripe** (`/billing`) — Stripe Checkout integrado aos 3 planos (Iniciante R$99, Profissional R$149, Ilimitado R$199), Stripe Customer Portal para troca de cartão/faturas/cancelamento, webhook listener (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`), e controle de trial de 30 dias com bloqueio pós-vencimento.
+- [ ] **Verificação de E-mail via Resend** — `ResendEmailService` no backend com fallback gracioso local em log, endpoints `POST /api/v1/auth/verify-email` e `POST /api/v1/auth/resend-verification`, banner de aviso no topo do dashboard para contas não verificadas e tela de confirmação `/verify-email`.
 - [ ] **Painel Admin** — dashboard, nutris, instâncias WhatsApp, financeiro, logs.
-- [ ] **Tela de Pagamento** (`/billing`) — plano atual, upgrade/downgrade, cartão, faturas, cancelar.
 - [ ] **Ajustes do Nutri** (`/settings`) — perfil, horário de atendimento, mensagem de boas-vindas, exportar dados (além do tema que já existe).
 
 ---
@@ -313,19 +314,19 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 
 - [ ] **Convite do Paciente** — revisar escopo antes de implementar; não incluir "Copiar link" se o produto não for usar convite WhatsApp.
 - [ ] **Status IA no paciente** — badge conectado/inativo no PatientView.
-- [ ] **Recuperação de senha** — fluxo "esqueci minha senha".
-- [ ] **Relatório do paciente** — exportar dados estruturados.
+- [ ] **Recuperação de senha via E-mail (Resend)** — fluxo "esqueci minha senha" com token seguro e disparo transacional.
 - [ ] **Notificações globais** — push, email ou in-app.
-- [ ] **Checkout + Pós-checkout** — integração com gateway de pagamento.
 
 ---
 
 ## Decisões de negócio registradas
 
 - **Público-alvo:** apenas nutricionistas solo (sem clínicas/multi-nutri por enquanto)
-- **Pricing:** Iniciante R$99,99 (15 pacientes) · Profissional R$149,99 (30 pacientes) · Ilimitado R$199,99 (ilimitado)
-- **Trial:** 30 dias grátis com cartão cadastrado, auto-renovação, cancelar quando quiser
-- **Todos planos = mesmas funcionalidades**, só muda a quantidade de pacientes
+- **Pricing:** Iniciante R$99,00 (até 15 pacientes) · Profissional R$149,00 (até 35 pacientes) · Ilimitado R$199,00 (ilimitado) — opção anual com 2 meses grátis (10x da mensalidade)
+- **Gateway de Pagamento:** Stripe (Stripe Checkout + Stripe Customer Portal com gestão autônoma de cartões, faturas e cancelamentos)
+- **Trial:** 30 dias grátis para explorar o painel sem travar o onboarding
+- **Todos os planos = mesmas funcionalidades**, a única diferença é a quantidade de pacientes ativos na carteira
+- **Provedor de E-mail Transacional:** Resend (plano gratuito até 3.000 envios/mês via API REST)
 - **IA:** responde sempre com base no plano alimentar do paciente, nunca inventa; abordagem de redução de danos e dieta flexível
 - **Alimentos porcionados:** cadastrados uma vez, reutilizados em qualquer plano
 - **Timeline biométrica:** peso, dobras, perimetria acompanhados como timeline por consulta, com gráficos de evolução
