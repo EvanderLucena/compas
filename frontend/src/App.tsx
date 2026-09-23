@@ -40,9 +40,59 @@ const InsightsView = lazy(() =>
 const VerifyEmailView = lazy(() =>
   import('./views/VerifyEmailView').then((m) => ({ default: m.VerifyEmailView })),
 );
+const AdminLoginView = lazy(() =>
+  import('./views/AdminLoginView').then((m) => ({ default: m.AdminLoginView })),
+);
+const AdminShell = lazy(() =>
+  import('./components/shell/AdminShell').then((m) => ({ default: m.AdminShell })),
+);
 const AdminWhatsAppFleetView = lazy(() =>
   import('./views/AdminWhatsAppFleetView').then((m) => ({ default: m.AdminWhatsAppFleetView })),
 );
+
+function isAdminSubdomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname.startsWith('admin.');
+}
+
+function AdminAuthGuard({ children }: { children: ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
+  const user = useAuthStore((s) => s.user);
+
+  if (isInitializing) return null;
+
+  if (!isAuthenticated || !user || user.role !== 'ADMIN') {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRedirectIfAuthenticated({ children }: { children: ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
+  const user = useAuthStore((s) => s.user);
+
+  if (isInitializing) return null;
+
+  if (isAuthenticated && user?.role === 'ADMIN') {
+    return <Navigate to="/admin/whatsapp" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminLogoutView() {
+  const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    void logout().finally(() => navigate('/admin/login', { replace: true }));
+  }, [logout, navigate]);
+
+  return null;
+}
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -52,17 +102,16 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   if (isInitializing) return null;
 
-  if (!isAuthenticated || !user) return <Navigate to="/" replace />;
+  if (!isAuthenticated || !user) {
+    if (isAdminSubdomain()) return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/" replace />;
+  }
 
-  if (user.role === 'ADMIN' && !location.pathname.startsWith('/admin')) {
+  if (user.role === 'ADMIN') {
     return <Navigate to="/admin/whatsapp" replace />;
   }
 
-  if (user.role !== 'ADMIN' && location.pathname.startsWith('/admin')) {
-    return <Navigate to="/home" replace />;
-  }
-
-  if (user.role !== 'ADMIN' && !user.onboardingCompleted && location.pathname !== '/onboarding') {
+  if (!user.onboardingCompleted && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -75,6 +124,10 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
 
   if (isInitializing) return null;
+
+  if (isAdminSubdomain() && (!isAuthenticated || user?.role !== 'ADMIN')) {
+    return <Navigate to="/admin/login" replace />;
+  }
 
   if (isAuthenticated && user) {
     if (user.role === 'ADMIN') return <Navigate to="/admin/whatsapp" replace />;
@@ -149,6 +202,27 @@ const router = createBrowserRouter([
       { path: '/logout', element: <LogoutView /> },
       { path: '/verify-email', element: <VerifyEmailView /> },
       {
+        path: '/admin/login',
+        element: (
+          <AdminRedirectIfAuthenticated>
+            <AdminLoginView />
+          </AdminRedirectIfAuthenticated>
+        ),
+      },
+      { path: '/admin/logout', element: <AdminLogoutView /> },
+      {
+        path: '/admin',
+        element: (
+          <AdminAuthGuard>
+            <AdminShell />
+          </AdminAuthGuard>
+        ),
+        children: [
+          { index: true, element: <Navigate to="/admin/whatsapp" replace /> },
+          { path: 'whatsapp', element: <AdminWhatsAppFleetView /> },
+        ],
+      },
+      {
         path: '/onboarding',
         element: (
           <AuthGuard>
@@ -169,7 +243,6 @@ const router = createBrowserRouter([
           { path: '/plans', element: <Navigate to="/patients" replace /> },
           { path: '/foods', element: <FoodsView /> },
           { path: '/insights', element: <InsightsView /> },
-          { path: '/admin/whatsapp', element: <AdminWhatsAppFleetView /> },
         ],
       },
     ],
