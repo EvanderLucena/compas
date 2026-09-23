@@ -16,11 +16,34 @@ interface PlanActiveMealContentProps {
   isReadOnly: boolean;
   onSelectOption: (index: number) => void;
   onAddOption: () => void;
+  onRenameOption: (optionId: string, name: string) => void;
+  onRemoveOption: (optionId: string) => void;
   onReferenceAmountChange: (itemId: string, amount: number) => void;
   onPrepChange: (itemId: string, prep: string) => void;
   onRemoveItem: (item: MealFood) => void;
   onAddFoodClick: () => void;
   onReadOnlyClick: () => void;
+}
+
+function ActiveMealTitle({ label, time, count }: { label: string; time: string; count: number }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div className="eyebrow">
+        EDITANDO · {label.toUpperCase()} · {time}
+      </div>
+      <h2
+        className="serif"
+        style={{
+          fontSize: 26,
+          margin: '4px 0 0',
+          fontWeight: 400,
+          letterSpacing: '-0.02em',
+        }}
+      >
+        {count} opções equivalentes
+      </h2>
+    </div>
+  );
 }
 
 export function PlanActiveMealContent({
@@ -34,6 +57,8 @@ export function PlanActiveMealContent({
   isReadOnly,
   onSelectOption,
   onAddOption,
+  onRenameOption,
+  onRemoveOption,
   onReferenceAmountChange,
   onPrepChange,
   onRemoveItem,
@@ -63,31 +88,11 @@ export function PlanActiveMealContent({
 
   return (
     <div style={{ padding: '20px 24px', background: 'var(--bg)' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          marginBottom: 18,
-        }}
-      >
-        <div>
-          <div className="eyebrow">
-            EDITANDO · {activeMeal.label.toUpperCase()} · {activeMeal.time}
-          </div>
-          <h2
-            className="serif"
-            style={{
-              fontSize: 26,
-              margin: '4px 0 0',
-              fontWeight: 400,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            {activeMeal.options.length} opções equivalentes
-          </h2>
-        </div>
-      </div>
+      <ActiveMealTitle
+        label={activeMeal.label}
+        time={activeMeal.time}
+        count={activeMeal.options.length}
+      />
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
         {activeMeal.options.map((o, i) => (
@@ -96,13 +101,21 @@ export function PlanActiveMealContent({
             name={o.name}
             active={activeOptionIndex === i}
             onClick={() => onSelectOption(i)}
-            onRename={(_name) => {
-              // Double-click rename → update via API
+            onRename={(newName) => {
+              if (isReadOnly) {
+                onReadOnlyClick();
+                return;
+              }
+              onRenameOption(o.id, newName);
             }}
             onRemove={
               activeMeal.options.length > 1
                 ? () => {
-                    // Will be wired to useDeleteOption
+                    if (isReadOnly) {
+                      onReadOnlyClick();
+                      return;
+                    }
+                    onRemoveOption(o.id);
                   }
                 : null
             }

@@ -20,6 +20,42 @@ interface PlanModalsProps {
   meals: MealSlot[];
 }
 
+interface DeleteModalsProps {
+  pendingDeleteItem: { name: string } | null;
+  pendingDeleteMealId: string | null;
+  meals: MealSlot[];
+  onCloseItem: () => void;
+  onConfirmItem: () => void;
+  onCloseMeal: () => void;
+  onConfirmMeal: () => void;
+}
+
+function DeleteModals({
+  pendingDeleteItem,
+  pendingDeleteMealId,
+  meals,
+  onCloseItem,
+  onConfirmItem,
+  onCloseMeal,
+  onConfirmMeal,
+}: DeleteModalsProps) {
+  const mealName = meals.find((m) => m.id === pendingDeleteMealId)?.label || 'esta refeição';
+  return (
+    <>
+      {pendingDeleteItem && (
+        <PlanDeleteModal
+          name={pendingDeleteItem.name}
+          onClose={onCloseItem}
+          onConfirm={onConfirmItem}
+        />
+      )}
+      {pendingDeleteMealId && (
+        <PlanDeleteModal name={mealName} onClose={onCloseMeal} onConfirm={onConfirmMeal} />
+      )}
+    </>
+  );
+}
+
 export function PlanModals({ patientId, activeMeal, activeOpt, meals }: PlanModalsProps) {
   const planUI = usePlanUIStore();
   const addFoodItem = useAddFoodItem(patientId);
@@ -75,19 +111,38 @@ export function PlanModals({ patientId, activeMeal, activeOpt, meals }: PlanModa
 
   const handleDeleteFood = () => {
     if (planUI.pendingDeleteItem) {
-      deleteFoodItem.mutate({
-        mealId: planUI.pendingDeleteItem.mealId,
-        optionId: planUI.pendingDeleteItem.optionId,
-        itemId: planUI.pendingDeleteItem.itemId,
-      });
-      planUI.setPendingDeleteItem(null);
+      deleteFoodItem.mutate(
+        {
+          mealId: planUI.pendingDeleteItem.mealId,
+          optionId: planUI.pendingDeleteItem.optionId,
+          itemId: planUI.pendingDeleteItem.itemId,
+        },
+        {
+          onSuccess: () => {
+            useToastStore.getState().showSuccess('Alimento removido com sucesso');
+            planUI.setPendingDeleteItem(null);
+          },
+          onError: (err) => {
+            const msg = resolveMutationErrorMessage(err, 'Erro ao remover alimento');
+            useToastStore.getState().showError(msg);
+          },
+        },
+      );
     }
   };
 
   const handleDeleteMeal = () => {
     if (planUI.pendingDeleteMealId) {
-      deleteMealSlot.mutate(planUI.pendingDeleteMealId);
-      planUI.setPendingDeleteMealId(null);
+      deleteMealSlot.mutate(planUI.pendingDeleteMealId, {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Refeição excluída com sucesso');
+          planUI.setPendingDeleteMealId(null);
+        },
+        onError: (err) => {
+          const msg = resolveMutationErrorMessage(err, 'Erro ao excluir refeição');
+          useToastStore.getState().showError(msg);
+        },
+      });
     }
   };
 
@@ -115,20 +170,15 @@ export function PlanModals({ patientId, activeMeal, activeOpt, meals }: PlanModa
           onAdd={handleAddMeal}
         />
       )}
-      {planUI.pendingDeleteItem && (
-        <PlanDeleteModal
-          name={planUI.pendingDeleteItem.name}
-          onClose={() => planUI.setPendingDeleteItem(null)}
-          onConfirm={handleDeleteFood}
-        />
-      )}
-      {planUI.pendingDeleteMealId && (
-        <PlanDeleteModal
-          name={meals.find((m) => m.id === planUI.pendingDeleteMealId)?.label || 'esta refeição'}
-          onClose={() => planUI.setPendingDeleteMealId(null)}
-          onConfirm={handleDeleteMeal}
-        />
-      )}
+      <DeleteModals
+        pendingDeleteItem={planUI.pendingDeleteItem}
+        pendingDeleteMealId={planUI.pendingDeleteMealId}
+        meals={meals}
+        onCloseItem={() => planUI.setPendingDeleteItem(null)}
+        onConfirmItem={handleDeleteFood}
+        onCloseMeal={() => planUI.setPendingDeleteMealId(null)}
+        onConfirmMeal={handleDeleteMeal}
+      />
     </>
   );
 }

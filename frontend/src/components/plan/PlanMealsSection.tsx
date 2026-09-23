@@ -4,8 +4,12 @@ import {
   usePlanUIStore,
   useUpdateMealSlot,
   useAddOption,
+  useUpdateOption,
+  useDeleteOption,
   useUpdateFoodItem,
 } from '../../stores/planStore';
+import { useToastStore } from '../../stores/toastStore';
+import { resolveMutationErrorMessage } from '../../stores/patientStore';
 import type { MealPlan, MealSlot, MealOption } from '../../types/plan';
 
 interface PlanMealsSectionProps {
@@ -28,7 +32,42 @@ export function PlanMealsSection({
   const planUI = usePlanUIStore();
   const updateMealSlot = useUpdateMealSlot(patientId);
   const addOption = useAddOption(patientId);
+  const updateOption = useUpdateOption(patientId);
+  const deleteOption = useDeleteOption(patientId);
   const updateFoodItem = useUpdateFoodItem(patientId);
+
+  const handleRenameOption = (optionId: string, name: string) => {
+    if (!activeMeal) return;
+    updateOption.mutate(
+      { mealId: activeMeal.id, optionId, data: { name } },
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Opção renomeada com sucesso');
+        },
+        onError: (err) => {
+          const msg = resolveMutationErrorMessage(err, 'Erro ao renomear opção');
+          useToastStore.getState().showError(msg);
+        },
+      },
+    );
+  };
+
+  const handleRemoveOption = (optionId: string) => {
+    if (!activeMeal) return;
+    deleteOption.mutate(
+      { mealId: activeMeal.id, optionId },
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Opção removida');
+          planUI.setActiveOptionIndex(0);
+        },
+        onError: (err) => {
+          const msg = resolveMutationErrorMessage(err, 'Erro ao remover opção');
+          useToastStore.getState().showError(msg);
+        },
+      },
+    );
+  };
 
   return (
     <div
@@ -66,6 +105,8 @@ export function PlanMealsSection({
               data: { name: `Opção ${activeMeal.options.length + 1} · Cópia` },
             })
           }
+          onRenameOption={handleRenameOption}
+          onRemoveOption={handleRemoveOption}
           onReferenceAmountChange={(itemId, referenceAmount) =>
             updateFoodItem.mutate({
               mealId: activeMeal.id,
