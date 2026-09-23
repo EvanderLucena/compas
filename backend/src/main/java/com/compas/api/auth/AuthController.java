@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -34,10 +35,6 @@ public class AuthController {
     @Value("${compas.jwt.cookie.same-site:${nutriai.jwt.cookie.same-site:Lax}}")
     private String cookieSameSite;
 
-    // HttpOnly is hardcoded in buildCookieHeaderValue() — always emitted.
-    // The cookieHttpOnly property was removed because it defaulted to true
-    // and was never actually read (the builder appends "; HttpOnly" directly).
-
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
@@ -53,12 +50,13 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of(
                 "accessToken", result.accessToken(),
-                "user", Map.of(
-                        "id", result.user().id(),
-                        "name", result.user().name(),
-                        "email", result.user().email(),
-                        "role", result.user().role(),
-                        "onboardingCompleted", result.user().onboardingCompleted()
+                "user", buildUserMap(
+                        result.user().id(),
+                        result.user().name(),
+                        result.user().email(),
+                        result.user().role(),
+                        result.user().onboardingCompleted(),
+                        result.user().emailVerified()
                 )
         ));
     }
@@ -74,12 +72,13 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of(
                 "accessToken", result.accessToken(),
-                "user", Map.of(
-                        "id", result.user().id(),
-                        "name", result.user().name(),
-                        "email", result.user().email(),
-                        "role", result.user().role(),
-                        "onboardingCompleted", result.user().onboardingCompleted()
+                "user", buildUserMap(
+                        result.user().id(),
+                        result.user().name(),
+                        result.user().email(),
+                        result.user().role(),
+                        result.user().onboardingCompleted(),
+                        result.user().emailVerified()
                 )
         ));
     }
@@ -101,14 +100,33 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of(
                 "accessToken", result.accessToken(),
-                "user", Map.of(
-                        "id", result.user().id(),
-                        "name", result.user().name(),
-                        "email", result.user().email(),
-                        "role", result.user().role(),
-                        "onboardingCompleted", result.user().onboardingCompleted()
+                "user", buildUserMap(
+                        result.user().id(),
+                        result.user().name(),
+                        result.user().email(),
+                        result.user().role(),
+                        result.user().onboardingCompleted(),
+                        result.user().emailVerified()
                 )
         ));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, Object>> verifyEmail(
+            @RequestBody @Valid VerifyEmailRequest request
+    ) {
+        Map<String, Object> result = authService.verifyEmail(request.token());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, Object>> resendVerification(
+            @RequestBody(required = false) ResendVerificationRequest request
+    ) {
+        Optional<UUID> currentNutriId = NutritionistAccess.findCurrentNutritionistId();
+        String email = request != null ? request.email() : null;
+        Map<String, Object> result = authService.resendVerification(currentNutriId.orElse(null), email);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/logout")
@@ -145,6 +163,24 @@ public class AuthController {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
         authService.completeOnboarding(nutritionistId);
         return ResponseEntity.ok(Map.of("success", true, "message", "Onboarding concluído"));
+    }
+
+    private Map<String, Object> buildUserMap(
+            UUID id,
+            String name,
+            String email,
+            String role,
+            Boolean onboardingCompleted,
+            Boolean emailVerified
+    ) {
+        return Map.of(
+                "id", id,
+                "name", name,
+                "email", email,
+                "role", role,
+                "onboardingCompleted", onboardingCompleted,
+                "emailVerified", emailVerified != null ? emailVerified : false
+        );
     }
 
     private String extractRefreshToken(HttpServletRequest request) {

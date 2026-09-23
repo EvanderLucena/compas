@@ -21,6 +21,10 @@ interface AuthState {
   clearError: () => void;
   updateUser: (partial: Partial<AuthUser>) => void;
 
+  // Email verification actions
+  verifyEmail: (token: string) => Promise<{ success: boolean; message: string }>;
+  resendVerification: (email?: string) => Promise<{ success: boolean; message: string }>;
+
   // Initialize from stored state
   initializeAuth: () => Promise<void>;
 }
@@ -145,6 +149,19 @@ export const useAuthStore = create<AuthState>()(
 
       clearError: () => set({ error: null, fieldErrors: {} }),
 
+      verifyEmail: async (token: string) => {
+        const result = await authService.verifyEmail(token);
+        const current = get().user;
+        if (current) {
+          set({ user: { ...current, emailVerified: true } });
+        }
+        return result;
+      },
+
+      resendVerification: async (email?: string) => {
+        return authService.resendVerification(email);
+      },
+
       initializeAuth: async () => {
         const oldAuth = localStorage.getItem('nutriai.auth');
         if (oldAuth === 'true') {
@@ -165,6 +182,7 @@ export const useAuthStore = create<AuthState>()(
               email: user.email,
               role: user.role as AuthUser['role'],
               onboardingCompleted: user.onboardingCompleted,
+              emailVerified: user.emailVerified,
             },
             isAuthenticated: true,
             isInitializing: false,
