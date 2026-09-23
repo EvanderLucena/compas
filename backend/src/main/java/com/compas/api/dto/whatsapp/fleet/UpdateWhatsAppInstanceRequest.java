@@ -1,5 +1,6 @@
 package com.compas.api.dto.whatsapp.fleet;
 
+import com.compas.api.model.WhatsAppInstanceStatus;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -15,6 +16,8 @@ public record UpdateWhatsAppInstanceRequest(
         @Max(value = 1000, message = "Capacidade máxima de pacientes é 1000")
         Integer maxPatients,
 
-        Boolean active
+        Boolean active,
+
+        WhatsAppInstanceStatus status
 ) {
 }

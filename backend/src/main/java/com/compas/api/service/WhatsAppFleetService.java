@@ -143,8 +143,21 @@ public class WhatsAppFleetService {
         if (request.active() != null) {
             instance.setActive(request.active());
         }
+        if (request.status() != null) {
+            instance.setStatus(request.status());
+            if (request.status() == WhatsAppInstanceStatus.BANNED || request.status() == WhatsAppInstanceStatus.DISABLED) {
+                if (instance.getDisconnectedAt() == null) {
+                    instance.setDisconnectedAt(LocalDateTime.now());
+                }
+            }
+        }
 
         WhatsAppInstance updated = instanceRepository.save(instance);
+
+        if (request.status() == WhatsAppInstanceStatus.BANNED || request.status() == WhatsAppInstanceStatus.DISABLED) {
+            autoFailover(id);
+        }
+
         return toDTO(updated);
     }
 
@@ -209,8 +222,15 @@ public class WhatsAppFleetService {
                 instance.setStatus(WhatsAppInstanceStatus.DISCONNECTED);
             } else if ("connecting".equalsIgnoreCase(state)) {
                 instance.setStatus(WhatsAppInstanceStatus.CONNECTING);
+            } else if ("banned".equalsIgnoreCase(state) || "unpaired".equalsIgnoreCase(state)) {
+                instance.setStatus(WhatsAppInstanceStatus.BANNED);
+                instance.setDisconnectedAt(LocalDateTime.now());
             }
             instanceRepository.save(instance);
+
+            if (instance.getStatus() == WhatsAppInstanceStatus.BANNED) {
+                autoFailover(id);
+            }
         }
 
         return toDTO(instance);
@@ -311,6 +331,62 @@ public class WhatsAppFleetService {
                 p.getNutritionistId(),
                 p.getStatus() != null ? p.getStatus().name() : "ONTRACK"
         ));
+    }
+
+    /**
+     * Automatic failover when an instance is BANNED, disconnected, or disabled.
+     * Reassigns all active patients from the unhealthy instance to the healthiest available active instance.
+     *
+     * @param unhealthyInstanceId ID of the instance to evacuate
+     * @return number of patients migrated
+     */
+    @Transactional
+    public int autoFailover(UUID unhealthyInstanceId) {
+        WhatsAppInstance unhealthy = findInstanceOrThrow(unhealthyInstanceId);
+        long patientCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(unhealthyInstanceId);
+        if (patientCount == 0) {
+            log.info("Auto-failover for instance '{}' ({}): no active patients assigned",
+                    unhealthy.getName(), unhealthyInstanceId);
+            return 0;
+        }
+
+        List<WhatsAppInstance> eligibleTargets = instanceRepository.findByActiveTrueOrderByCreatedAtAsc()
+                .stream()
+                .filter(inst -> !inst.getId().equals(unhealthyInstanceId)
+                        && inst.getStatus() != WhatsAppInstanceStatus.BANNED
+                        && inst.getStatus() != WhatsAppInstanceStatus.DISABLED)
+                .toList();
+
+        if (eligibleTargets.isEmpty()) {
+            log.warn("Auto-failover triggered for instance '{}' ({} patients), but NO eligible healthy targets found",
+                    unhealthy.getName(), patientCount);
+            return 0;
+        }
+
+        record TargetCandidate(WhatsAppInstance instance, long count) {}
+        List<TargetCandidate> candidates = eligibleTargets.stream()
+                .map(t -> new TargetCandidate(t, patientRepository.countByWhatsappInstanceIdAndActiveTrue(t.getId())))
+                .sorted(Comparator.comparingLong(TargetCandidate::count))
+                .toList();
+
+        // 1st preference: CONNECTED and under maxPatients
+        WhatsAppInstance target = candidates.stream()
+                .filter(c -> c.instance().getStatus() == WhatsAppInstanceStatus.CONNECTED
+                        && c.count() < c.instance().getMaxPatients())
+                .map(TargetCandidate::instance)
+                .findFirst()
+                .or(() -> candidates.stream()
+                        .filter(c -> c.count() < c.instance().getMaxPatients())
+                        .map(TargetCandidate::instance)
+                        .findFirst())
+                .or(() -> candidates.stream().map(TargetCandidate::instance).findFirst())
+                .orElse(eligibleTargets.get(0));
+
+        int moved = patientRepository.reassignPatients(unhealthyInstanceId, target.getId(), null);
+        log.warn("AUTO-FAILOVER: Reassigned {} patients from unhealthy instance '{}' ({}) to healthy instance '{}' ({})",
+                moved, unhealthy.getName(), unhealthyInstanceId, target.getName(), target.getId());
+
+        return moved;
     }
 
     /**

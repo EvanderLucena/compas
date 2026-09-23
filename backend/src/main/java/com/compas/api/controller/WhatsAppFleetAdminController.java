@@ -108,6 +108,15 @@ public class WhatsAppFleetAdminController {
         )));
     }
 
+    @PostMapping("/instances/{id}/failover")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerFailover(@PathVariable UUID id) {
+        int count = fleetService.autoFailover(id);
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "message", count + " pacientes migrados automaticamente por failover",
+                "migratedCount", count
+        )));
+    }
+
     @GetMapping("/instances/{id}/patients")
     public ResponseEntity<ApiResponse<Page<InstancePatientDTO>>> listInstancePatients(
             @PathVariable UUID id,
