@@ -123,26 +123,19 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void ensureAdminUser() {
-        nutritionistRepository.findByEmail("ops@compas.app")
-                .ifPresentOrElse(
-                        admin -> {
-                            if (admin.getRole() != UserRole.ADMIN) {
-                                admin.setRole(UserRole.ADMIN);
-                                nutritionistRepository.save(admin);
-                            }
-                        },
-                        () -> nutritionistRepository.save(Nutritionist.builder()
-                                .name("Operador Compas")
-                                .professionalName("Compas Ops")
-                                .email("ops@compas.app")
-                                .passwordHash(passwordEncoder.encode(adminPassword))
-                                .role(UserRole.ADMIN)
-                                .emailVerified(true)
-                                .onboardingCompleted(true)
-                                .subscriptionTier("UNLIMITED")
-                                .patientLimit(9999)
-                                .build())
-                );
+        if (nutritionistRepository.findByEmail("ops@compas.app").isEmpty()) {
+            nutritionistRepository.save(Nutritionist.builder()
+                    .name("Operador Compas")
+                    .professionalName("Compas Ops")
+                    .email("ops@compas.app")
+                    .passwordHash(passwordEncoder.encode(adminPassword))
+                    .role(UserRole.ADMIN)
+                    .emailVerified(true)
+                    .onboardingCompleted(true)
+                    .subscriptionTier("UNLIMITED")
+                    .patientLimit(9999)
+                    .build());
+        }
     }
 
     private Nutritionist ensureDemoNutritionist() {
