@@ -1,7 +1,7 @@
 package com.compas.api.controller;
 
 import com.compas.api.auth.AuthService;
-import com.compas.api.auth.RefreshTokenRepository;
+import com.compas.api.repository.RefreshTokenRepository;
 import com.compas.api.auth.dto.SignupRequest;
 import com.compas.api.dto.patient.CreatePatientRequest;
 import com.compas.api.repository.EpisodeRepository;

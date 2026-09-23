@@ -22,4 +22,13 @@ public interface EmailService {
      * @param resetToken     the password reset token
      */
     void sendPasswordResetEmail(String recipientEmail, String recipientName, String resetToken);
+
+    /**
+     * Sends an operational alert email to an administrator.
+     *
+     * @param recipientEmail the target administrator email address
+     * @param subject        the alert email subject line
+     * @param alertMessage   the description or details of the operational event
+     */
+    void sendAdminAlertEmail(String recipientEmail, String subject, String alertMessage);
 }

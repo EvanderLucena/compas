@@ -1106,6 +1106,10 @@ public class ConversationService {
         if (sent) {
             waResponse.setSentAt(LocalDateTime.now());
             whatsAppResponseRepository.save(waResponse);
+            message.setJevRequiresAttention(true);
+            message.setJevAttentionScore(BigDecimal.valueOf(0.85));
+            message.setJevAttentionResolved(false);
+            message.setJevIntent("document_unavailable");
             markProcessed(message);
         } else {
             log.warn("Failed to send document unavailable notice to {}, leaving message for retry",

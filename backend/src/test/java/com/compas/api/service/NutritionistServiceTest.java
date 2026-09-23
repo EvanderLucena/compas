@@ -40,6 +40,9 @@ class NutritionistServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private com.compas.api.repository.RefreshTokenRepository refreshTokenRepository;
+
     @InjectMocks
     private NutritionistService nutritionistService;
 
@@ -143,6 +146,7 @@ class NutritionistServiceTest {
 
         assertEquals("hashed_new_password", nutritionist.getPasswordHash());
         verify(nutritionistRepository).save(nutritionist);
+        verify(refreshTokenRepository).deleteByNutritionistId(nutritionistId);
     }
 
     @Test
