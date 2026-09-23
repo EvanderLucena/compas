@@ -60,7 +60,7 @@ export function HomeView() {
         activePatients={metrics.activePatientsCount}
         patientCountText={metrics.patientCountText}
         avgAdherence={metrics.avgAdherence}
-        assessedInLast30Days={kpis.assessedInLast30Days ?? 0}
+        assessedInLast30Days={metrics.assessedInLast30Days}
         dangerCount={metrics.danger}
         whatsappStatus={whatsappStatus}
         isWhatsappLoading={isWhatsappLoading}

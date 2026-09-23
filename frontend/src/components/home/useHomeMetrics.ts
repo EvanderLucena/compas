@@ -41,12 +41,15 @@ export function useHomeMetrics(
     const patientCountText = `${activePats.length} ${countSuffix}`;
     const headerDate = formatHeaderDate();
 
+    const assessedInLast30Days = kpis?.assessedInLast30Days ?? 0;
+
     return {
       onTrack,
       warning,
       danger,
       avgAdherence,
       activePatientsCount,
+      assessedInLast30Days,
       patientCountText,
       headerDate,
     };
