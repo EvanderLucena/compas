@@ -16,6 +16,60 @@ import { FleetModalsContainer } from '../components/admin/whatsapp/FleetModalsCo
 import { IconPlus, IconRefresh } from '../components/icons';
 import type { WhatsAppFleetInstance } from '../types/whatsappFleet';
 
+interface FleetHeaderProps {
+  onRefresh: () => void;
+  onOpenCreate: () => void;
+}
+
+function FleetHeader({ onRefresh, onOpenCreate }: FleetHeaderProps) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+        marginBottom: 24,
+      }}
+    >
+      <div>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Frota WhatsApp & Gateway</h1>
+        <p style={{ fontSize: 13, color: 'var(--fg-muted)', margin: '4px 0 0 0' }}>
+          Monitoramento de chips, pareamento de números, balanceamento de pacientes e estabilidade.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            border: '1px solid var(--border)',
+          }}
+          onClick={onRefresh}
+          title="Atualizar dados da frota"
+        >
+          <IconRefresh size={15} />
+          <span>Atualizar</span>
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          onClick={onOpenCreate}
+        >
+          <IconPlus size={16} />
+          <span>Novo Chip / Instância</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminWhatsAppFleetView() {
   const {
     data: instances,
@@ -93,52 +147,7 @@ export function AdminWhatsAppFleetView() {
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
-      {/* Top Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Frota WhatsApp & Gateway</h1>
-          <p style={{ fontSize: 13, color: 'var(--fg-muted)', margin: '4px 0 0 0' }}>
-            Monitoramento de chips, pareamento de números, balanceamento de pacientes e
-            estabilidade.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            className="btn-ghost"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              border: '1px solid var(--border)',
-            }}
-            onClick={handleRefresh}
-            title="Atualizar dados da frota"
-          >
-            <IconRefresh size={15} />
-            <span>Atualizar</span>
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            onClick={openCreateModal}
-          >
-            <IconPlus size={16} />
-            <span>Novo Chip / Instância</span>
-          </button>
-        </div>
-      </div>
+      <FleetHeader onRefresh={handleRefresh} onOpenCreate={openCreateModal} />
 
       <FleetSummaryCards summary={summary} isLoading={loadingSummary} />
 
