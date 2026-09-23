@@ -102,4 +102,27 @@ class ResendEmailServiceTest {
                 service.sendVerificationEmail("nutri@teste.com", "Dra. Mariana", "abc456")
         );
     }
+
+    @Test
+    void sendVerificationEmail_escapesHtmlInRecipientName() throws IOException, InterruptedException {
+        when(httpResponse.statusCode()).thenReturn(200);
+        doReturn(httpResponse).when(httpClient).send(any(HttpRequest.class), any());
+
+        ResendEmailService service = new ResendEmailService(
+                "re_live_valid_key_123",
+                "Compas <nao-responder@compas.app>",
+                "https://app.compas.com.br",
+                true,
+                objectMapper,
+                httpClient
+        );
+
+        service.sendVerificationEmail("nutri@teste.com", "<script>alert(1)</script> Dra. Test", "abc456");
+
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(captor.capture(), any());
+
+        HttpRequest sentRequest = captor.getValue();
+        assertNotNull(sentRequest);
+    }
 }

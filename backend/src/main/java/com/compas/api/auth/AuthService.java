@@ -218,19 +218,24 @@ public class AuthService {
 
     @Transactional
     public Map<String, Object> resendVerification(UUID currentNutritionistId, String optionalEmail) {
+        boolean isUnauthenticated = currentNutritionistId == null;
         Nutritionist nutritionist = resolveNutritionistForResend(currentNutritionistId, optionalEmail);
+
         if (nutritionist == null) {
-            return Map.of(
-                    "success", true,
-                    "message", "Se o e-mail estiver cadastrado, um link de confirmação será enviado."
-            );
+            return genericResendResponse();
         }
 
         if (Boolean.TRUE.equals(nutritionist.getEmailVerified())) {
+            if (isUnauthenticated) {
+                return genericResendResponse();
+            }
             return Map.of("success", true, "message", "Este e-mail já foi verificado anteriormente.");
         }
 
         if (isCooldownActive(nutritionist)) {
+            if (isUnauthenticated) {
+                return genericResendResponse();
+            }
             throw new ResponseStatusException(
                     HttpStatus.TOO_MANY_REQUESTS,
                     "Aguarde 1 minuto antes de solicitar um novo e-mail de confirmação."
@@ -249,7 +254,18 @@ public class AuthService {
             LOG.warn("Falha ao reenviar e-mail de verificação para {}: {}", nutritionist.getEmail(), e.getMessage());
         }
 
+        if (isUnauthenticated) {
+            return genericResendResponse();
+        }
+
         return Map.of("success", true, "message", "E-mail de confirmação enviado! Verifique sua caixa de entrada.");
+    }
+
+    private Map<String, Object> genericResendResponse() {
+        return Map.of(
+                "success", true,
+                "message", "Se o e-mail estiver cadastrado, um link de confirmação será enviado."
+        );
     }
 
     private boolean isCooldownActive(Nutritionist nutritionist) {

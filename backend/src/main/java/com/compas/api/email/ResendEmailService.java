@@ -113,7 +113,7 @@ public class ResendEmailService implements EmailService {
 
     private String buildVerificationHtml(String recipientName, String verificationUrl) {
         String nameSafe = (recipientName != null && !recipientName.isBlank())
-                ? recipientName.trim()
+                ? escapeHtml(recipientName.trim())
                 : "Nutricionista";
 
         return """
@@ -163,5 +163,16 @@ public class ResendEmailService implements EmailService {
         </body>
         </html>
         """.formatted(nameSafe, verificationUrl, verificationUrl, verificationUrl);
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }
