@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ViewType = 'home' | 'patients' | 'patient' | 'foods' | 'insights';
+export type ViewType = 'home' | 'patients' | 'patient' | 'foods' | 'insights' | 'admin-whatsapp';
 type StatusFilter = 'all' | 'ontrack' | 'warning' | 'danger';
 
 interface NavigationState {

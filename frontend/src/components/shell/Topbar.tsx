@@ -12,6 +12,7 @@ const VIEW_LABELS: Record<string, string[]> = {
   patient: ['Pacientes', 'Paciente'],
   foods: ['Alimentos'],
   insights: ['Inteligência'],
+  'admin-whatsapp': ['Administração', 'Frota WhatsApp'],
 };
 
 interface UserProfileMenuProps {

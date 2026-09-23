@@ -7,6 +7,7 @@ const PATH_TO_VIEW: Record<string, string> = {
   '/patients': 'patients',
   '/foods': 'foods',
   '/insights': 'insights',
+  '/admin/whatsapp': 'admin-whatsapp',
 };
 
 export function useRouteSync() {
