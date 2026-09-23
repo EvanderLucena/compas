@@ -332,6 +332,25 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 
 ---
 
+## Entrega de Documentos sob Demanda (WhatsApp / Painel)
+
+> Funcionalidade para envio automatizado de documentos clínicos gerados sob demanda com o cabeçalho oficial do nutricionista (Nome, CRN regional `CRN-X 12345`, especialidade e WhatsApp de contato).
+
+- [ ] **1. Plano Alimentar Completo (PDF Oficial)**  
+  - **Gatilho:** Paciente pede no WhatsApp (*"Pode me mandar o PDF da minha dieta?"*, *"Perdi meu plano"*) ou o nutricionista clica em "Exportar PDF" no painel.  
+  - **Estrutura:** Cabeçalho clínico oficial com dados da nutri, identificação do paciente, horários das refeições, alimentos com gramaturas/porções de referência, opções alternativas/substitutas e extras acordados.
+
+- [ ] **2. Lista de Compras da Semana (PDF / Checklist WhatsApp)**  
+  - **Gatilho:** Paciente pede no WhatsApp (*"Tô no mercado, pode me mandar a lista de compras da semana?"*).  
+  - **Estrutura:** Varre os alimentos do plano alimentar ativo e consolida por setores do supermercado (*Hortifrúti*, *Açougue & Ovos*, *Mercearia & Grãos*, *Laticínios*).  
+  - **Formato:** Mensagem rápida com caixas de seleção `[ ]` no chat ou PDF compacto para compras.
+
+- [ ] **3. Relatório de Evolução Biométrica (PDF)**  
+  - **Gatilho:** Paciente solicita progresso no WhatsApp (*"Consegue me mandar meu progresso desse mês?"*) para motivação ou para apresentar ao médico/personal.  
+  - **Estrutura:** Histórico das avaliações biométricas cadastradas (peso, IMC, dobras, circunferências corporais e gráficos de tendência) com a assinatura visual da nutri.
+
+---
+
 ## Code Quality — Próximos passos
 
 ### Alto valor ✅
