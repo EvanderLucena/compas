@@ -3,6 +3,70 @@ import { Link } from 'react-router';
 import { resetPassword } from '../../api/auth';
 import { useToastStore } from '../../stores/toastStore';
 
+interface PasswordInputProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  showPassword?: boolean;
+  onToggleShow?: () => void;
+}
+
+function PasswordInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  showPassword = false,
+  onToggleShow,
+}: PasswordInputProps) {
+  return (
+    <div style={{ marginBottom: onToggleShow ? '18px' : '24px' }}>
+      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+        {label}
+      </label>
+      <div style={{ position: 'relative' }}>
+        <input
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required
+          style={{
+            width: '100%',
+            padding: onToggleShow ? '12px 40px 12px 14px' : '12px 14px',
+            borderRadius: '8px',
+            background: 'var(--input-bg, #0f172a)',
+            border: '1px solid var(--border, #334155)',
+            color: 'var(--fg, #f8fafc)',
+            fontSize: '14px',
+            boxSizing: 'border-box',
+          }}
+        />
+        {onToggleShow && (
+          <button
+            type="button"
+            onClick={onToggleShow}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              color: 'var(--fg-muted, #94a3b8)',
+              cursor: 'pointer',
+              fontSize: '13px',
+            }}
+          >
+            {showPassword ? 'Ocultar' : 'Ver'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface ResetPasswordFormProps {
   token: string;
   onSuccess: () => void;
@@ -78,74 +142,22 @@ export function ResetPasswordForm({ token, onSuccess }: ResetPasswordFormProps) 
       )}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '18px' }}>
-          <label
-            style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}
-          >
-            Nova Senha
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-              required
-              style={{
-                width: '100%',
-                padding: '12px 40px 12px 14px',
-                borderRadius: '8px',
-                background: 'var(--input-bg, #0f172a)',
-                border: '1px solid var(--border, #334155)',
-                color: 'var(--fg, #f8fafc)',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              style={{
-                position: 'absolute',
-                right: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'none',
-                border: 'none',
-                color: 'var(--fg-muted, #94a3b8)',
-                cursor: 'pointer',
-                fontSize: '13px',
-              }}
-            >
-              {showPassword ? 'Ocultar' : 'Ver'}
-            </button>
-          </div>
-        </div>
+        <PasswordInput
+          label="Nova Senha"
+          value={password}
+          onChange={setPassword}
+          placeholder="Mínimo 6 caracteres"
+          showPassword={showPassword}
+          onToggleShow={() => setShowPassword((prev) => !prev)}
+        />
 
-        <div style={{ marginBottom: '24px' }}>
-          <label
-            style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}
-          >
-            Confirmar Nova Senha
-          </label>
-          <input
-            type={showPassword ? 'text' : 'password'}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Repita a nova senha"
-            required
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: '8px',
-              background: 'var(--input-bg, #0f172a)',
-              border: '1px solid var(--border, #334155)',
-              color: 'var(--fg, #f8fafc)',
-              fontSize: '14px',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
+        <PasswordInput
+          label="Confirmar Nova Senha"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          placeholder="Repita a nova senha"
+          showPassword={showPassword}
+        />
 
         <button
           type="submit"
