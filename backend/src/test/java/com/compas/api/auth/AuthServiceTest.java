@@ -261,4 +261,143 @@ class AuthServiceTest {
         assertEquals("TRIAL", meResponse.subscriptionTier());
         assertEquals(15, meResponse.patientLimit());
     }
+
+    @Test
+    void verifyEmail_withValidToken_marksEmailVerifiedAndClearsToken() {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. Verificada",
+                "verif@compas.app",
+                "senha12345",
+                "54321",
+                "CRN-3",
+                "Esportiva",
+                "11988887777",
+                true
+        );
+        AuthService.SignupResult signupResult = authService.signup(signupRequest);
+
+        Nutritionist created = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        assertFalse(created.getEmailVerified());
+        assertNotNull(created.getEmailVerificationToken());
+
+        var response = authService.verifyEmail(created.getEmailVerificationToken());
+        assertTrue((Boolean) response.get("success"));
+
+        Nutritionist verified = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        assertTrue(verified.getEmailVerified());
+        assertNull(verified.getEmailVerificationToken());
+        assertNull(verified.getEmailVerificationExpiresAt());
+    }
+
+    @Test
+    void verifyEmail_withExpiredToken_throwsBadRequest() {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. Expirada",
+                "expirada@compas.app",
+                "senha12345",
+                "54322",
+                "CRN-3",
+                null,
+                null,
+                true
+        );
+        AuthService.SignupResult signupResult = authService.signup(signupRequest);
+
+        Nutritionist created = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        created.setEmailVerificationExpiresAt(java.time.LocalDateTime.now().minusHours(1));
+        nutritionistRepository.save(created);
+
+        assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> authService.verifyEmail(created.getEmailVerificationToken())
+        );
+    }
+
+    @Test
+    void verifyEmail_withInvalidToken_throwsBadRequest() {
+        assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> authService.verifyEmail("token_que_nao_existe")
+        );
+    }
+
+    @Test
+    void resendVerification_generatesNewToken() {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. Reenvio",
+                "reenvio@compas.app",
+                "senha12345",
+                "54323",
+                "CRN-3",
+                null,
+                null,
+                true
+        );
+        AuthService.SignupResult signupResult = authService.signup(signupRequest);
+
+        Nutritionist created = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        // Set older expiration to bypass cooldown
+        created.setEmailVerificationExpiresAt(java.time.LocalDateTime.now().plusHours(22));
+        nutritionistRepository.save(created);
+
+        var resendResult = authService.resendVerification(created.getId(), null);
+        assertTrue((Boolean) resendResult.get("success"));
+
+        Nutritionist updated = nutritionistRepository.findById(created.getId()).orElseThrow();
+        assertNotNull(updated.getEmailVerificationToken());
+    }
+
+    @Test
+    void resendVerification_whenAlreadyVerified_returnsAlreadyVerified() {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. JaVerificada",
+                "javerificada@compas.app",
+                "senha12345",
+                "54324",
+                "CRN-3",
+                null,
+                null,
+                true
+        );
+        AuthService.SignupResult signupResult = authService.signup(signupRequest);
+        Nutritionist created = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        created.setEmailVerified(true);
+        nutritionistRepository.save(created);
+
+        var resendResult = authService.resendVerification(created.getId(), null);
+        assertTrue(resendResult.get("message").toString().contains("já foi verificado"));
+    }
+
+    @Test
+    void resendVerification_withUnregisteredEmail_returnsGenericSuccess() {
+        var resendResult = authService.resendVerification(null, "inexistente@compas.app");
+        assertTrue((Boolean) resendResult.get("success"));
+        assertTrue(resendResult.get("message").toString().contains("Se o e-mail estiver cadastrado"));
+    }
+
+    @Test
+    void resendVerification_reusesActiveTokenWithoutInvalidatingLink() {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. Ativa",
+                "ativa@compas.app",
+                "senha12345",
+                "54325",
+                "CRN-3",
+                null,
+                null,
+                true
+        );
+        AuthService.SignupResult signupResult = authService.signup(signupRequest);
+        Nutritionist created = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        String originalToken = created.getEmailVerificationToken();
+        created.setEmailVerificationExpiresAt(java.time.LocalDateTime.now().plusHours(22));
+        nutritionistRepository.save(created);
+
+        var resendResult = authService.resendVerification(null, "ativa@compas.app");
+        assertTrue((Boolean) resendResult.get("success"));
+
+        Nutritionist reloaded = nutritionistRepository.findById(created.getId()).orElseThrow();
+        assertEquals(originalToken, reloaded.getEmailVerificationToken(),
+                "Active token should be preserved to prevent link invalidation");
+    }
 }

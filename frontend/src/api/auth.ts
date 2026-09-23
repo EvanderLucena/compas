@@ -28,3 +28,21 @@ export async function getCurrentUser(): Promise<MeResponse> {
 export async function completeOnboarding(): Promise<void> {
   await apiClient.post('/auth/onboarding');
 }
+
+export async function verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    '/auth/verify-email',
+    { token },
+  );
+  return response.data;
+}
+
+export async function resendVerification(
+  email?: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    '/auth/resend-verification',
+    email ? { email } : {},
+  );
+  return response.data;
+}

@@ -2,6 +2,7 @@ package com.compas.api.auth;
 
 import com.compas.api.auth.dto.LoginRequest;
 import com.compas.api.auth.dto.SignupRequest;
+import com.compas.api.model.Nutritionist;
 import com.compas.api.repository.NutritionistRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -303,5 +304,70 @@ class AuthControllerTest {
     void healthEndpoint_doesNotRequireAuth() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void verifyEmail_withValidToken_returns200() throws Exception {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. Controller",
+                "ctrl-verif@compas.app",
+                "senha12345",
+                "12345",
+                "SP",
+                null,
+                null,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signupRequest)))
+                .andExpect(status().isOk());
+
+        Nutritionist created = nutritionistRepository.findByEmail("ctrl-verif@compas.app").orElseThrow();
+        String token = created.getEmailVerificationToken();
+
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void verifyEmail_withBlankToken_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resendVerification_withEmail_returns200() throws Exception {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. ResendCtrl",
+                "ctrl-resend@compas.app",
+                "senha12345",
+                "12345",
+                "SP",
+                null,
+                null,
+                true
+        );
+
+        mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signupRequest)))
+                .andExpect(status().isOk());
+
+        Nutritionist created = nutritionistRepository.findByEmail("ctrl-resend@compas.app").orElseThrow();
+        created.setEmailVerificationExpiresAt(java.time.LocalDateTime.now().plusHours(22));
+        nutritionistRepository.save(created);
+
+        mockMvc.perform(post("/api/v1/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ctrl-resend@compas.app\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 }

@@ -37,6 +37,9 @@ const FoodsView = lazy(() => import('./views/FoodsView').then((m) => ({ default:
 const InsightsView = lazy(() =>
   import('./views/InsightsView').then((m) => ({ default: m.InsightsView })),
 );
+const VerifyEmailView = lazy(() =>
+  import('./views/VerifyEmailView').then((m) => ({ default: m.VerifyEmailView })),
+);
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -132,6 +135,7 @@ const router = createBrowserRouter([
         ),
       },
       { path: '/logout', element: <LogoutView /> },
+      { path: '/verify-email', element: <VerifyEmailView /> },
       {
         path: '/onboarding',
         element: (

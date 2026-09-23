@@ -25,6 +25,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     private static final int LOGIN_MAX_REQUESTS = 10;
     private static final int SIGNUP_MAX_REQUESTS = 5;
+    private static final int RESEND_VERIFICATION_MAX_REQUESTS = 3;
     private static final int WEBHOOK_MAX_REQUESTS = 120;
     private static final long WINDOW_SECONDS = 60;
 
@@ -51,6 +52,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                 allowed = checkRateLimit("rate_limit:login:" + clientIp, LOGIN_MAX_REQUESTS);
             } else if (path.equals("/api/v1/auth/signup")) {
                 allowed = checkRateLimit("rate_limit:signup:" + clientIp, SIGNUP_MAX_REQUESTS);
+            } else if (path.equals("/api/v1/auth/resend-verification")) {
+                allowed = checkRateLimit("rate_limit:resend_verification:" + clientIp,
+                        RESEND_VERIFICATION_MAX_REQUESTS);
             } else if (path.equals("/api/v1/webhooks/whatsapp")) {
                 allowed = checkRateLimit("rate_limit:webhook:" + clientIp, WEBHOOK_MAX_REQUESTS);
             }
@@ -113,6 +117,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return !path.startsWith("/api/v1/auth/login")
                 && !path.startsWith("/api/v1/auth/signup")
+                && !path.startsWith("/api/v1/auth/resend-verification")
                 && !path.startsWith("/api/v1/webhooks/whatsapp");
     }
 }

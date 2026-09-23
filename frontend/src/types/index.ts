@@ -62,6 +62,7 @@ export interface AuthUser {
   email: string;
   role: 'NUTRITIONIST' | 'ADMIN';
   onboardingCompleted: boolean;
+  emailVerified?: boolean;
 }
 
 export interface LoginRequest {

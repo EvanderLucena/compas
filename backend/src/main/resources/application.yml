@@ -83,6 +83,12 @@ compas:
     worker:
       max-concurrent: ${COMPAS_WHATSAPP_WORKER_CONCURRENT:${NUTRIAI_WHATSAPP_WORKER_CONCURRENT:5}}
 
+  email:
+    resend-api-key: ${COMPAS_RESEND_API_KEY:${RESEND_API_KEY:}}
+    from: ${COMPAS_EMAIL_FROM:Compas <nao-responder@compas.app>}
+    verification-base-url: ${COMPAS_FRONTEND_URL:http://localhost:5173}
+    enabled: ${COMPAS_EMAIL_ENABLED:true}
+
   webhook:
     # Secret for authenticating inbound webhook requests (X-Webhook-Secret, apikey, or Bearer)
     secret: ${COMPAS_WEBHOOK_SECRET:${NUTRIAI_WEBHOOK_SECRET:}}

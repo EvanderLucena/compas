@@ -4,6 +4,7 @@ import { Topbar } from './Topbar';
 import { Outlet, useLocation } from 'react-router';
 import { useRouteSync } from '../../hooks/useRouteSync';
 import { useNavigationStore } from '../../stores/navigationStore';
+import { EmailVerificationBanner } from '../auth/EmailVerificationBanner';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { PageFallback } from '../ui/PageFallback';
 
@@ -28,6 +29,7 @@ export function AppShell() {
       <Sidebar />
       <div className="main">
         <Topbar />
+        <EmailVerificationBanner />
         <div className="page">
           <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<PageFallback />}>

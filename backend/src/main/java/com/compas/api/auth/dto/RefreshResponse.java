@@ -11,6 +11,11 @@ public record RefreshResponse(
             String name,
             String email,
             String role,
-            Boolean onboardingCompleted
-    ) {}
+            Boolean onboardingCompleted,
+            Boolean emailVerified
+    ) {
+        public UserDto(UUID id, String name, String email, String role, Boolean onboardingCompleted) {
+            this(id, name, email, role, onboardingCompleted, false);
+        }
+    }
 }
