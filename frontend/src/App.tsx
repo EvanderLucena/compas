@@ -162,12 +162,14 @@ function RootLayout() {
   usePublicTheme();
 
   return (
-    <ErrorBoundary key={location.pathname}>
+    <>
       <InitializeAuth />
-      <Suspense fallback={<PageFallback fullScreen />}>
-        <Outlet />
-      </Suspense>
-    </ErrorBoundary>
+      <ErrorBoundary key={location.pathname}>
+        <Suspense fallback={<PageFallback fullScreen />}>
+          <Outlet />
+        </Suspense>
+      </ErrorBoundary>
+    </>
   );
 }
 
