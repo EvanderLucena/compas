@@ -149,6 +149,51 @@ public class ResendEmailService implements EmailService {
         }
     }
 
+    @Override
+    public void sendAdminAlertEmail(String recipientEmail, String subject, String alertMessage) {
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            LOG.warn("Destinatário de alerta administrativo não configurado, email não enviado");
+            return;
+        }
+
+        if (shouldSimulateEmail()) {
+            LOG.info("[Email Simulation] Alerta administrativo para {}: [{}] {}",
+                    recipientEmail, subject, alertMessage);
+            return;
+        }
+
+        try {
+            String htmlContent = buildAdminAlertHtml(subject, alertMessage);
+            Map<String, Object> payload = Map.of(
+                    "from", fromAddress,
+                    "to", List.of(recipientEmail),
+                    "subject", subject,
+                    "html", htmlContent
+            );
+
+            String requestBody = objectMapper.writeValueAsString(payload);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(RESEND_API_URL))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .timeout(DEFAULT_TIMEOUT)
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                LOG.info("Alerta administrativo enviado com sucesso para {} via Resend", recipientEmail);
+            } else {
+                LOG.error("Falha ao enviar alerta administrativo para {}. Status: {}, Resposta: {}",
+                        recipientEmail, response.statusCode(), response.body());
+            }
+        } catch (Exception e) {
+            LOG.error("Erro inesperado ao disparar alerta administrativo para {}: {}",
+                    recipientEmail, e.getMessage(), e);
+        }
+    }
+
     private boolean shouldSimulateEmail() {
         return !enabled || apiKey.isBlank() || apiKey.startsWith("test") || apiKey.contains("dummy");
     }
@@ -259,6 +304,46 @@ public class ResendEmailService implements EmailService {
         </body>
         </html>
         """.formatted(nameSafe, resetUrl, resetUrl, resetUrl);
+    }
+
+    private String buildAdminAlertHtml(String subject, String alertMessage) {
+        String subjectSafe = escapeHtml(subject);
+        String messageSafe = escapeHtml(alertMessage);
+
+        return """
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>%s</title>
+        </head>
+        <body style="margin: 0; padding: 24px; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #f8fafc;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 560px; background-color: #1e293b; border-radius: 12px; border: 1px solid #334155; overflow: hidden; margin: 0 auto;">
+            <tr>
+              <td style="padding: 24px 32px; background-color: #dc2626; text-align: center;">
+                <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">
+                  ⚠️ Alerta Operacional Compas
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px;">
+                <h1 style="font-size: 18px; font-weight: 600; color: #f8fafc; margin: 0 0 16px;">
+                  %s
+                </h1>
+                <div style="font-size: 14px; line-height: 1.6; color: #cbd5e1; background-color: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; margin: 0 0 24px; white-space: pre-wrap;">
+                  %s
+                </div>
+                <div style="padding-top: 16px; border-top: 1px solid #334155; font-size: 12px; color: #64748b; line-height: 1.5;">
+                  Este e um alerta automatico gerado pelo sistema Compas. Acesse o painel administrativo para verificar a frota.
+                </div>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """.formatted(subjectSafe, subjectSafe, messageSafe);
     }
 
     private String escapeHtml(String text) {

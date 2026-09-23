@@ -2,7 +2,7 @@ package com.compas.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.compas.api.auth.AuthService;
-import com.compas.api.auth.RefreshTokenRepository;
+import com.compas.api.repository.RefreshTokenRepository;
 import com.compas.api.auth.dto.SignupRequest;
 import com.compas.api.dto.food.CreateFoodRequest;
 import com.compas.api.dto.patient.CreatePatientRequest;

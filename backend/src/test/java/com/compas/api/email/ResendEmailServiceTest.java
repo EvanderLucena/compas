@@ -125,4 +125,44 @@ class ResendEmailServiceTest {
         HttpRequest sentRequest = captor.getValue();
         assertNotNull(sentRequest);
     }
+
+    @Test
+    void sendAdminAlertEmail_simulatesWhenKeyIsBlank() throws IOException, InterruptedException {
+        ResendEmailService service = new ResendEmailService(
+                "",
+                "Compas <nao-responder@compas.app>",
+                "http://localhost:5173",
+                true,
+                objectMapper,
+                httpClient
+        );
+
+        service.sendAdminAlertEmail("admin@compas.app", "Alerta WhatsApp", "Instância desconectada");
+
+        verify(httpClient, never()).send(any(), any());
+    }
+
+    @Test
+    void sendAdminAlertEmail_sendsRealRequestWhenConfigured() throws IOException, InterruptedException {
+        when(httpResponse.statusCode()).thenReturn(200);
+        doReturn(httpResponse).when(httpClient).send(any(HttpRequest.class), any());
+
+        ResendEmailService service = new ResendEmailService(
+                "re_live_valid_key_123",
+                "Compas <nao-responder@compas.app>",
+                "https://app.compas.com.br",
+                true,
+                objectMapper,
+                httpClient
+        );
+
+        service.sendAdminAlertEmail("admin@compas.app", "Alerta WhatsApp", "Instância banida");
+
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(captor.capture(), any());
+
+        HttpRequest sentRequest = captor.getValue();
+        assertEquals("POST", sentRequest.method());
+        assertEquals("https://api.resend.com/emails", sentRequest.uri().toString());
+    }
 }

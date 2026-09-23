@@ -22,6 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.compas.api.email.EmailService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -37,16 +41,33 @@ public class WhatsAppFleetService {
     private final PatientRepository patientRepository;
     private final EvolutionApiService evolutionApiService;
     private final TransactionTemplate transactionTemplate;
+    private final EmailService emailService;
+    private final String adminAlertEmail;
+
+    @Autowired
+    public WhatsAppFleetService(
+            WhatsAppInstanceRepository instanceRepository,
+            PatientRepository patientRepository,
+            EvolutionApiService evolutionApiService,
+            PlatformTransactionManager transactionManager,
+            @Autowired(required = false) EmailService emailService,
+            @Value("${compas.admin.alert-email:${compas.seed.admin.email:admin@compas.app}}")
+            String adminAlertEmail) {
+        this.instanceRepository = instanceRepository;
+        this.patientRepository = patientRepository;
+        this.evolutionApiService = evolutionApiService;
+        this.transactionTemplate = transactionManager != null ? new TransactionTemplate(transactionManager) : null;
+        this.emailService = emailService;
+        this.adminAlertEmail = adminAlertEmail;
+    }
 
     public WhatsAppFleetService(
             WhatsAppInstanceRepository instanceRepository,
             PatientRepository patientRepository,
             EvolutionApiService evolutionApiService,
             PlatformTransactionManager transactionManager) {
-        this.instanceRepository = instanceRepository;
-        this.patientRepository = patientRepository;
-        this.evolutionApiService = evolutionApiService;
-        this.transactionTemplate = transactionManager != null ? new TransactionTemplate(transactionManager) : null;
+        this(instanceRepository, patientRepository, evolutionApiService, transactionManager,
+                null, "admin@compas.app");
     }
 
     @Transactional(readOnly = true)
@@ -143,12 +164,19 @@ public class WhatsAppFleetService {
         if (request.active() != null) {
             instance.setActive(request.active());
         }
+        WhatsAppInstanceStatus previousStatus = instance.getStatus();
         if (request.status() != null) {
             instance.setStatus(request.status());
-            if (request.status() == WhatsAppInstanceStatus.BANNED || request.status() == WhatsAppInstanceStatus.DISABLED) {
+            if (request.status() == WhatsAppInstanceStatus.BANNED
+                    || request.status() == WhatsAppInstanceStatus.DISABLED) {
                 if (instance.getDisconnectedAt() == null) {
                     instance.setDisconnectedAt(LocalDateTime.now());
                 }
+            }
+            if (request.status() != previousStatus
+                    && (request.status() == WhatsAppInstanceStatus.BANNED
+                    || request.status() == WhatsAppInstanceStatus.DISCONNECTED)) {
+                notifyAdminOfUnhealthyInstance(instance, previousStatus, request.status());
             }
         }
 
@@ -207,6 +235,7 @@ public class WhatsAppFleetService {
 
     public WhatsAppFleetInstanceDTO syncInstanceStatus(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
+        WhatsAppInstanceStatus previousStatus = instance.getStatus();
 
         Optional<String> stateOpt = evolutionApiService.fetchConnectionState(instance.getName());
         if (stateOpt.isPresent()) {
@@ -227,6 +256,13 @@ public class WhatsAppFleetService {
                 instance.setDisconnectedAt(LocalDateTime.now());
             }
             instanceRepository.save(instance);
+
+            if (instance.getStatus() != previousStatus
+                    && (instance.getStatus() == WhatsAppInstanceStatus.BANNED
+                    || (instance.getStatus() == WhatsAppInstanceStatus.DISCONNECTED
+                    && previousStatus == WhatsAppInstanceStatus.CONNECTED))) {
+                notifyAdminOfUnhealthyInstance(instance, previousStatus, instance.getStatus());
+            }
 
             if (instance.getStatus() == WhatsAppInstanceStatus.BANNED) {
                 autoFailover(id);
@@ -360,6 +396,14 @@ public class WhatsAppFleetService {
         if (eligibleTargets.isEmpty()) {
             log.warn("Auto-failover triggered for instance '{}' ({} patients), but NO eligible healthy targets found",
                     unhealthy.getName(), patientCount);
+            if (emailService != null && adminAlertEmail != null && !adminAlertEmail.isBlank()) {
+                emailService.sendAdminAlertEmail(
+                        adminAlertEmail,
+                        "CRÍTICO: Sem alvos para failover na instância " + unhealthy.getName(),
+                        "A instância " + unhealthy.getName() + " falhou com " + patientCount
+                                + " pacientes ativos, mas não há nenhuma outra instância ativa para assumir o tráfego!"
+                );
+            }
             return 0;
         }
 
@@ -383,7 +427,8 @@ public class WhatsAppFleetService {
                 .orElse(eligibleTargets.get(0));
 
         int moved = patientRepository.reassignPatients(unhealthyInstanceId, target.getId(), null);
-        log.warn("AUTO-FAILOVER: Reassigned {} patients from unhealthy instance '{}' ({}) to healthy instance '{}' ({})",
+        log.warn("AUTO-FAILOVER: Reassigned {} patients from unhealthy instance '{}' ({}) "
+                + "to healthy instance '{}' ({})",
                 moved, unhealthy.getName(), unhealthyInstanceId, target.getName(), target.getId());
 
         return moved;
@@ -499,5 +544,39 @@ public class WhatsAppFleetService {
                 inst.getDisconnectedAt(),
                 inst.getCreatedAt()
         );
+    }
+
+    private void notifyAdminOfUnhealthyInstance(
+            WhatsAppInstance instance,
+            WhatsAppInstanceStatus oldStatus,
+            WhatsAppInstanceStatus newStatus
+    ) {
+        log.warn("ALERT: WhatsApp fleet instance '{}' (id={}) changed status from {} to {}",
+                instance.getName(), instance.getId(), oldStatus, newStatus);
+
+        if (emailService != null && adminAlertEmail != null && !adminAlertEmail.isBlank()) {
+            try {
+                String subject = String.format("Alerta WhatsApp: Instancia %s esta %s",
+                        instance.getName(), newStatus);
+                String details = String.format(
+                        "A instancia de WhatsApp '%s' (ID: %s) alterou seu status de %s para %s.\n\n"
+                                + "Numero configurado: %s\n"
+                                + "Capacidade maxima: %d pacientes\n"
+                                + "Data do evento: %s\n\n"
+                                + "Acesse o painel do administrador em Configuracoes > Frota WhatsApp para verificar.",
+                        instance.getName(),
+                        instance.getId(),
+                        oldStatus,
+                        newStatus,
+                        instance.getPhoneNumber() != null ? instance.getPhoneNumber() : "Nao informado",
+                        instance.getMaxPatients() != null ? instance.getMaxPatients() : 180,
+                        LocalDateTime.now()
+                );
+                emailService.sendAdminAlertEmail(adminAlertEmail, subject, details);
+            } catch (Exception e) {
+                log.error("Failed to send admin alert email for instance {}: {}",
+                        instance.getName(), e.getMessage());
+            }
+        }
     }
 }

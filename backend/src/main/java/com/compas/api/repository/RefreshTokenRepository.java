@@ -1,5 +1,6 @@
-package com.compas.api.auth;
+package com.compas.api.repository;
 
+import com.compas.api.model.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

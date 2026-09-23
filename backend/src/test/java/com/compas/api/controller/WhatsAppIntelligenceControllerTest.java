@@ -3,7 +3,7 @@ package com.compas.api.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.compas.api.auth.AuthService;
 import com.compas.api.auth.JwtService;
-import com.compas.api.auth.RefreshTokenRepository;
+import com.compas.api.repository.RefreshTokenRepository;
 import com.compas.api.auth.dto.LoginRequest;
 import com.compas.api.auth.dto.SignupRequest;
 import com.compas.api.dto.whatsapp.PatchExtractionRequest;

@@ -33,6 +33,7 @@ Desktop.ini
 .docker/
 volumes/
 /data/
+backups/
 
 # Logs
 *.log
@@ -43,6 +44,7 @@ stderr.log
 # Misc
 *.tmp
 *.bak
+*.sql.gz
 
 # Playwright MCP cache
 .playwright-mcp/

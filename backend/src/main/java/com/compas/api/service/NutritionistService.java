@@ -6,6 +6,7 @@ import com.compas.api.dto.nutritionist.UpdateProfileRequest;
 import com.compas.api.model.Nutritionist;
 import com.compas.api.repository.NutritionistRepository;
 import com.compas.api.repository.PatientRepository;
+import com.compas.api.repository.RefreshTokenRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,15 +21,18 @@ public class NutritionistService {
     private final NutritionistRepository nutritionistRepository;
     private final PatientRepository patientRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     public NutritionistService(
             NutritionistRepository nutritionistRepository,
             PatientRepository patientRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            RefreshTokenRepository refreshTokenRepository
     ) {
         this.nutritionistRepository = nutritionistRepository;
         this.patientRepository = patientRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +83,7 @@ public class NutritionistService {
 
         nutritionist.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         nutritionistRepository.save(nutritionist);
+        refreshTokenRepository.deleteByNutritionistId(nutritionistId);
     }
 
     private NutritionistProfileResponse toProfileResponse(Nutritionist nutritionist, long activePatientCount) {

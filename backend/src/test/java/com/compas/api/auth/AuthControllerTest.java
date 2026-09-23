@@ -4,6 +4,7 @@ import com.compas.api.auth.dto.LoginRequest;
 import com.compas.api.auth.dto.SignupRequest;
 import com.compas.api.model.Nutritionist;
 import com.compas.api.repository.NutritionistRepository;
+import com.compas.api.repository.RefreshTokenRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

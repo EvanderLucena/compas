@@ -1039,4 +1039,31 @@ class ConversationServiceTest {
         assertNull(conversationService.detectDocumentRequest("Posso comer banana no café da manhã?"));
         assertNull(conversationService.detectDocumentRequest("Almocei arroz com frango e salada"));
     }
+
+    @Test
+    void processMessage_documentRequest_whenPlanNotFound_sendsUnavailableNoticeAndSetsAttentionFlag() {
+        textMessage.setMessageContent("Manda meu plano em pdf");
+        textMessage.setRetryCount(0);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId))
+                .thenThrow(new ResourceNotFoundException("Plano não encontrado"));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        assertTrue(textMessage.getProcessed());
+        assertTrue(textMessage.getJevRequiresAttention());
+        assertFalse(textMessage.getJevAttentionResolved());
+        assertEquals(BigDecimal.valueOf(0.85), textMessage.getJevAttentionScore());
+        assertEquals("document_unavailable", textMessage.getJevIntent());
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("Ainda não encontrei um plano alimentar"));
+        verify(whatsAppResponseRepository).save(argThat(r -> "DOCUMENT_UNAVAILABLE".equals(r.getResponseType())));
+        verify(whatsAppMessageRepository).save(textMessage);
+        verifyNoInteractions(llmService);
+    }
 }

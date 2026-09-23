@@ -3,7 +3,9 @@ package com.compas.api.auth;
 import com.compas.api.auth.dto.LoginRequest;
 import com.compas.api.auth.dto.SignupRequest;
 import com.compas.api.model.Nutritionist;
+import com.compas.api.model.RefreshToken;
 import com.compas.api.repository.NutritionistRepository;
+import com.compas.api.repository.RefreshTokenRepository;
 
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;

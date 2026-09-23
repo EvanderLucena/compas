@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,6 +48,9 @@ class WhatsAppFleetServiceTest {
 
     @Mock
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @Mock
+    private com.compas.api.email.EmailService emailService;
 
     @InjectMocks
     private WhatsAppFleetService fleetService;
@@ -80,6 +84,15 @@ class WhatsAppFleetServiceTest {
                 .maxPatients(180)
                 .active(true)
                 .build();
+
+        fleetService = new WhatsAppFleetService(
+                instanceRepository,
+                patientRepository,
+                evolutionApiService,
+                transactionManager,
+                emailService,
+                "admin@compas.app"
+        );
     }
 
     @Test
@@ -219,6 +232,22 @@ class WhatsAppFleetServiceTest {
     }
 
     @Test
+    void syncInstanceStatus_whenBanned_sendsAdminAlertEmail() {
+        instance1.setStatus(WhatsAppInstanceStatus.CONNECTED);
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(evolutionApiService.fetchConnectionState("compas-chip-01")).thenReturn(Optional.of("banned"));
+        when(instanceRepository.findByActiveTrueOrderByCreatedAtAsc()).thenReturn(List.of(instance2));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId1)).thenReturn(5L);
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId2)).thenReturn(10L);
+        when(patientRepository.reassignPatients(instanceId1, instanceId2, null)).thenReturn(5);
+
+        WhatsAppFleetInstanceDTO dto = fleetService.syncInstanceStatus(instanceId1);
+
+        assertEquals(WhatsAppInstanceStatus.BANNED, dto.status());
+        verify(emailService).sendAdminAlertEmail(eq("admin@compas.app"), anyString(), anyString());
+    }
+
+    @Test
     void migratePatients_reassignsPatientsToTarget() {
         when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
         when(instanceRepository.findById(instanceId2)).thenReturn(Optional.of(instance2));
@@ -328,6 +357,7 @@ class WhatsAppFleetServiceTest {
 
         assertEquals(WhatsAppInstanceStatus.BANNED, result.status());
         verify(patientRepository).reassignPatients(instanceId1, instanceId2, null);
+        verify(emailService).sendAdminAlertEmail(eq("admin@compas.app"), anyString(), anyString());
     }
 
     @Test
