@@ -1,46 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { Food } from '../../types/food';
 import { FOOD_UNIT_SYMBOLS } from '../../types/food';
 import { IconDots, IconEdit, IconTrash } from '../icons';
-
-function MiniMacro({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  color?: string;
-}) {
-  return (
-    <div>
-      <div
-        className="mono"
-        style={{
-          fontSize: 9.5,
-          color: 'var(--fg-subtle)',
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          marginBottom: 2,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        className="mono tnum"
-        style={{
-          fontSize: 14,
-          fontWeight: 500,
-          color: color || 'var(--fg)',
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
+import { MiniMacro } from './FoodMacroInputs';
 
 function DropdownItem({
   onClick,
@@ -87,21 +50,30 @@ function FoodMenuDropdown({
   onEdit,
   onDelete,
   onClose,
+  triggerRef,
   isCustom = true,
 }: {
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
   isCustom?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const target = e.target as Node;
+      if (
+        ref.current &&
+        !ref.current.contains(target) &&
+        (!triggerRef?.current || !triggerRef.current.contains(target))
+      ) {
+        onClose();
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   return (
     <div
@@ -194,6 +166,7 @@ export interface FoodCardProps {
 
 export function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const unitSymbol = FOOD_UNIT_SYMBOLS[food.unit];
   const refLabel = food.unit === 'UNIDADE' ? 'unidade' : food.unit === 'ML' ? 'ml' : 'g';
 
@@ -249,6 +222,7 @@ export function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
         </div>
         <div style={{ position: 'relative' }}>
           <button
+            ref={triggerRef}
             type="button"
             aria-label="Opções do alimento"
             style={{
@@ -263,6 +237,7 @@ export function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
           </button>
           {menuOpen && (
             <FoodMenuDropdown
+              triggerRef={triggerRef}
               onEdit={onEdit}
               onDelete={onDelete}
               onClose={() => setMenuOpen(false)}

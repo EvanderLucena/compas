@@ -152,7 +152,10 @@ export function FoodFormFields({
         referenceAmount={form.referenceAmount}
         onReferenceAmountChange={(val) => onFieldChange('referenceAmount', val)}
         onReferenceAmountBlur={() => {
-          onFieldChange('referenceAmount', String(parseNumberInput(form.referenceAmount)));
+          const parsed = parseNumberInput(form.referenceAmount);
+          if (parsed != null && !Number.isNaN(parsed)) {
+            onFieldChange('referenceAmount', String(parsed));
+          }
           onFieldBlur('referenceAmount');
         }}
         error={errors.referenceAmount}

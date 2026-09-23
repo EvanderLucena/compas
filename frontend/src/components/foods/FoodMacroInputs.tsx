@@ -1,6 +1,44 @@
 import { sanitizeNumberInput, parseNumberInput } from '../../utils/numberInput';
 import { foodFieldStyle } from './foodValidation';
 
+export function MiniMacro({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color?: string;
+}) {
+  return (
+    <div>
+      <div
+        className="mono"
+        style={{
+          fontSize: 9.5,
+          color: 'var(--fg-subtle)',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="mono tnum"
+        style={{
+          fontSize: 14,
+          fontWeight: 500,
+          color: color || 'var(--fg)',
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 const MACRO_CONFIG = [
   { key: 'kcal', label: 'Kcal' },
   { key: 'prot', label: 'Prot (g)' },
@@ -50,7 +88,7 @@ export function FoodMacroInputs({
               aria-invalid={error ? 'true' : undefined}
               aria-describedby={error ? errorId : undefined}
               inputMode="decimal"
-              style={foodFieldStyle(!!error, true)}
+              style={foodFieldStyle(Boolean(error), true)}
             />
             {error && (
               <p id={errorId} className="text-xs text-coral" role="alert">
