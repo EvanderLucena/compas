@@ -183,6 +183,117 @@ public class EvolutionApiService {
     }
 
     /**
+     * Send a media document (PDF) via Evolution API using default instance.
+     *
+     * @param phone    the recipient phone number
+     * @param pdfBytes the PDF file content in bytes
+     * @param fileName the file name (e.g. Plano_Alimentar.pdf)
+     * @param caption  optional caption accompanying the document
+     * @return true if sent successfully, false otherwise
+     */
+    public boolean sendMediaDocument(String phone, byte[] pdfBytes, String fileName, String caption) {
+        return sendMediaDocument(this.instanceName, phone, pdfBytes, fileName, caption);
+    }
+
+    /**
+     * Send a media document (PDF) via Evolution API routed to a specific instance in the fleet.
+     *
+     * @param targetInstance the instance name (e.g. compas-chip-01)
+     * @param phone          the recipient phone number
+     * @param pdfBytes       the PDF file content in bytes
+     * @param fileName       the file name (e.g. Plano_Alimentar.pdf)
+     * @param caption        optional caption accompanying the document
+     * @return true if sent successfully, false otherwise
+     */
+    public boolean sendMediaDocument(
+            String targetInstance,
+            String phone,
+            byte[] pdfBytes,
+            String fileName,
+            String caption) {
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            log.warn("Cannot send empty media document to {}", maskPhone(phone));
+            return false;
+        }
+        if (pdfBytes.length > MAX_MEDIA_SIZE_BYTES) {
+            log.warn("Media document exceeds size limit ({} bytes) for {}",
+                    pdfBytes.length, maskPhone(phone));
+            return false;
+        }
+
+        String instance = (targetInstance != null && !targetInstance.isBlank())
+                ? targetInstance : this.instanceName;
+        try {
+            String targetPhone = formatTargetPhone(phone);
+            String endpoint = apiUrl + "/message/sendMedia/" + instance;
+            String base64Media = "data:application/pdf;base64,"
+                    + Base64.getEncoder().encodeToString(pdfBytes);
+
+            java.util.Map<String, Object> payloadMap = new java.util.LinkedHashMap<>();
+            payloadMap.put("number", targetPhone);
+            payloadMap.put("mediatype", "document");
+            payloadMap.put("mimetype", "application/pdf");
+            payloadMap.put("caption", caption != null ? caption : "");
+            payloadMap.put("media", base64Media);
+            payloadMap.put("fileName", (fileName != null && !fileName.isBlank())
+                    ? fileName : "documento.pdf");
+
+            String jsonPayload = objectMapper.writeValueAsString(payloadMap);
+
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                    .timeout(Duration.ofSeconds(30));
+
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(
+                    builder.build(), HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                log.info("Media document sent via Evolution API ({}) to {}: fileName={}, status={}",
+                        instance, maskPhone(targetPhone), fileName, response.statusCode());
+                return true;
+            }
+
+            // Retry once on server error (>= 500)
+            if (response.statusCode() >= 500) {
+                log.warn("Evolution API server error ({}) on sendMedia to {}, retrying...",
+                        response.statusCode(), instance);
+                Thread.sleep(500);
+
+                HttpResponse<String> retryResponse = httpClient.send(
+                        builder.build(), HttpResponse.BodyHandlers.ofString());
+                if (retryResponse.statusCode() >= 200 && retryResponse.statusCode() < 300) {
+                    log.info("Media document sent on retry: instance={}, phone={}, fileName={}",
+                            instance, maskPhone(targetPhone), fileName);
+                    return true;
+                }
+                log.error("Evolution API sendMedia retry failed: instance={}, status={}",
+                        instance, retryResponse.statusCode());
+                return false;
+            }
+
+            log.error("Evolution API sendMedia error on instance {}: status={}, body={}",
+                    instance, response.statusCode(), truncate(response.body(), 200));
+            return false;
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Evolution API sendMedia interrupted on instance {}: {}",
+                    instance, e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.error("Evolution API sendMedia failed on instance {}: {}",
+                    instance, e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
      * Create an instance in Evolution API.
      */
     public boolean createInstance(String instanceName) {

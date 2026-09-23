@@ -47,6 +47,7 @@ class ConversationServiceTest {
     @Mock AudioTranscriptionService audioTranscriptionService;
     @Mock JevService jevService;
     @Mock BiometryService biometryService;
+    @Mock PatientDocumentService patientDocumentService;
 
     @InjectMocks
     ConversationService conversationService;
@@ -64,6 +65,7 @@ class ConversationServiceTest {
 
     @BeforeEach
     void setup() {
+        conversationService.setPatientDocumentService(patientDocumentService);
         messageId = UUID.randomUUID();
         patientId = UUID.randomUUID();
         nutritionistId = UUID.randomUUID();
@@ -808,5 +810,121 @@ class ConversationServiceTest {
         conversationService.sendTechnicalFallback(messageId);
 
         assertFalse(textMessage.getProcessed());
+    }
+
+    @Test
+    void processMessage_whenPatientRequestsMealPlanPdf_generatesAndDeliversPdf() {
+        textMessage.setMessageContent("Pode me mandar o PDF do meu plano alimentar?");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        byte[] fakePdf = new byte[]{1, 2, 3};
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId)).thenReturn(fakePdf);
+        when(evolutionApiService.sendMediaDocument(anyString(), any(), anyString(), anyString())).thenReturn(true);
+
+        conversationService.processMessage(messageId);
+
+        verify(patientDocumentService).generateMealPlanPdf(nutritionistId, patientId);
+        verify(evolutionApiService).sendMediaDocument(
+                eq("11999998888"),
+                eq(fakePdf),
+                contains("Plano_Alimentar"),
+                contains("plano alimentar")
+        );
+        assertTrue(textMessage.getProcessed());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenPatientRequestsGroceryListPdf_generatesAndDeliversGroceryList() {
+        textMessage.setMessageContent("Manda a lista de compras em pdf por favor");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        byte[] fakePdf = new byte[]{4, 5, 6};
+        when(patientDocumentService.generateGroceryListPdf(nutritionistId, patientId)).thenReturn(fakePdf);
+        when(evolutionApiService.sendMediaDocument(anyString(), any(), anyString(), anyString())).thenReturn(true);
+
+        conversationService.processMessage(messageId);
+
+        verify(patientDocumentService).generateGroceryListPdf(nutritionistId, patientId);
+        verify(evolutionApiService).sendMediaDocument(
+                eq("11999998888"),
+                eq(fakePdf),
+                contains("Lista_de_Compras"),
+                contains("lista de compras")
+        );
+        assertTrue(textMessage.getProcessed());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenPatientRequestsBiometryReportPdf_generatesAndDeliversBiometryReport() {
+        textMessage.setMessageContent("Quero meu relatório de evolução corporal em pdf");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        byte[] fakePdf = new byte[]{7, 8, 9};
+        when(patientDocumentService.generateBiometryReportPdf(nutritionistId, patientId)).thenReturn(fakePdf);
+        when(evolutionApiService.sendMediaDocument(anyString(), any(), anyString(), anyString())).thenReturn(true);
+
+        conversationService.processMessage(messageId);
+
+        verify(patientDocumentService).generateBiometryReportPdf(nutritionistId, patientId);
+        verify(evolutionApiService).sendMediaDocument(
+                eq("11999998888"),
+                eq(fakePdf),
+                contains("Relatorio_Evolucao"),
+                contains("relatório de evolução")
+        );
+        assertTrue(textMessage.getProcessed());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenPatientRequestsPdfButNoPlanExists_sendsPoliteFallbackMessage() {
+        textMessage.setMessageContent("Pode enviar meu plano em pdf?");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId))
+                .thenThrow(new IllegalStateException("Nenhum plano alimentar encontrado"));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+
+        conversationService.processMessage(messageId);
+
+        verify(evolutionApiService).sendMessage(
+                eq("11999998888"),
+                contains("Ainda não encontrei um plano alimentar ativo")
+        );
+        assertTrue(textMessage.getProcessed());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void detectDocumentRequest_identifiesCorrectTypesAndIgnoresGeneralInquiries() {
+        assertEquals(ConversationService.RequestedDocumentType.MEAL_PLAN,
+                conversationService.detectDocumentRequest("Manda meu plano em pdf"));
+        assertEquals(ConversationService.RequestedDocumentType.MEAL_PLAN,
+                conversationService.detectDocumentRequest("Pode me enviar o cardápio?"));
+        assertEquals(ConversationService.RequestedDocumentType.GROCERY_LIST,
+                conversationService.detectDocumentRequest("Lista de compras da semana em pdf"));
+        assertEquals(ConversationService.RequestedDocumentType.BIOMETRY_REPORT,
+                conversationService.detectDocumentRequest("Relatório de evolução em pdf"));
+
+        assertNull(conversationService.detectDocumentRequest("Posso comer banana no café da manhã?"));
+        assertNull(conversationService.detectDocumentRequest("Almocei arroz com frango e salada"));
     }
 }
