@@ -38,6 +38,7 @@ class WebhookServiceTest {
     @Mock PhoneNormalizationService phoneNormalizationService;
     @Mock MessageQueueService messageQueueService;
     @Mock EvolutionApiService evolutionApiService;
+    @Mock com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository;
 
     @InjectMocks
     WebhookService webhookService;

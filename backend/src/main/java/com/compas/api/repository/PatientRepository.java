@@ -74,4 +74,34 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
      */
     @Query("SELECT DISTINCT p.nutritionistId FROM Patient p WHERE p.whatsapp = :whatsapp")
     List<UUID> findDistinctNutritionistIdsByWhatsapp(@Param("whatsapp") String whatsapp);
+
+    /**
+     * Count active patients assigned to a WhatsApp fleet instance.
+     */
+    long countByWhatsappInstanceIdAndActiveTrue(UUID instanceId);
+
+    /**
+     * Count distinct nutritionists with active patients on a WhatsApp fleet instance.
+     */
+    @Query("SELECT COUNT(DISTINCT p.nutritionistId) FROM Patient p WHERE p.whatsappInstanceId = :instanceId AND p.active = true")
+    long countDistinctNutritionistIdsByWhatsappInstanceId(@Param("instanceId") UUID instanceId);
+
+    /**
+     * Paginated list of active patients assigned to an instance.
+     */
+    Page<Patient> findByWhatsappInstanceIdAndActiveTrue(UUID instanceId, Pageable pageable);
+
+    /**
+     * Reassign all patients from one fleet instance to another.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = :targetInstanceId WHERE p.whatsappInstanceId = :sourceInstanceId")
+    int reassignAllPatients(@Param("sourceInstanceId") UUID sourceInstanceId, @Param("targetInstanceId") UUID targetInstanceId);
+
+    /**
+     * Clear instance assignment from patients when an instance is removed.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = NULL WHERE p.whatsappInstanceId = :instanceId")
+    int clearInstanceFromPatients(@Param("instanceId") UUID instanceId);
 }

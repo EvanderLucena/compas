@@ -34,6 +34,7 @@ public class WebhookService {
     private final PhoneNormalizationService phoneNormalizationService;
     private final MessageQueueService messageQueueService;
     private final EvolutionApiService evolutionApiService;
+    private final com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository;
 
     @Value("${compas.whatsapp.unknown-response-enabled:${nutriai.whatsapp.unknown-response-enabled:true}}")
     private boolean unknownResponseEnabled = true;
@@ -54,13 +55,15 @@ public class WebhookService {
             EpisodeRepository episodeRepository,
             PhoneNormalizationService phoneNormalizationService,
             MessageQueueService messageQueueService,
-            EvolutionApiService evolutionApiService) {
+            EvolutionApiService evolutionApiService,
+            com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository) {
         this.whatsAppMessageRepository = whatsAppMessageRepository;
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
         this.phoneNormalizationService = phoneNormalizationService;
         this.messageQueueService = messageQueueService;
         this.evolutionApiService = evolutionApiService;
+        this.whatsAppInstanceRepository = whatsAppInstanceRepository;
     }
 
     /**
@@ -187,6 +190,18 @@ public class WebhookService {
 
             return Optional.of(new WebhookMessageDTO(
                     saved.getId(), normalizedPhone, null, null, messageContent, messageType));
+        }
+
+        // Sticky binding: if patient has no whatsappInstanceId yet, bind to incoming instance if known
+        if (instanceId != null && !instanceId.isBlank()) {
+            Patient patient = patientOpt.get();
+            if (patient.getWhatsappInstanceId() == null) {
+                whatsAppInstanceRepository.findByName(instanceId).ifPresent(inst -> {
+                    patient.setWhatsappInstanceId(inst.getId());
+                    patientRepository.save(patient);
+                    log.info("Sticky binding: patient {} bound to WhatsApp fleet instance '{}'", patient.getId(), inst.getName());
+                });
+            }
         }
 
         // Enqueue for async AI processing after transaction commits

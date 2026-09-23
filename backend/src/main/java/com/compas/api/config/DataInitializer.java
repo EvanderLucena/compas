@@ -106,6 +106,7 @@ public class DataInitializer implements CommandLineRunner {
         TenantContext.executeWithBypass(() -> {
             transactionTemplate.executeWithoutResult(status -> {
                 Nutritionist demo = ensureDemoNutritionist();
+                ensureDemoAdmin();
                 List<Food> foods = ensureDemoFoods(demo.getId());
                 if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
                     ensureDemoHistoryCycle(demo.getId(), foods);
@@ -164,6 +165,26 @@ public class DataInitializer implements CommandLineRunner {
             changed = true;
         }
         return changed ? nutritionistRepository.save(nutritionist) : nutritionist;
+    }
+
+    private void ensureDemoAdmin() {
+        String fleetAdminEmail = "fleet@compas.app";
+        if (nutritionistRepository.findByEmail(fleetAdminEmail).isEmpty()) {
+            nutritionistRepository.save(Nutritionist.builder()
+                    .name("Administrador Compas")
+                    .professionalName("Compas Fleet")
+                    .email(fleetAdminEmail)
+                    .passwordHash(passwordEncoder.encode(adminPassword))
+                    .crn("00000")
+                    .crnRegional("CRN-3")
+                    .role(UserRole.ADMIN)
+                    .emailVerified(true)
+                    .onboardingCompleted(true)
+                    .subscriptionTier("UNLIMITED")
+                    .patientLimit(9999)
+                    .build());
+            logger.info("Demo Fleet Admin created: {}", fleetAdminEmail);
+        }
     }
 
     private List<Food> ensureDemoFoods(UUID nutritionistId) {

@@ -1,0 +1,363 @@
+package com.compas.api.service;
+
+import com.compas.api.dto.whatsapp.fleet.CreateWhatsAppInstanceRequest;
+import com.compas.api.dto.whatsapp.fleet.FleetSummaryDTO;
+import com.compas.api.dto.whatsapp.fleet.InstancePatientDTO;
+import com.compas.api.dto.whatsapp.fleet.InstanceQrCodeResponse;
+import com.compas.api.dto.whatsapp.fleet.UpdateWhatsAppInstanceRequest;
+import com.compas.api.dto.whatsapp.fleet.WhatsAppFleetInstanceDTO;
+import com.compas.api.model.Patient;
+import com.compas.api.model.WhatsAppInstance;
+import com.compas.api.model.WhatsAppInstanceStatus;
+import com.compas.api.repository.PatientRepository;
+import com.compas.api.repository.WhatsAppInstanceRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+public class WhatsAppFleetService {
+
+    private static final Logger log = LoggerFactory.getLogger(WhatsAppFleetService.class);
+
+    private final WhatsAppInstanceRepository instanceRepository;
+    private final PatientRepository patientRepository;
+    private final EvolutionApiService evolutionApiService;
+
+    public WhatsAppFleetService(
+            WhatsAppInstanceRepository instanceRepository,
+            PatientRepository patientRepository,
+            EvolutionApiService evolutionApiService) {
+        this.instanceRepository = instanceRepository;
+        this.patientRepository = patientRepository;
+        this.evolutionApiService = evolutionApiService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<WhatsAppFleetInstanceDTO> listFleetInstances() {
+        List<WhatsAppInstance> instances = instanceRepository.findAllByOrderByCreatedAtDesc();
+        return instances.stream().map(this::toDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public FleetSummaryDTO getFleetSummary() {
+        List<WhatsAppInstance> instances = instanceRepository.findAll();
+        int totalInstances = instances.size();
+        int connected = 0;
+        int disconnected = 0;
+        long totalAssigned = 0;
+        long totalCapacity = 0;
+        int alerts = 0;
+
+        for (WhatsAppInstance inst : instances) {
+            long pCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(inst.getId());
+            totalAssigned += pCount;
+            totalCapacity += inst.getMaxPatients();
+
+            if (inst.getStatus() == WhatsAppInstanceStatus.CONNECTED) {
+                connected++;
+            } else {
+                disconnected++;
+                alerts++;
+            }
+
+            if (inst.getMaxPatients() > 0 && pCount >= inst.getMaxPatients() * 0.9) {
+                alerts++;
+            }
+        }
+
+        return new FleetSummaryDTO(totalInstances, connected, disconnected, totalAssigned, totalCapacity, alerts);
+    }
+
+    @Transactional(readOnly = true)
+    public WhatsAppFleetInstanceDTO getInstance(UUID id) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+        return toDTO(instance);
+    }
+
+    @Transactional
+    public WhatsAppFleetInstanceDTO createInstance(CreateWhatsAppInstanceRequest request) {
+        String normalizedName = request.name().trim().toLowerCase();
+        if (instanceRepository.findByName(normalizedName).isPresent()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Já existe uma instância com o nome '" + normalizedName + "'"
+            );
+        }
+
+        int maxPatients = request.maxPatients() != null ? request.maxPatients() : 180;
+        WhatsAppInstance instance = WhatsAppInstance.builder()
+                .name(normalizedName)
+                .phoneNumber(request.phoneNumber() != null ? request.phoneNumber().trim() : null)
+                .description(request.description() != null ? request.description().trim() : null)
+                .status(WhatsAppInstanceStatus.DISCONNECTED)
+                .maxPatients(maxPatients)
+                .active(true)
+                .build();
+
+        WhatsAppInstance saved = instanceRepository.save(instance);
+
+        // Async or non-blocking attempt to create instance in Evolution API
+        try {
+            evolutionApiService.createInstance(normalizedName);
+        } catch (Exception e) {
+            log.warn("Could not register instance {} in Evolution API immediately: {}", normalizedName, e.getMessage());
+        }
+
+        return toDTO(saved);
+    }
+
+    @Transactional
+    public WhatsAppFleetInstanceDTO updateInstance(UUID id, UpdateWhatsAppInstanceRequest request) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+
+        if (request.phoneNumber() != null) {
+            instance.setPhoneNumber(request.phoneNumber().trim());
+        }
+        if (request.description() != null) {
+            instance.setDescription(request.description().trim());
+        }
+        if (request.maxPatients() != null && request.maxPatients() > 0) {
+            instance.setMaxPatients(request.maxPatients());
+        }
+        if (request.active() != null) {
+            instance.setActive(request.active());
+        }
+
+        WhatsAppInstance updated = instanceRepository.save(instance);
+        return toDTO(updated);
+    }
+
+    @Transactional
+    public InstanceQrCodeResponse connectInstance(UUID id) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+
+        Optional<String> qrCodeOpt = evolutionApiService.fetchQrCode(instance.getName());
+        String qrCode = qrCodeOpt.orElse(null);
+
+        if (qrCode != null && !qrCode.isBlank()) {
+            instance.setQrCodeBase64(qrCode);
+            instance.setStatus(WhatsAppInstanceStatus.CONNECTING);
+            instanceRepository.save(instance);
+            return new InstanceQrCodeResponse(
+                    instance.getId(),
+                    instance.getName(),
+                    qrCode,
+                    WhatsAppInstanceStatus.CONNECTING,
+                    "QR Code obtido com sucesso. Aponte a câmera do WhatsApp para conectar."
+            );
+        }
+
+        // Check if it was already connected
+        Optional<String> stateOpt = evolutionApiService.fetchConnectionState(instance.getName());
+        if (stateOpt.isPresent() && "open".equalsIgnoreCase(stateOpt.get())) {
+            instance.setStatus(WhatsAppInstanceStatus.CONNECTED);
+            instance.setQrCodeBase64(null);
+            instance.setLastHeartbeatAt(LocalDateTime.now());
+            instanceRepository.save(instance);
+            return new InstanceQrCodeResponse(
+                    instance.getId(),
+                    instance.getName(),
+                    null,
+                    WhatsAppInstanceStatus.CONNECTED,
+                    "Esta instância já se encontra conectada."
+            );
+        }
+
+        return new InstanceQrCodeResponse(
+                instance.getId(),
+                instance.getName(),
+                instance.getQrCodeBase64(),
+                instance.getStatus(),
+                "Aguardando geração do QR Code pela Evolution API. Tente novamente em alguns segundos."
+        );
+    }
+
+    @Transactional
+    public WhatsAppFleetInstanceDTO syncInstanceStatus(UUID id) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+
+        Optional<String> stateOpt = evolutionApiService.fetchConnectionState(instance.getName());
+        if (stateOpt.isPresent()) {
+            String state = stateOpt.get();
+            if ("open".equalsIgnoreCase(state)) {
+                instance.setStatus(WhatsAppInstanceStatus.CONNECTED);
+                instance.setLastHeartbeatAt(LocalDateTime.now());
+                instance.setQrCodeBase64(null);
+            } else if ("close".equalsIgnoreCase(state)) {
+                if (instance.getStatus() == WhatsAppInstanceStatus.CONNECTED) {
+                    instance.setDisconnectedAt(LocalDateTime.now());
+                }
+                instance.setStatus(WhatsAppInstanceStatus.DISCONNECTED);
+            } else if ("connecting".equalsIgnoreCase(state)) {
+                instance.setStatus(WhatsAppInstanceStatus.CONNECTING);
+            }
+            instanceRepository.save(instance);
+        }
+
+        return toDTO(instance);
+    }
+
+    @Transactional
+    public void restartInstance(UUID id) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+        evolutionApiService.restartInstance(instance.getName());
+        instance.setStatus(WhatsAppInstanceStatus.CONNECTING);
+        instanceRepository.save(instance);
+    }
+
+    @Transactional
+    public void disconnectInstance(UUID id) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+        evolutionApiService.logoutInstance(instance.getName());
+        instance.setStatus(WhatsAppInstanceStatus.DISCONNECTED);
+        instance.setDisconnectedAt(LocalDateTime.now());
+        instance.setQrCodeBase64(null);
+        instanceRepository.save(instance);
+    }
+
+    @Transactional
+    public void deleteInstance(UUID id) {
+        WhatsAppInstance instance = findInstanceOrThrow(id);
+        patientRepository.clearInstanceFromPatients(id);
+        evolutionApiService.deleteInstance(instance.getName());
+        instanceRepository.delete(instance);
+    }
+
+    @Transactional
+    public int migratePatients(UUID sourceId, UUID targetId) {
+        if (sourceId.equals(targetId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Instância de origem e destino devem ser distintas."
+            );
+        }
+        findInstanceOrThrow(sourceId);
+        findInstanceOrThrow(targetId);
+
+        int count = patientRepository.reassignAllPatients(sourceId, targetId);
+        log.info("Migrated {} patients from WhatsApp instance {} to {}", count, sourceId, targetId);
+        return count;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<InstancePatientDTO> listInstancePatients(UUID instanceId, Pageable pageable) {
+        findInstanceOrThrow(instanceId);
+        Page<Patient> page = patientRepository.findByWhatsappInstanceIdAndActiveTrue(instanceId, pageable);
+        return page.map(p -> new InstancePatientDTO(
+                p.getId(),
+                p.getName(),
+                p.getWhatsapp(),
+                p.getNutritionistId(),
+                p.getStatus() != null ? p.getStatus().name() : "ONTRACK"
+        ));
+    }
+
+    /**
+     * Sticky Affinity + Least Loaded Active Routing:
+     * 1. If patient already assigned to an existing active instance, keep it!
+     * 2. If unassigned, find active CONNECTED instance with lowest patient count (< maxPatients).
+     * 3. Fallback to active instance with lowest patient count.
+     */
+    @Transactional
+    public Optional<WhatsAppInstance> assignPatientToInstance(Patient patient) {
+        if (patient.getWhatsappInstanceId() != null) {
+            Optional<WhatsAppInstance> current = instanceRepository.findById(patient.getWhatsappInstanceId());
+            if (current.isPresent() && Boolean.TRUE.equals(current.get().getActive())) {
+                return current;
+            }
+        }
+
+        List<WhatsAppInstance> activeInstances = instanceRepository.findByActiveTrueOrderByCreatedAtAsc();
+        if (activeInstances.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // Try to pick from CONNECTED instances under max capacity
+        record InstanceCandidate(WhatsAppInstance instance, long count) {}
+
+        List<InstanceCandidate> candidates = activeInstances.stream()
+                .map(inst -> new InstanceCandidate(
+                        inst,
+                        patientRepository.countByWhatsappInstanceIdAndActiveTrue(inst.getId())
+                ))
+                .sorted(Comparator.comparingLong(InstanceCandidate::count))
+                .toList();
+
+        // 1st preference: Connected and under maxPatients
+        Optional<WhatsAppInstance> selected = candidates.stream()
+                .filter(c -> c.instance().getStatus() == WhatsAppInstanceStatus.CONNECTED
+                        && c.count() < c.instance().getMaxPatients())
+                .map(InstanceCandidate::instance)
+                .findFirst();
+
+        // 2nd preference: Any Connected instance with lowest count
+        if (selected.isEmpty()) {
+            selected = candidates.stream()
+                    .filter(c -> c.instance().getStatus() == WhatsAppInstanceStatus.CONNECTED)
+                    .map(InstanceCandidate::instance)
+                    .findFirst();
+        }
+
+        // 3rd preference: Any active instance with lowest count
+        if (selected.isEmpty()) {
+            selected = candidates.stream()
+                    .map(InstanceCandidate::instance)
+                    .findFirst();
+        }
+
+        selected.ifPresent(inst -> {
+            patient.setWhatsappInstanceId(inst.getId());
+            patientRepository.save(patient);
+            log.info("Assigned patient {} to WhatsApp fleet instance '{}' (id={})",
+                    patient.getId(), inst.getName(), inst.getId());
+        });
+
+        return selected;
+    }
+
+    private WhatsAppInstance findInstanceOrThrow(UUID id) {
+        return instanceRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Instância de WhatsApp não encontrada"
+                ));
+    }
+
+    private WhatsAppFleetInstanceDTO toDTO(WhatsAppInstance inst) {
+        long patientCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(inst.getId());
+        long nutritionistCount = patientRepository.countDistinctNutritionistIdsByWhatsappInstanceId(inst.getId());
+        int max = inst.getMaxPatients() != null && inst.getMaxPatients() > 0 ? inst.getMaxPatients() : 180;
+        int capacityPercentage = (int) Math.min(100, (patientCount * 100) / max);
+        boolean isNearCapacity = capacityPercentage >= 80;
+
+        return new WhatsAppFleetInstanceDTO(
+                inst.getId(),
+                inst.getName(),
+                inst.getPhoneNumber(),
+                inst.getDescription(),
+                inst.getStatus(),
+                inst.getQrCodeBase64(),
+                inst.getMaxPatients(),
+                inst.getActive(),
+                patientCount,
+                nutritionistCount,
+                capacityPercentage,
+                isNearCapacity,
+                inst.getLastHeartbeatAt(),
+                inst.getDisconnectedAt(),
+                inst.getCreatedAt()
+        );
+    }
+}
