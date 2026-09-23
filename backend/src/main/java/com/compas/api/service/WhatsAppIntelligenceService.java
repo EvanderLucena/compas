@@ -1,10 +1,6 @@
 package com.compas.api.service;
 
-import com.compas.api.dto.whatsapp.ActivationLinkDTO;
-import com.compas.api.dto.whatsapp.PatchExtractionRequest;
-import com.compas.api.dto.whatsapp.ExtractionDTO;
-import com.compas.api.dto.whatsapp.ExtractionItemDTO;
-import com.compas.api.dto.whatsapp.WhatsAppStatusDTO;
+import com.compas.api.dto.whatsapp.*;
 import com.compas.api.model.EpisodeHistoryEvent;
 import com.compas.api.model.ExtractionItem;
 import com.compas.api.model.MealExtraction;
@@ -47,8 +43,6 @@ public class WhatsAppIntelligenceService {
     private final WhatsAppMessageRepository whatsAppMessageRepository;
     private final EpisodeHistoryEventRepository episodeHistoryEventRepository;
     private final ObjectMapper objectMapper;
-    private final WhatsAppFleetService fleetService;
-    private final com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository;
 
     @Value("${compas.whatsapp.central-number:${nutriai.whatsapp.central-number:}}")
     private String centralNumber;
@@ -59,26 +53,11 @@ public class WhatsAppIntelligenceService {
             PatientRepository patientRepository,
             WhatsAppMessageRepository whatsAppMessageRepository,
             EpisodeHistoryEventRepository episodeHistoryEventRepository) {
-        this(mealExtractionRepository, extractionItemRepository, patientRepository,
-                whatsAppMessageRepository, episodeHistoryEventRepository, null, null);
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    public WhatsAppIntelligenceService(
-            MealExtractionRepository mealExtractionRepository,
-            ExtractionItemRepository extractionItemRepository,
-            PatientRepository patientRepository,
-            WhatsAppMessageRepository whatsAppMessageRepository,
-            EpisodeHistoryEventRepository episodeHistoryEventRepository,
-            WhatsAppFleetService fleetService,
-            com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository) {
         this.mealExtractionRepository = mealExtractionRepository;
         this.extractionItemRepository = extractionItemRepository;
         this.patientRepository = patientRepository;
         this.whatsAppMessageRepository = whatsAppMessageRepository;
         this.episodeHistoryEventRepository = episodeHistoryEventRepository;
-        this.fleetService = fleetService;
-        this.whatsAppInstanceRepository = whatsAppInstanceRepository;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -190,30 +169,16 @@ public class WhatsAppIntelligenceService {
             phone = phone.substring(2);
         }
 
-        if (patient.getWhatsappInstanceId() == null && fleetService != null) {
-            fleetService.assignPatientToInstance(patient);
-        }
-
-        String targetPhone = null;
-        if (patient.getWhatsappInstanceId() != null && whatsAppInstanceRepository != null) {
-            targetPhone = whatsAppInstanceRepository.findById(patient.getWhatsappInstanceId())
-                    .map(com.compas.api.model.WhatsAppInstance::getPhoneNumber)
-                    .filter(p -> p != null && !p.isBlank())
-                    .map(EvolutionApiService::formatTargetPhone)
-                    .orElse(null);
-        }
-
-        if (targetPhone == null || targetPhone.isBlank()) {
-            if (centralNumber != null && !centralNumber.isBlank()) {
-                String normalizedCentral = centralNumber.replaceAll("\\D", "");
-                if (normalizedCentral.length() <= 11) {
-                    targetPhone = "55" + normalizedCentral;
-                } else {
-                    targetPhone = normalizedCentral;
-                }
+        String targetPhone;
+        if (centralNumber != null && !centralNumber.isBlank()) {
+            String normalizedCentral = centralNumber.replaceAll("\\D", "");
+            if (normalizedCentral.length() <= 11) {
+                targetPhone = "55" + normalizedCentral;
             } else {
-                targetPhone = "55" + phone;
+                targetPhone = normalizedCentral;
             }
+        } else {
+            targetPhone = "55" + phone;
         }
 
         String link = "https://wa.me/" + targetPhone + "?text=Oi";

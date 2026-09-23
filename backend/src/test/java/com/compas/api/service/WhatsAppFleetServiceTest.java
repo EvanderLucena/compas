@@ -167,6 +167,18 @@ class WhatsAppFleetServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
+    @Test
+    void migratePatients_exceedsCapacity_throwsBadRequest() {
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(instanceRepository.findById(instanceId2)).thenReturn(Optional.of(instance2));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId2)).thenReturn(170L);
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId1)).thenReturn(20L);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> fleetService.migratePatients(instanceId1, instanceId2));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+    }
+
 
     @Test
     void connectInstance_returnsQrCodeWhenAvailable() {

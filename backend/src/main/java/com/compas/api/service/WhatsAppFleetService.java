@@ -277,6 +277,16 @@ public class WhatsAppFleetService {
             );
         }
 
+        long targetCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(targetId);
+        long movingCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(sourceId);
+        if (targetCount + movingCount > target.getMaxPatients()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    String.format("Migração excederia a capacidade da instância de destino (%d + %d > %d)",
+                            targetCount, movingCount, target.getMaxPatients())
+            );
+        }
+
         int count = patientRepository.reassignPatients(sourceId, targetId, nutritionistId);
         log.info("Migrated {} patients from WhatsApp instance {} to {} (nutritionistId={})",
                 count, sourceId, targetId, nutritionistId);
@@ -298,28 +308,35 @@ public class WhatsAppFleetService {
 
     /**
      * Sticky Affinity + Least Loaded Active Routing:
-     * 1. If patient already assigned to an existing active instance, keep it!
-     * 2. If unassigned, find active CONNECTED instance with lowest patient count (< maxPatients).
-     * 3. Fallback to active instance with lowest patient count.
+     * 1. If patient already assigned to an existing active, non-banned instance, keep it!
+     * 2. If unassigned, find eligible (active, non-banned, non-disabled) CONNECTED instance under maxPatients.
+     * 3. Fallback: eligible active instance under maxPatients.
+     * 4. Fallback: eligible CONNECTED instance with lowest count.
+     * 5. Fallback: any eligible instance with lowest count.
      */
     @Transactional
     public Optional<WhatsAppInstance> assignPatientToInstance(Patient patient) {
         if (patient.getWhatsappInstanceId() != null) {
             Optional<WhatsAppInstance> current = instanceRepository.findById(patient.getWhatsappInstanceId());
-            if (current.isPresent() && Boolean.TRUE.equals(current.get().getActive())) {
+            if (current.isPresent() && Boolean.TRUE.equals(current.get().getActive())
+                    && current.get().getStatus() != WhatsAppInstanceStatus.BANNED
+                    && current.get().getStatus() != WhatsAppInstanceStatus.DISABLED) {
                 return current;
             }
         }
 
-        List<WhatsAppInstance> activeInstances = instanceRepository.findByActiveTrueOrderByCreatedAtAsc();
-        if (activeInstances.isEmpty()) {
+        List<WhatsAppInstance> eligibleInstances = instanceRepository.findByActiveTrueOrderByCreatedAtAsc()
+                .stream()
+                .filter(inst -> inst.getStatus() != WhatsAppInstanceStatus.BANNED
+                        && inst.getStatus() != WhatsAppInstanceStatus.DISABLED)
+                .toList();
+        if (eligibleInstances.isEmpty()) {
             return Optional.empty();
         }
 
-        // Try to pick from CONNECTED instances under max capacity
         record InstanceCandidate(WhatsAppInstance instance, long count) {}
 
-        List<InstanceCandidate> candidates = activeInstances.stream()
+        List<InstanceCandidate> candidates = eligibleInstances.stream()
                 .map(inst -> new InstanceCandidate(
                         inst,
                         patientRepository.countByWhatsappInstanceIdAndActiveTrue(inst.getId())
@@ -334,7 +351,15 @@ public class WhatsAppFleetService {
                 .map(InstanceCandidate::instance)
                 .findFirst();
 
-        // 2nd preference: Any Connected instance with lowest count
+        // 2nd preference: Any eligible state under maxPatients
+        if (selected.isEmpty()) {
+            selected = candidates.stream()
+                    .filter(c -> c.count() < c.instance().getMaxPatients())
+                    .map(InstanceCandidate::instance)
+                    .findFirst();
+        }
+
+        // 3rd preference: Connected instance with lowest count
         if (selected.isEmpty()) {
             selected = candidates.stream()
                     .filter(c -> c.instance().getStatus() == WhatsAppInstanceStatus.CONNECTED)
@@ -342,7 +367,7 @@ public class WhatsAppFleetService {
                     .findFirst();
         }
 
-        // 3rd preference: Any active instance with lowest count
+        // 4th preference: Any eligible instance with lowest count
         if (selected.isEmpty()) {
             selected = candidates.stream()
                     .map(InstanceCandidate::instance)
