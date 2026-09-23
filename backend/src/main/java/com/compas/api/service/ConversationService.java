@@ -13,9 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.compas.api.dto.jev.JevDecision;
+import com.compas.api.exception.ResourceNotFoundException;
+import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,6 +48,7 @@ public class ConversationService {
     private final AudioTranscriptionService audioTranscriptionService;
     private JevService jevService;
     private BiometryService biometryService;
+    private PatientDocumentService patientDocumentService;
 
     @Autowired(required = false)
     public void setJevService(JevService jevService) {
@@ -53,6 +58,11 @@ public class ConversationService {
     @Autowired(required = false)
     public void setBiometryService(BiometryService biometryService) {
         this.biometryService = biometryService;
+    }
+
+    @Autowired(required = false)
+    public void setPatientDocumentService(PatientDocumentService patientDocumentService) {
+        this.patientDocumentService = patientDocumentService;
     }
 
     public ConversationService(
@@ -224,6 +234,9 @@ public class ConversationService {
                 if (handleEmergencyEscalationIfTriggered(messageId, message, patient, nutritionist)) {
                     return;
                 }
+                if (handleDocumentDeliveryIfRequested(messageId, message, patient, nutritionist, userMessage)) {
+                    return;
+                }
                 systemPrompt = buildClassifyingPrompt(patient, nutritionist, message);
                 responseType = "CONVERSATION";
             } else {
@@ -282,6 +295,10 @@ public class ConversationService {
                 }
                 markProcessed(message);
                 log.info("Message {} fast-tracked as GREETING via Jev triage", messageId);
+                return;
+            }
+
+            if (handleDocumentDeliveryIfRequested(messageId, message, patient, nutritionist, userMessage)) {
                 return;
             }
 
@@ -926,6 +943,274 @@ public class ConversationService {
             log.warn("Failed to send technical fallback to sender {}, leaving message unprocessed",
                     message.getSenderPhoneNormalized());
         }
+    }
+
+    public enum RequestedDocumentType {
+        MEAL_PLAN,
+        GROCERY_LIST,
+        BIOMETRY_REPORT
+    }
+
+    boolean handleDocumentDeliveryIfRequested(
+            UUID messageId,
+            WhatsAppMessage message,
+            Patient patient,
+            Nutritionist nutritionist,
+            String text) {
+        if (patientDocumentService == null || text == null || text.isBlank()) {
+            return false;
+        }
+
+        RequestedDocumentType docType = detectDocumentRequest(text);
+        if (docType == null) {
+            return false;
+        }
+
+        log.info("Detected document delivery request ({}) for patient {}", docType, patient.getId());
+
+        try {
+            byte[] pdfBytes;
+            String fileName;
+            String caption;
+
+            switch (docType) {
+                case GROCERY_LIST -> {
+                    pdfBytes = patientDocumentService.generateGroceryListPdf(
+                            nutritionist.getId(), patient.getId());
+                    fileName = "Lista_de_Compras_" + sanitizeFileName(patient.getName()) + ".pdf";
+                    caption = "Aqui está a sua lista de compras da semana organizada por seções! 🛒📋";
+                }
+                case BIOMETRY_REPORT -> {
+                    pdfBytes = patientDocumentService.generateBiometryReportPdf(
+                            nutritionist.getId(), patient.getId());
+                    fileName = "Relatorio_Evolucao_" + sanitizeFileName(patient.getName()) + ".pdf";
+                    caption = "Aqui está o seu relatório de evolução corporal e biometria! 📊💪";
+                }
+                default -> {
+                    pdfBytes = patientDocumentService.generateMealPlanPdf(
+                            nutritionist.getId(), patient.getId());
+                    fileName = "Plano_Alimentar_" + sanitizeFileName(patient.getName()) + ".pdf";
+                    caption = "Aqui está o seu plano alimentar oficial atualizado em PDF! 🥗📄";
+                }
+            }
+
+            boolean sent = evolutionApiService.sendMediaDocument(
+                    message.getSenderPhoneNormalized(),
+                    pdfBytes,
+                    fileName,
+                    caption
+            );
+
+            if (sent) {
+                WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                        .messageId(messageId)
+                        .nutritionistId(nutritionist.getId())
+                        .patientId(patient.getId())
+                        .responseType("DOCUMENT_DELIVERY")
+                        .responseContent(caption + " [" + fileName + "]")
+                        .sentAt(LocalDateTime.now())
+                        .build();
+                whatsAppResponseRepository.save(waResponse);
+                markProcessed(message);
+                return true;
+            } else {
+                log.warn("Failed to deliver media document to sender {}, checking retry eligibility",
+                        message.getSenderPhoneNormalized());
+                if (message.getRetryCount() != null
+                        && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                    sendTechnicalFallback(message, patient, nutritionist);
+                }
+                return true;
+            }
+
+        } catch (ResourceNotFoundException e) {
+            log.info("Patient {} has no active plan/data for document {}: {}",
+                    patient.getId(), docType, e.getMessage());
+            sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            return true;
+
+        } catch (ResponseStatusException e) {
+            if (e.getStatusCode().is4xxClientError()) {
+                log.info("Patient {} missing data/precondition for document {}: {}",
+                        patient.getId(), docType, e.getMessage());
+                sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            } else {
+                log.error("Server error generating {} document for patient {}: {}",
+                        docType, patient.getId(), e.getMessage(), e);
+                if (message.getRetryCount() != null
+                        && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                    sendTechnicalFallback(message, patient, nutritionist);
+                }
+            }
+            return true;
+
+        } catch (IllegalStateException e) {
+            if (isMissingDataMessage(e.getMessage())) {
+                log.info("Patient {} has missing data for document {}: {}",
+                        patient.getId(), docType, e.getMessage());
+                sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            } else {
+                log.error("Error generating {} document for patient {}: {}",
+                        docType, patient.getId(), e.getMessage(), e);
+                if (message.getRetryCount() != null
+                        && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                    sendTechnicalFallback(message, patient, nutritionist);
+                }
+            }
+            return true;
+
+        } catch (Exception e) {
+            log.error("Unexpected error generating or delivering {} document for patient {}: {}",
+                    docType, patient.getId(), e.getMessage(), e);
+            if (message.getRetryCount() != null
+                    && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                sendTechnicalFallback(message, patient, nutritionist);
+            }
+            return true;
+        }
+    }
+
+    private void sendDocumentUnavailableNotice(
+            UUID messageId,
+            WhatsAppMessage message,
+            Patient patient,
+            Nutritionist nutritionist,
+            RequestedDocumentType docType) {
+        String fallbackMessage;
+        if (docType == RequestedDocumentType.GROCERY_LIST) {
+            fallbackMessage = "Olá, " + patient.getName() + "! Para gerar a sua lista de compras, "
+                    + "precisamos de um plano alimentar ativo no sistema. "
+                    + "Vou avisar o(a) " + nutritionist.getDisplayName() + "!";
+        } else if (docType == RequestedDocumentType.BIOMETRY_REPORT) {
+            fallbackMessage = "Olá, " + patient.getName() + "! Você ainda não possui avaliações biométricas "
+                    + "registradas no sistema para gerar o relatório de evolução. "
+                    + "Assim que tivermos seus registros, o relatório estará disponível!";
+        } else {
+            fallbackMessage = "Olá, " + patient.getName() + "! Ainda não encontrei um plano alimentar ativo "
+                    + "cadastrado no sistema para você. Vou avisar o(a) "
+                    + nutritionist.getDisplayName() + " para disponibilizá-lo!";
+        }
+
+        WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                .messageId(messageId)
+                .nutritionistId(nutritionist.getId())
+                .patientId(patient.getId())
+                .responseType("DOCUMENT_UNAVAILABLE")
+                .responseContent(fallbackMessage)
+                .build();
+
+        boolean sent = evolutionApiService.sendMessage(
+                message.getSenderPhoneNormalized(),
+                fallbackMessage
+        );
+        if (sent) {
+            waResponse.setSentAt(LocalDateTime.now());
+            whatsAppResponseRepository.save(waResponse);
+            markProcessed(message);
+        } else {
+            log.warn("Failed to send document unavailable notice to {}, leaving message for retry",
+                    message.getSenderPhoneNormalized());
+        }
+    }
+
+    private boolean isMissingDataMessage(String msg) {
+        if (msg == null) {
+            return false;
+        }
+        String lower = msg.toLowerCase(Locale.ROOT);
+        return lower.contains("não encontrado")
+                || lower.contains("nao encontrado")
+                || lower.contains("nenhum plano");
+    }
+
+    RequestedDocumentType detectDocumentRequest(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+
+        String normalized = Normalizer.normalize(text.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .trim();
+
+        // Conversational/status inquiries should always be handled by LLM, not trigger document downloads
+        boolean isConversationalQuery = normalized.startsWith("como ")
+                || normalized.startsWith("qual ")
+                || normalized.startsWith("quanto ")
+                || normalized.contains("como ta")
+                || normalized.contains("como esta")
+                || normalized.contains("o que posso")
+                || normalized.contains("posso comer")
+                || normalized.contains("posso tomar")
+                || normalized.contains("posso trocar")
+                || normalized.contains("posso substituir")
+                || normalized.contains("como preparar")
+                || normalized.contains("qual alimento");
+
+        if (isConversationalQuery && !normalized.contains("pdf") && !normalized.contains("relatorio")) {
+            return null;
+        }
+
+        boolean hasDeliveryVerb = normalized.contains("manda")
+                || normalized.contains("mandar")
+                || normalized.contains("envia")
+                || normalized.contains("enviar")
+                || normalized.contains("compartilha")
+                || normalized.contains("compartilhar")
+                || normalized.contains("encaminha")
+                || normalized.contains("encaminhar")
+                || normalized.contains("baixar")
+                || normalized.contains("download");
+
+        boolean hasDocumentKeyword = normalized.contains("pdf")
+                || normalized.contains("documento")
+                || normalized.contains("arquivo");
+
+        // 1. Grocery / Shopping list
+        boolean hasGroceryContext = normalized.contains("compras")
+                || normalized.contains("mercado")
+                || normalized.contains("feira");
+        boolean hasListKeyword = normalized.contains("lista");
+        if (hasGroceryContext && (hasListKeyword || (hasDocumentKeyword && hasDeliveryVerb))) {
+            return RequestedDocumentType.GROCERY_LIST;
+        }
+
+        // 2. Biometry / Progress report
+        boolean hasBiometryContext = normalized.contains("biometria")
+                || normalized.contains("bioimpedancia")
+                || normalized.contains("antropometria")
+                || normalized.contains("dobras")
+                || normalized.contains("evolucao")
+                || normalized.contains("progresso");
+        boolean hasReportKeyword = normalized.contains("relatorio")
+                || normalized.contains("grafico")
+                || hasDocumentKeyword;
+        if (hasBiometryContext && hasReportKeyword) {
+            return RequestedDocumentType.BIOMETRY_REPORT;
+        }
+
+        // 3. Meal Plan
+        boolean hasPlanContext = normalized.contains("plano")
+                || normalized.contains("cardapio")
+                || normalized.contains("dieta");
+
+        if (hasPlanContext && (hasDocumentKeyword || hasDeliveryVerb)) {
+            return RequestedDocumentType.MEAL_PLAN;
+        }
+
+        if (hasDocumentKeyword && (hasDeliveryVerb || normalized.equals("pdf"))) {
+            return RequestedDocumentType.MEAL_PLAN;
+        }
+
+        return null;
+    }
+
+    String sanitizeFileName(String name) {
+        if (name == null || name.isBlank()) {
+            return "Paciente";
+        }
+        return Normalizer.normalize(name, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^a-zA-Z0-9_.-]", "_");
     }
 
     private void markProcessed(WhatsAppMessage message) {

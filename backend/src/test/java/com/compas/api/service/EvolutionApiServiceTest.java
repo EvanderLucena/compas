@@ -41,4 +41,18 @@ class EvolutionApiServiceTest {
         assertEquals("", EvolutionApiService.formatTargetPhone(null));
         assertEquals("", EvolutionApiService.formatTargetPhone(""));
     }
+
+    @Test
+    void sendMediaDocument_nullOrEmptyBytes_returnsFalse() {
+        EvolutionApiService service = new EvolutionApiService("http://localhost:8080", "key", "instance");
+        org.junit.jupiter.api.Assertions.assertFalse(service.sendMediaDocument("11999998888", null, "plan.pdf", "caption"));
+        org.junit.jupiter.api.Assertions.assertFalse(service.sendMediaDocument("11999998888", new byte[0], "plan.pdf", "caption"));
+    }
+
+    @Test
+    void sendMediaDocument_excessiveSizeBytes_returnsFalse() {
+        EvolutionApiService service = new EvolutionApiService("http://localhost:8080", "key", "instance");
+        byte[] oversized = new byte[11 * 1024 * 1024]; // 11MB exceeds 10MB limit
+        org.junit.jupiter.api.Assertions.assertFalse(service.sendMediaDocument("11999998888", oversized, "plan.pdf", "caption"));
+    }
 }
