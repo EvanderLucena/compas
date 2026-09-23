@@ -73,6 +73,7 @@ public class PatientService {
     private final MealSlotRepository mealSlotRepository;
     private final MealOptionRepository mealOptionRepository;
     private final MealFoodRepository mealFoodRepository;
+    private final SubscriptionService subscriptionService;
 
     public PatientService(PatientRepository patientRepository,
                            EpisodeRepository episodeRepository,
@@ -86,7 +87,8 @@ public class PatientService {
                            ExtractionItemRepository extractionItemRepository,
                            MealSlotRepository mealSlotRepository,
                            MealOptionRepository mealOptionRepository,
-                           MealFoodRepository mealFoodRepository) {
+                           MealFoodRepository mealFoodRepository,
+                           SubscriptionService subscriptionService) {
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
         this.nutritionistRepository = nutritionistRepository;
@@ -100,10 +102,12 @@ public class PatientService {
         this.mealSlotRepository = mealSlotRepository;
         this.mealOptionRepository = mealOptionRepository;
         this.mealFoodRepository = mealFoodRepository;
+        this.subscriptionService = subscriptionService;
     }
 
     @Transactional
     public PatientResponse createPatient(UUID nutritionistId, CreatePatientRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         nutritionistRepository.findById(nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Nutricionista", nutritionistId));
 
@@ -181,6 +185,7 @@ public class PatientService {
 
     @Transactional
     public PatientResponse updatePatient(UUID id, UUID nutritionistId, UpdatePatientRequest req) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         Patient patient = patientRepository.findByIdAndNutritionistId(id, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente", id));
 
@@ -192,15 +197,33 @@ public class PatientService {
             patient.setBirthDate(req.birthDate());
             patient.setAge(computeAge(req.birthDate()));
         }
-        if (req.sex() != null) patient.setSex(req.sex());
-        if (req.heightCm() != null) patient.setHeightCm(req.heightCm());
-        if (req.whatsapp() != null) patient.setWhatsapp(normalizePhone(req.whatsapp()));
-        if (req.objective() != null) patient.setObjective(parseObjective(req.objective()));
-        if (req.status() != null) patient.setStatus(parseStatus(req.status()));
-        if (req.weight() != null) patient.setWeight(req.weight());
-        if (req.weightDelta() != null) patient.setWeightDelta(req.weightDelta());
-        if (req.adherence() != null) patient.setAdherence(req.adherence());
-        if (req.tag() != null) patient.setTag(req.tag());
+        if (req.sex() != null) {
+            patient.setSex(req.sex());
+        }
+        if (req.heightCm() != null) {
+            patient.setHeightCm(req.heightCm());
+        }
+        if (req.whatsapp() != null) {
+            patient.setWhatsapp(normalizePhone(req.whatsapp()));
+        }
+        if (req.objective() != null) {
+            patient.setObjective(parseObjective(req.objective()));
+        }
+        if (req.status() != null) {
+            patient.setStatus(parseStatus(req.status()));
+        }
+        if (req.weight() != null) {
+            patient.setWeight(req.weight());
+        }
+        if (req.weightDelta() != null) {
+            patient.setWeightDelta(req.weightDelta());
+        }
+        if (req.adherence() != null) {
+            patient.setAdherence(req.adherence());
+        }
+        if (req.tag() != null) {
+            patient.setTag(req.tag());
+        }
 
         Patient updated = patientRepository.save(patient);
         logger.info("Patient updated: id={}, nutritionistId={}", updated.getId(), nutritionistId);
@@ -209,11 +232,14 @@ public class PatientService {
 
     @Transactional
     public PatientResponse deactivatePatient(UUID id, UUID nutritionistId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         Patient patient = patientRepository.findByIdAndNutritionistId(id, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente", id));
 
         patient.softDelete();
-        episodeRepository.findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patient.getId(), nutritionistId)
+        episodeRepository
+                .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                        patient.getId(), nutritionistId)
                 .ifPresent(e -> {
                     e.close();
                     episodeRepository.save(e);
@@ -237,6 +263,7 @@ public class PatientService {
 
     @Transactional
     public PatientResponse reactivatePatient(UUID id, UUID nutritionistId) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         Patient patient = patientRepository.findByIdAndNutritionistId(id, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente", id));
 

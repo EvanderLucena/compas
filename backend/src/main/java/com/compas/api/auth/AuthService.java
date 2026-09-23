@@ -96,7 +96,9 @@ public class AuthService {
                         nutritionist.getEmail(),
                         nutritionist.getRole().name(),
                         nutritionist.getOnboardingCompleted(),
-                        nutritionist.getEmailVerified()
+                        nutritionist.getEmailVerified(),
+                        nutritionist.isSubscriptionActive(),
+                        nutritionist.isReadOnly()
                 )
         );
     }
@@ -124,7 +126,9 @@ public class AuthService {
                         nutritionist.getEmail(),
                         nutritionist.getRole().name(),
                         nutritionist.getOnboardingCompleted(),
-                        nutritionist.getEmailVerified()
+                        nutritionist.getEmailVerified(),
+                        nutritionist.isSubscriptionActive(),
+                        nutritionist.isReadOnly()
                 )
         );
     }
@@ -170,7 +174,9 @@ public class AuthService {
                         nutritionist.getEmail(),
                         nutritionist.getRole().name(),
                         nutritionist.getOnboardingCompleted(),
-                        nutritionist.getEmailVerified()
+                        nutritionist.getEmailVerified(),
+                        nutritionist.isSubscriptionActive(),
+                        nutritionist.isReadOnly()
                 )
         );
     }
@@ -319,7 +325,9 @@ public class AuthService {
                 nutritionist.getOnboardingCompleted(),
                 nutritionist.getTrialEndsAt(),
                 nutritionist.getSubscriptionTier(),
-                nutritionist.getPatientLimit()
+                nutritionist.getPatientLimit(),
+                nutritionist.isSubscriptionActive(),
+                nutritionist.isReadOnly()
         );
     }
 

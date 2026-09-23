@@ -28,6 +28,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle SubscriptionRequiredException — returns 402 PAYMENT_REQUIRED with READ_ONLY_MODE code.
+     */
+    @ExceptionHandler(SubscriptionRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleSubscriptionRequired(SubscriptionRequiredException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", false);
+        body.put("code", "READ_ONLY_MODE");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(body);
+    }
+
+    /**
      * Handle validation errors — returns 400 with field-level errors.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)

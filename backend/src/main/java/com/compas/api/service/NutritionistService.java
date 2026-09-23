@@ -98,7 +98,9 @@ public class NutritionistService {
                 nutritionist.getSubscriptionTier(),
                 nutritionist.getPatientLimit(),
                 activePatientCount,
-                nutritionist.getCreatedAt()
+                nutritionist.getCreatedAt(),
+                nutritionist.isSubscriptionActive(),
+                nutritionist.isReadOnly()
         );
     }
 }

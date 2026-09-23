@@ -30,6 +30,9 @@ class FoodServiceTest {
     @Mock
     private JevService jevService;
 
+    @Mock
+    private SubscriptionService subscriptionService;
+
     @InjectMocks
     private FoodService foodService;
 
@@ -192,5 +195,21 @@ class FoodServiceTest {
         assertEquals("GRAMAS", result.unit());
         assertEquals(15.0, result.referenceAmount());
         assertTrue(result.success());
+    }
+
+    @Test
+    void createFood_whenSubscriptionInactive_throwsSubscriptionRequiredException() {
+        doThrow(new com.compas.api.exception.SubscriptionRequiredException("Modo Leitura ativo"))
+                .when(subscriptionService).assertSubscriptionActive(nutritionistId);
+
+        CreateFoodRequest req = new CreateFoodRequest(
+                "Frango", "PROTEINA", "GRAMAS",
+                new BigDecimal("100"), new BigDecimal("165"), new BigDecimal("31"),
+                BigDecimal.ZERO, new BigDecimal("3.6"), BigDecimal.ZERO,
+                "grelhado", "1 filé"
+        );
+
+        assertThrows(com.compas.api.exception.SubscriptionRequiredException.class,
+                () -> foodService.createFood(nutritionistId, req));
     }
 }

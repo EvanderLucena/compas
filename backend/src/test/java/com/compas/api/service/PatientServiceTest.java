@@ -71,6 +71,9 @@ class PatientServiceTest {
     @Mock
     private MealFoodRepository mealFoodRepository;
 
+    @Mock
+    private SubscriptionService subscriptionService;
+
     @InjectMocks
     private PatientService patientService;
 
@@ -637,5 +640,31 @@ class PatientServiceTest {
         assertEquals("Doce de leite", food.foodName());
         assertEquals(BigDecimal.ZERO, food.typicalGrams());
         assertEquals(BigDecimal.ZERO, food.typicalKcal());
+    }
+
+    @Test
+    void createPatient_whenSubscriptionInactive_throwsSubscriptionRequiredException() {
+        doThrow(new com.compas.api.exception.SubscriptionRequiredException("Modo Leitura ativo"))
+                .when(subscriptionService).assertSubscriptionActive(nutritionistId);
+
+        CreatePatientRequest req = new CreatePatientRequest(
+                "Carlos", null, "M", 175, "11999998888", "HIPERTROFIA", new BigDecimal("75.0"), true
+        );
+
+        assertThrows(com.compas.api.exception.SubscriptionRequiredException.class,
+                () -> patientService.createPatient(nutritionistId, req));
+    }
+
+    @Test
+    void updatePatient_whenSubscriptionInactive_throwsSubscriptionRequiredException() {
+        doThrow(new com.compas.api.exception.SubscriptionRequiredException("Modo Leitura ativo"))
+                .when(subscriptionService).assertSubscriptionActive(nutritionistId);
+
+        UpdatePatientRequest req = new UpdatePatientRequest(
+                "Carlos Editado", null, null, null, null, null, null, null, null, null, null
+        );
+
+        assertThrows(com.compas.api.exception.SubscriptionRequiredException.class,
+                () -> patientService.updatePatient(UUID.randomUUID(), nutritionistId, req));
     }
 }

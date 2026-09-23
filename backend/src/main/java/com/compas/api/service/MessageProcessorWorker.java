@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class MessageProcessorWorker {
 
     private static final Logger log = LoggerFactory.getLogger(MessageProcessorWorker.class);
-    private static final int MAX_RETRIES = 3;
+    public static final int MAX_RETRIES = 3;
 
     private final MessageQueueService messageQueueService;
     private final ConversationService conversationService;
@@ -129,7 +129,8 @@ public class MessageProcessorWorker {
         }
 
         if (message.getRetryCount() >= MAX_RETRIES) {
-            log.warn("Message {} exceeded max retries ({}), skipping", messageId, MAX_RETRIES);
+            log.warn("Message {} exceeded max retries ({}), sending technical fallback", messageId, MAX_RETRIES);
+            conversationService.sendTechnicalFallback(messageId);
             return;
         }
 

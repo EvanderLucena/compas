@@ -76,7 +76,7 @@ public class Nutritionist {
 
     @Column(name = "trial_ends_at")
     @Builder.Default
-    private LocalDateTime trialEndsAt = null;
+    private LocalDateTime trialEndsAt = LocalDateTime.now(ZoneOffset.UTC).plusDays(30);
 
     @Column(name = "subscription_tier")
     @Builder.Default
@@ -85,6 +85,31 @@ public class Nutritionist {
     @Column(name = "patient_limit")
     @Builder.Default
     private Integer patientLimit = 15;
+
+    public static boolean isSubscriptionActive(String subscriptionTier, LocalDateTime trialEndsAt) {
+        if (subscriptionTier == null) {
+            return false;
+        }
+        String tier = subscriptionTier.trim().toUpperCase(java.util.Locale.ROOT);
+        if ("UNLIMITED".equals(tier) || "PRO".equals(tier) || "STARTER".equals(tier)) {
+            return true;
+        }
+        if ("TRIAL".equals(tier)) {
+            if (trialEndsAt == null) {
+                return false;
+            }
+            return trialEndsAt.isAfter(LocalDateTime.now(ZoneOffset.UTC));
+        }
+        return false;
+    }
+
+    public boolean isSubscriptionActive() {
+        return isSubscriptionActive(subscriptionTier, trialEndsAt);
+    }
+
+    public boolean isReadOnly() {
+        return !isSubscriptionActive();
+    }
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -78,6 +78,7 @@ public class BiometryService {
     private final MealPlanRepository mealPlanRepository;
     private final MealSlotRepository mealSlotRepository;
     private final MealOptionRepository mealOptionRepository;
+    private final SubscriptionService subscriptionService;
 
     public BiometryService(BiometryAssessmentRepository assessmentRepository,
                            BiometrySkinfoldRepository skinfoldRepository,
@@ -87,7 +88,8 @@ public class BiometryService {
                            EpisodeRepository episodeRepository,
                            MealPlanRepository mealPlanRepository,
                            MealSlotRepository mealSlotRepository,
-                           MealOptionRepository mealOptionRepository) {
+                           MealOptionRepository mealOptionRepository,
+                           SubscriptionService subscriptionService) {
         this.assessmentRepository = assessmentRepository;
         this.skinfoldRepository = skinfoldRepository;
         this.perimetryRepository = perimetryRepository;
@@ -97,10 +99,12 @@ public class BiometryService {
         this.mealPlanRepository = mealPlanRepository;
         this.mealSlotRepository = mealSlotRepository;
         this.mealOptionRepository = mealOptionRepository;
+        this.subscriptionService = subscriptionService;
     }
 
     @Transactional
     public BiometryAssessmentResponse createAssessment(UUID nutritionistId, UUID patientId, CreateBiometryAssessmentRequest request) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
 
@@ -159,6 +163,7 @@ public class BiometryService {
 
     @Transactional
     public BiometryAssessmentResponse updateAssessment(UUID nutritionistId, UUID patientId, UUID assessmentId, UpdateBiometryAssessmentRequest request) {
+        subscriptionService.assertSubscriptionActive(nutritionistId);
         BiometryAssessment assessment = assessmentRepository.findByIdAndPatientIdAndNutritionistId(
                         assessmentId, patientId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Avaliação biométrica", assessmentId));

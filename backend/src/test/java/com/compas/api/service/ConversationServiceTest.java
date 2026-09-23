@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -720,5 +721,92 @@ class ConversationServiceTest {
         assertNotNull(prompt);
         assertTrue(prompt.contains("EVOLUÇÃO BIOMÉTRICA: - Peso inicial 85kg -> atual 80kg"));
         assertTrue(prompt.contains("Se o paciente perguntar sobre peso, emagrecimento"));
+    }
+
+    @Test
+    void processMessage_nutritionistSubscriptionInactive_sendsFriendlyPauseNoticeAndSkipsLlm() {
+        nutritionist.setSubscriptionTier("TRIAL");
+        nutritionist.setTrialEndsAt(LocalDateTime.now(ZoneOffset.UTC).minusDays(1));
+
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        // Verify LLM was NOT called
+        verify(llmService, never()).chat(any());
+        // Verify friendly paused notice sent via Evolution API
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("atendimento da assistente virtual do consultório está temporariamente pausado"));
+        verify(whatsAppResponseRepository, atLeastOnce()).save(argThat(r -> "SUBSCRIPTION_INACTIVE".equals(r.getResponseType())));
+        assertTrue(textMessage.getProcessed());
+    }
+
+    @Test
+    void processMessage_nutritionistSubscriptionInactive_deliveryFails_doesNotMarkProcessed() {
+        nutritionist.setSubscriptionTier("TRIAL");
+        nutritionist.setTrialEndsAt(LocalDateTime.now(ZoneOffset.UTC).minusDays(1));
+
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(false);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        assertFalse(textMessage.getProcessed());
+    }
+
+    @Test
+    void processMessage_llmFailureOnLastRetry_sendsResilientTechnicalFallback() {
+        textMessage.setRetryCount(MessageProcessorWorker.MAX_RETRIES - 1);
+
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(llmService.chat(any(LlmRequest.class))).thenReturn(LlmResponse.failed("Timeout"));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("oscilação na conexão"));
+        verify(whatsAppResponseRepository, atLeastOnce()).save(argThat(r -> "TECHNICAL_FALLBACK".equals(r.getResponseType())));
+        assertTrue(textMessage.getProcessed());
+    }
+
+    @Test
+    void sendTechnicalFallback_byId_sendsFriendlyMessageAndMarksProcessed() {
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+        when(whatsAppMessageRepository.save(any(WhatsAppMessage.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.sendTechnicalFallback(messageId);
+
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("oscilação na conexão"));
+        verify(whatsAppResponseRepository, atLeastOnce()).save(argThat(r -> "TECHNICAL_FALLBACK".equals(r.getResponseType())));
+        assertTrue(textMessage.getProcessed());
+    }
+
+    @Test
+    void sendTechnicalFallback_deliveryFails_doesNotMarkProcessed() {
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(false);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.sendTechnicalFallback(messageId);
+
+        assertFalse(textMessage.getProcessed());
     }
 }

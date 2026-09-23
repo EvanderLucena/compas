@@ -12,10 +12,8 @@ public record SignupResponse(
             String email,
             String role,
             Boolean onboardingCompleted,
-            Boolean emailVerified
-    ) {
-        public UserDto(UUID id, String name, String email, String role, Boolean onboardingCompleted) {
-            this(id, name, email, role, onboardingCompleted, false);
-        }
-    }
+            Boolean emailVerified,
+            Boolean subscriptionActive,
+            Boolean readOnly
+    ) {}
 }
