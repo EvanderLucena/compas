@@ -1,7 +1,7 @@
 package com.compas.api.service;
 
 import com.compas.api.dto.whatsapp.ActivationLinkDTO;
-import com.compas.api.dto.whatsapp.CorrectExtractionRequest;
+import com.compas.api.dto.whatsapp.PatchExtractionRequest;
 import com.compas.api.dto.whatsapp.ExtractionDTO;
 import com.compas.api.dto.whatsapp.ExtractionItemDTO;
 import com.compas.api.dto.whatsapp.WhatsAppStatusDTO;
