@@ -106,7 +106,7 @@
   - **Migração Assistida de Contingência:** Ferramenta administrativa para remanejar pacientes de um chip para outro apenas em caso excepcional de banimento definitivo pela Meta, com opção de disparo de aviso amigável de novo número.
 
 ### 4. Gestão de Planos, Modo Leitura (*Read-Only*) & Fallback Amigável da IA
-- [ ] **Regras de Acesso e Modo Leitura (Nutri sem Plano Ativo / Vencido / Cancelado):**
+- [x] **Regras de Acesso e Modo Leitura (Nutri sem Plano Ativo / Vencido / Cancelado):** ✅ (PR #168 backend + PR #170 frontend)
   - **Consulta Total Preservada (GET liberado):** O nutricionista inativo continua com acesso integral de leitura a todos os seus pacientes, dietas, avaliações e gráficos já cadastrados. Respeita a ética médica e regulamentação (CFN/LGPD), retém o profissional e evita atrito de perda de dados.
   - **Bloqueio de Ações de Escrita (POST/PUT/DELETE bloqueados):** Proíbe cadastro de novos pacientes, edição de dietas e inserção de novas avaliações biométricas. Modal e banners informativos convidam o nutricionista a reativar sua assinatura.
   - **Corte de IA no WhatsApp:** Desativa o processamento de mensagens pela IA para os pacientes do nutricionista sem plano ativo, eliminando custos de LLM/servidor.
@@ -424,5 +424,5 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 9. ~~Geração de Documentos e PDFs do Paciente~~ ✅ (PatientDocumentService + PatientDocumentController + frontend buttons)
 10. ~~Verificação de E-mail via Resend~~ ✅ (ResendEmailService + endpoints + banner dashboard + tela pública de validação)
 11. ~~Portal Admin da Frota WhatsApp~~ ✅ (PR #165 + PR #167)
-12. **Gestão de Planos, Modo Leitura (Read-Only) & Fallback Amigável da IA** (GET liberado, escrita bloqueada, corte de IA no WhatsApp com mensagem acolhedora e fallback universal)
+12. ~~Gestão de Planos, Modo Leitura (Read-Only) & Fallback Amigável da IA~~ ✅ (PR #168 backend + PR #170 frontend)
 13. **Pagamentos Stripe, Deploys e VPS** (Checkout, Customer Portal, Webhooks, Docker em VPS)
