@@ -100,7 +100,7 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
      * Reassign patients from one fleet instance to another, with optional nutritionist scope.
      */
     @org.springframework.data.jpa.repository.Modifying
-    @Query("UPDATE Patient p SET p.whatsappInstanceId = :targetInstanceId WHERE p.whatsappInstanceId = :sourceInstanceId AND (:nutritionistId IS NULL OR p.nutritionistId = :nutritionistId)")
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = :targetInstanceId WHERE p.whatsappInstanceId = :sourceInstanceId AND p.active = true AND (:nutritionistId IS NULL OR p.nutritionistId = :nutritionistId)")
     int reassignPatients(
             @Param("sourceInstanceId") UUID sourceInstanceId,
             @Param("targetInstanceId") UUID targetInstanceId,

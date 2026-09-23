@@ -82,10 +82,6 @@ public class WhatsAppFleetService {
                 }
             }
 
-            if (inst.getStatus() == WhatsAppInstanceStatus.BANNED && isActive) {
-                alerts++;
-            }
-
             if (isActive && inst.getMaxPatients() > 0 && pCount >= inst.getMaxPatients() * 0.9) {
                 alerts++;
             }
