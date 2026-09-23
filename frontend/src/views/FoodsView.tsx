@@ -28,6 +28,7 @@ import {
 } from '../components/icons';
 import { useValidation } from '../hooks/useValidation';
 import { useToastStore } from '../stores/toastStore';
+import { useAuthStore } from '../stores/authStore';
 import { resolveMutationErrorMessage } from '../stores/patientStore';
 import { suggestFood } from '../api/foods';
 
@@ -1503,6 +1504,8 @@ export function FoodsView() {
   const { data, isLoading, isError, refetch } = useFoodCatalog();
   const deleteFood = useDeleteFood();
   const [deletingFood, setDeletingFood] = useState<Food | null>(null);
+  const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
+  const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
 
   // Debounced search: 300ms
   const [localQ, setLocalQ] = useState(searchQuery);
@@ -1589,7 +1592,13 @@ export function FoodsView() {
           </select>
           <button
             className="btn btn-primary"
-            onClick={() => setCreateModalOpen(true)}
+            onClick={() => {
+              if (isReadOnly) {
+                openReadOnlyModal();
+                return;
+              }
+              setCreateModalOpen(true);
+            }}
             data-testid="newfood-btn"
           >
             <IconPlus size={13} /> Novo alimento
@@ -1628,8 +1637,20 @@ export function FoodsView() {
               <FoodCard
                 key={f.id}
                 food={f}
-                onEdit={() => setEditingFoodId(f.id)}
-                onDelete={() => setDeletingFood(f)}
+                onEdit={() => {
+                  if (isReadOnly) {
+                    openReadOnlyModal();
+                    return;
+                  }
+                  setEditingFoodId(f.id);
+                }}
+                onDelete={() => {
+                  if (isReadOnly) {
+                    openReadOnlyModal();
+                    return;
+                  }
+                  setDeletingFood(f);
+                }}
               />
             ))
           )}

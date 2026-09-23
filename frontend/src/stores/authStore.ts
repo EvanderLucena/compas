@@ -25,6 +25,12 @@ interface AuthState {
   verifyEmail: (token: string) => Promise<{ success: boolean; message: string }>;
   resendVerification: (email?: string) => Promise<{ success: boolean; message: string }>;
 
+  // Read-only subscription state & actions
+  isReadOnlyModalOpen: boolean;
+  setReadOnly: (readOnly: boolean) => void;
+  openReadOnlyModal: () => void;
+  closeReadOnlyModal: () => void;
+
   // Initialize from stored state
   initializeAuth: () => Promise<void>;
 }
@@ -48,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
       fieldErrors: {},
+      isReadOnlyModalOpen: false,
 
       updateUser: (partial) => {
         const current = get().user;
@@ -162,6 +169,22 @@ export const useAuthStore = create<AuthState>()(
         return authService.resendVerification(email);
       },
 
+      setReadOnly: (readOnly: boolean) => {
+        const current = get().user;
+        if (current) {
+          set({
+            user: {
+              ...current,
+              readOnly,
+              subscriptionActive: !readOnly,
+            },
+          });
+        }
+      },
+
+      openReadOnlyModal: () => set({ isReadOnlyModalOpen: true }),
+      closeReadOnlyModal: () => set({ isReadOnlyModalOpen: false }),
+
       initializeAuth: async () => {
         const oldAuth = localStorage.getItem('nutriai.auth');
         if (oldAuth === 'true') {
@@ -183,6 +206,8 @@ export const useAuthStore = create<AuthState>()(
               role: user.role as AuthUser['role'],
               onboardingCompleted: user.onboardingCompleted,
               emailVerified: user.emailVerified,
+              subscriptionActive: user.subscriptionActive,
+              readOnly: user.readOnly,
             },
             isAuthenticated: true,
             isInitializing: false,
@@ -212,4 +237,8 @@ registerAuthCallbacks({
   getToken: () => useAuthStore.getState().accessToken ?? null,
   refreshAuth: () => useAuthStore.getState().refreshAuth(),
   logout: () => useAuthStore.getState().logout(),
+  onReadOnly: () => {
+    useAuthStore.getState().setReadOnly(true);
+    useAuthStore.getState().openReadOnlyModal();
+  },
 });

@@ -4,6 +4,7 @@ import { IconWhatsapp, IconEdit } from '../icons';
 import { useActivationLink } from '../../stores/whatsappStore';
 import { useDeactivatePatient, useReactivatePatient } from '../../stores/patientStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuthStore } from '../../stores/authStore';
 
 interface WhatsAppActivationRowProps {
   patient: Patient;
@@ -229,9 +230,16 @@ export function WhatsAppActivationRow({
     }
   };
 
+  const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
+  const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
+
   const isActive = patient.active !== false;
 
   const handleToggleAi = () => {
+    if (isReadOnly) {
+      openReadOnlyModal();
+      return;
+    }
     if (isActive) {
       deactivateMutation.mutate(patientId, {
         onSuccess: () => showSuccess('Acesso da IA pausado para este paciente.'),

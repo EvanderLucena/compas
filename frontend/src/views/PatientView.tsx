@@ -12,6 +12,7 @@ import type {
 import { IconEdit, IconPlus, IconDownload } from '../components/icons';
 import { downloadPatientDocument } from '../api/documents';
 import { useToastStore } from '../stores/toastStore';
+import { useAuthStore } from '../stores/authStore';
 import {
   EditPatientModal,
   Timeline,
@@ -75,6 +76,8 @@ export function PatientView() {
   const { data: plan } = usePlan(routePatientId);
   const [tab, setTab] = React.useState<Tab>('today');
   const [editOpen, setEditOpen] = React.useState(false);
+  const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
+  const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
 
   const mappedApiData = apiData ? mapPatientFromApi(apiData) : null;
   const hasRealPatient = mappedApiData !== null;
@@ -268,7 +271,13 @@ export function PatientView() {
                 data-testid="btn-edit-patient-header"
                 className="btn btn-ghost"
                 style={{ fontSize: 11.5, padding: '3px 8px', marginLeft: 4 }}
-                onClick={() => setEditOpen(true)}
+                onClick={() => {
+                  if (isReadOnly) {
+                    openReadOnlyModal();
+                    return;
+                  }
+                  setEditOpen(true);
+                }}
               >
                 <IconEdit size={11} /> Editar
               </button>
@@ -308,7 +317,13 @@ export function PatientView() {
         <WhatsAppActivationRow
           patient={patient}
           patientId={patientId}
-          onEditPatient={() => setEditOpen(true)}
+          onEditPatient={() => {
+            if (isReadOnly) {
+              openReadOnlyModal();
+              return;
+            }
+            setEditOpen(true);
+          }}
         />
 
         <div
@@ -943,6 +958,8 @@ function BiometryTab({
   patientStatus: PatientStatus;
 }) {
   const { data: assessments, isLoading } = usePatientBiometry(patientId);
+  const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
+  const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
   const [metric, setMetric] = React.useState('all');
   const [newEvalOpen, setNewEvalOpen] = React.useState(false);
   const [statusReviewOpen, setStatusReviewOpen] = React.useState(false);
@@ -997,7 +1014,13 @@ function BiometryTab({
           <button
             className="btn btn-primary"
             data-testid="btn-new-biometry"
-            onClick={() => setNewEvalOpen(true)}
+            onClick={() => {
+              if (isReadOnly) {
+                openReadOnlyModal();
+                return;
+              }
+              setNewEvalOpen(true);
+            }}
           >
             <IconPlus size={13} /> Registrar primeira avaliação
           </button>
@@ -1113,7 +1136,13 @@ function BiometryTab({
             <button
               className="btn btn-primary"
               data-testid="btn-new-biometry"
-              onClick={() => setNewEvalOpen(true)}
+              onClick={() => {
+                if (isReadOnly) {
+                  openReadOnlyModal();
+                  return;
+                }
+                setNewEvalOpen(true);
+              }}
             >
               <IconPlus size={13} /> Nova avaliação
             </button>

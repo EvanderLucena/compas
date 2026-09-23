@@ -27,6 +27,7 @@ import {
   useDeleteExtra,
 } from '../stores/planStore';
 import { useToastStore } from '../stores/toastStore';
+import { useAuthStore } from '../stores/authStore';
 import { resolveMutationErrorMessage } from '../stores/patientStore';
 
 function DailyMacro({
@@ -265,6 +266,8 @@ interface PlansViewProps {
 export function PlansView({ patientId }: PlansViewProps) {
   const { data: plan, isLoading } = usePlan(patientId);
   const planUI = usePlanUIStore();
+  const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
+  const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
   const activeMealId = planUI.activeMealId;
   const activeOptionIndex = planUI.activeOptionIndex;
   const addFoodModalOpen = planUI.addFoodModalOpen;
@@ -451,6 +454,10 @@ export function PlansView({ patientId }: PlansViewProps) {
             ) : (
               <h2
                 onClick={() => {
+                  if (isReadOnly) {
+                    openReadOnlyModal();
+                    return;
+                  }
                   setTitleValue(plan.title);
                   setEditingTitle(true);
                 }}
@@ -651,6 +658,10 @@ export function PlansView({ patientId }: PlansViewProps) {
                 <button
                   className="btn btn-ghost"
                   onClick={() => {
+                    if (isReadOnly) {
+                      openReadOnlyModal();
+                      return;
+                    }
                     setTargetValues({
                       kcal: String(plan.kcalTarget),
                       prot: String(plan.protTarget),
@@ -730,9 +741,27 @@ export function PlansView({ patientId }: PlansViewProps) {
       {section === 'extras' ? (
         <ExtrasSection
           extras={extras}
-          onUpdateExtra={(extraId, data) => updateExtra.mutate({ extraId, data })}
-          onAddExtra={handleAddExtra}
-          onDeleteExtra={(extraId) => deleteExtra.mutate(extraId)}
+          onUpdateExtra={(extraId, data) => {
+            if (isReadOnly) {
+              openReadOnlyModal();
+              return;
+            }
+            updateExtra.mutate({ extraId, data });
+          }}
+          onAddExtra={() => {
+            if (isReadOnly) {
+              openReadOnlyModal();
+              return;
+            }
+            handleAddExtra();
+          }}
+          onDeleteExtra={(extraId) => {
+            if (isReadOnly) {
+              openReadOnlyModal();
+              return;
+            }
+            deleteExtra.mutate(extraId);
+          }}
         />
       ) : (
         <div
@@ -843,6 +872,10 @@ export function PlansView({ patientId }: PlansViewProps) {
                             style={{ fontSize: 13, fontWeight: active ? 600 : 500, cursor: 'text' }}
                             onDoubleClick={(e) => {
                               e.stopPropagation();
+                              if (isReadOnly) {
+                                openReadOnlyModal();
+                                return;
+                              }
                               setEditingMealId(m.id);
                               setMealLabelValue(m.label);
                             }}
@@ -869,6 +902,10 @@ export function PlansView({ patientId }: PlansViewProps) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                if (isReadOnly) {
+                                  openReadOnlyModal();
+                                  return;
+                                }
                                 planUI.setPendingDeleteMealId(m.id);
                               }}
                               style={{
@@ -909,7 +946,13 @@ export function PlansView({ patientId }: PlansViewProps) {
               })}
               <button
                 data-testid="add-meal-btn"
-                onClick={() => planUI.setAddMealModalOpen(true)}
+                onClick={() => {
+                  if (isReadOnly) {
+                    openReadOnlyModal();
+                    return;
+                  }
+                  planUI.setAddMealModalOpen(true);
+                }}
                 style={{
                   padding: '10px 14px',
                   borderRadius: 6,
@@ -978,12 +1021,16 @@ export function PlansView({ patientId }: PlansViewProps) {
                   />
                 ))}
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    if (isReadOnly) {
+                      openReadOnlyModal();
+                      return;
+                    }
                     addOption.mutate({
                       mealId: activeMeal.id,
                       data: { name: `Opção ${activeMeal.options.length + 1} · Cópia` },
-                    })
-                  }
+                    });
+                  }}
                   style={{
                     padding: '7px 12px',
                     borderRadius: 6,
@@ -1055,14 +1102,18 @@ export function PlansView({ patientId }: PlansViewProps) {
                         data: { prep },
                       })
                     }
-                    onRemove={() =>
+                    onRemove={() => {
+                      if (isReadOnly) {
+                        openReadOnlyModal();
+                        return;
+                      }
                       planUI.setPendingDeleteItem({
                         mealId: activeMeal.id,
                         optionId: activeOpt.id,
                         itemId: it.id,
                         name: it.foodName,
-                      })
-                    }
+                      });
+                    }}
                   />
                 ))}
                 <div
@@ -1075,7 +1126,13 @@ export function PlansView({ patientId }: PlansViewProps) {
                   }}
                 >
                   <button
-                    onClick={() => planUI.setAddFoodModalOpen(true)}
+                    onClick={() => {
+                      if (isReadOnly) {
+                        openReadOnlyModal();
+                        return;
+                      }
+                      planUI.setAddFoodModalOpen(true);
+                    }}
                     style={{ fontSize: 12, color: 'var(--fg-muted)' }}
                   >
                     <IconPlus size={12} style={{ verticalAlign: '-2px' }} /> Adicionar Alimento
