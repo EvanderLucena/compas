@@ -63,6 +63,12 @@ public class Nutritionist {
     @Column(name = "email_verification_expires_at")
     private LocalDateTime emailVerificationExpiresAt;
 
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_expires_at")
+    private LocalDateTime passwordResetExpiresAt;
+
     public String getDisplayName() {
         if (professionalName != null && !professionalName.isBlank()) {
             return professionalName.trim();

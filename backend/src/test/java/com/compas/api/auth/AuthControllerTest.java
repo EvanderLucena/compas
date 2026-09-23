@@ -40,6 +40,9 @@ class AuthControllerTest {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private AuthService authService;
+
     @BeforeEach
     void setUp() {
         refreshTokenRepository.deleteAll();
@@ -414,6 +417,33 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/resend-verification")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"ctrl-resend@compas.app\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void forgotPassword_returns200() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"qualquer@compas.app\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void resetPassword_withValidToken_returns200() throws Exception {
+        SignupRequest signup = new SignupRequest(
+                "Dra. ControllerReset", "ctrl-reset@compas.app", "senhaOriginal", "12345", "PR", null, null, true
+        );
+        authService.signup(signup);
+        authService.forgotPassword("ctrl-reset@compas.app");
+
+        Nutritionist nutri = nutritionistRepository.findByEmail("ctrl-reset@compas.app").orElseThrow();
+        String token = nutri.getPasswordResetToken();
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\",\"newPassword\":\"novaSenhaSegura123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }

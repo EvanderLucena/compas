@@ -135,6 +135,22 @@ public class AuthController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(
+            @RequestBody @Valid ForgotPasswordRequest request
+    ) {
+        Map<String, Object> result = authService.forgotPassword(request.email());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(
+            @RequestBody @Valid ResetPasswordRequest request
+    ) {
+        Map<String, Object> result = authService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/logout")
     @PreAuthorize("hasAnyRole('NUTRITIONIST', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {

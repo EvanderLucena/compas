@@ -46,3 +46,24 @@ export async function resendVerification(
   );
   return response.data;
 }
+
+export async function forgotPassword(
+  email: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    '/auth/forgot-password',
+    { email },
+  );
+  return response.data;
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    '/auth/reset-password',
+    { token, newPassword },
+  );
+  return response.data;
+}
