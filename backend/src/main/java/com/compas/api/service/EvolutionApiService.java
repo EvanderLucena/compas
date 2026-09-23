@@ -50,89 +50,292 @@ public class EvolutionApiService {
      * @param text  the message text to send
      * @return true if the message was sent successfully, false otherwise
      */
+    /**
+     * Send a text message via Evolution Go API using default instance.
+     *
+     * @param phone the recipient phone number (normalized, with country code e.g. 5511999999999)
+     * @param text  the message text to send
+     * @return true if the message was sent successfully, false otherwise
+     */
     public boolean sendMessage(String phone, String text) {
+        return sendMessage(this.instanceName, phone, text);
+    }
+
+    /**
+     * Send a text message via Evolution API routed to a specific instance in the fleet.
+     *
+     * @param targetInstance the instance name (e.g. compas-chip-01)
+     * @param phone          the recipient phone number
+     * @param text           the message text
+     * @return true if sent successfully, false otherwise
+     */
+    public boolean sendMessage(String targetInstance, String phone, String text) {
+        String instance = (targetInstance != null && !targetInstance.isBlank()) ? targetInstance : this.instanceName;
         try {
             String targetPhone = formatTargetPhone(phone);
-            String endpoint = apiUrl + "/send/text";
+            String endpoint = apiUrl + "/message/sendText/" + instance;
             String payload = String.format(
-                    "{\"number\":\"%s\",\"text\":\"%s\"}",
+                    "{\"number\":\"%s\",\"text\":\"%s\",\"instance\":\"%s\"}",
                     escapeJson(targetPhone),
-                    escapeJson(text)
+                    escapeJson(text),
+                    escapeJson(instance)
             );
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(endpoint))
                     .header("Content-Type", "application/json")
-                    .header("apikey", apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
+                    .timeout(Duration.ofSeconds(15));
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                log.info("Message sent via Evolution API: phone={}, status={}",
-                        maskPhone(targetPhone), response.statusCode());
+                log.info("Message sent via Evolution API ({}) to {}: status={}",
+                        instance, maskPhone(targetPhone), response.statusCode());
                 return true;
             }
 
-            // Retry once on server error or timeout
-            if (response.statusCode() >= 500) {
-                log.warn("Evolution API server error ({}), retrying...", response.statusCode());
-                Thread.sleep(500);
-
-                HttpResponse<String> retryResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (retryResponse.statusCode() >= 200 && retryResponse.statusCode() < 300) {
-                    log.info("Message sent on retry: phone={}", maskPhone(targetPhone));
+            // Fallback for single-instance Go /send/text ONLY if targeting the default instance
+            if (response.statusCode() == 404 && this.instanceName != null
+                    && this.instanceName.equalsIgnoreCase(instance)) {
+                HttpRequest.Builder fallbackBuilder = HttpRequest.newBuilder()
+                        .uri(URI.create(apiUrl + "/send/text"))
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(payload))
+                        .timeout(Duration.ofSeconds(15));
+                if (apiKey != null && !apiKey.isBlank()) {
+                    fallbackBuilder.header("apikey", apiKey);
+                }
+                HttpResponse<String> fbResponse = httpClient.send(
+                        fallbackBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                if (fbResponse.statusCode() >= 200 && fbResponse.statusCode() < 300) {
+                    log.info("Message sent via /send/text fallback to {}: status={}",
+                            maskPhone(targetPhone), fbResponse.statusCode());
                     return true;
                 }
-                log.error("Evolution API retry failed: status={}", retryResponse.statusCode());
+            }
+
+            // Retry once on server error (>= 500)
+            if (response.statusCode() >= 500) {
+                log.warn("Evolution API server error ({}) on instance {}, retrying...", response.statusCode(), instance);
+                Thread.sleep(500);
+
+                HttpResponse<String> retryResponse = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+                if (retryResponse.statusCode() >= 200 && retryResponse.statusCode() < 300) {
+                    log.info("Message sent on retry: instance={}, phone={}", instance, maskPhone(targetPhone));
+                    return true;
+                }
+                log.error("Evolution API retry failed: instance={}, status={}", instance, retryResponse.statusCode());
                 return false;
             }
 
-            log.error("Evolution API client error: status={}, body={}", response.statusCode(),
-                    truncate(response.body(), 200));
+            log.error("Evolution API client error on instance {}: status={}, body={}",
+                    instance, response.statusCode(), truncate(response.body(), 200));
             return false;
 
         } catch (java.net.http.HttpTimeoutException e) {
-            log.error("Evolution API timeout sending message to {}", maskPhone(phone));
-            return retrySendOnce(phone, text);
+            log.error("Evolution API timeout sending message to {} on instance {}", maskPhone(phone), instance);
+            return retrySendOnce(instance, phone, text);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.error("Evolution API send interrupted: {}", e.getMessage());
+            log.error("Evolution API send interrupted on instance {}: {}", instance, e.getMessage());
             return false;
         } catch (Exception e) {
-            log.error("Evolution API send failed: {}", e.getMessage(), e);
-            return retrySendOnce(phone, text);
+            log.error("Evolution API send failed on instance {}: {}", instance, e.getMessage(), e);
+            return retrySendOnce(instance, phone, text);
         }
     }
 
-    private boolean retrySendOnce(String phone, String text) {
+    private boolean retrySendOnce(String instance, String phone, String text) {
         try {
             String targetPhone = formatTargetPhone(phone);
-            String endpoint = apiUrl + "/send/text";
+            String endpoint = apiUrl + "/message/sendText/" + instance;
             String payload = String.format(
-                    "{\"number\":\"%s\",\"text\":\"%s\"}",
+                    "{\"number\":\"%s\",\"text\":\"%s\",\"instance\":\"%s\"}",
                     escapeJson(targetPhone),
-                    escapeJson(text)
+                    escapeJson(text),
+                    escapeJson(instance)
             );
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(endpoint))
                     .header("Content-Type", "application/json")
-                    .header("apikey", apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
+                    .timeout(Duration.ofSeconds(15));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
             if (!success) {
-                log.error("Evolution API retry also failed: status={}", response.statusCode());
+                log.error("Evolution API retry also failed on instance {}: status={}", instance, response.statusCode());
             }
             return success;
         } catch (Exception e) {
-            log.error("Evolution API retry failed: {}", e.getMessage());
+            log.error("Evolution API retry failed on instance {}: {}", instance, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create an instance in Evolution API.
+     */
+    public boolean createInstance(String instanceName) {
+        try {
+            String endpoint = apiUrl + "/instance/create";
+            String payload = String.format(
+                    "{\"instanceName\":\"%s\",\"token\":\"%s\",\"qrcode\":true}",
+                    escapeJson(instanceName),
+                    escapeJson(apiKey != null ? apiKey : "")
+            );
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .timeout(Duration.ofSeconds(10));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() >= 200 && response.statusCode() < 300;
+        } catch (Exception e) {
+            log.warn("Failed to create instance {} in Evolution API: {}", instanceName, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Fetch QR Code for pairing an instance.
+     */
+    public Optional<String> fetchQrCode(String instanceName) {
+        try {
+            String endpoint = apiUrl + "/instance/connect/" + instanceName;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .GET()
+                    .timeout(Duration.ofSeconds(15));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                JsonNode root = objectMapper.readTree(response.body());
+                if (root.has("base64")) {
+                    return Optional.of(root.get("base64").asText());
+                }
+                if (root.has("code")) {
+                    return Optional.of(root.get("code").asText());
+                }
+                if (root.has("qrcode") && root.get("qrcode").has("base64")) {
+                    return Optional.of(root.get("qrcode").get("base64").asText());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch QR code for instance {}: {}", instanceName, e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Fetch connection state for an instance: 'open' -> CONNECTED, 'close' -> DISCONNECTED, 'connecting' -> CONNECTING
+     */
+    public Optional<String> fetchConnectionState(String instanceName) {
+        try {
+            String endpoint = apiUrl + "/instance/connectionState/" + instanceName;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .GET()
+                    .timeout(Duration.ofSeconds(10));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                JsonNode root = objectMapper.readTree(response.body());
+                JsonNode instanceNode = root.path("instance");
+                if (instanceNode.has("state")) {
+                    return Optional.of(instanceNode.get("state").asText().toLowerCase());
+                }
+                if (root.has("state")) {
+                    return Optional.of(root.get("state").asText().toLowerCase());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch connection state for instance {}: {}", instanceName, e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Restart an instance in Evolution API.
+     */
+    public boolean restartInstance(String instanceName) {
+        try {
+            String endpoint = apiUrl + "/instance/restart/" + instanceName;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .timeout(Duration.ofSeconds(10));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() >= 200 && response.statusCode() < 300;
+        } catch (Exception e) {
+            log.warn("Failed to restart instance {}: {}", instanceName, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Disconnect / Logout an instance in Evolution API.
+     */
+    public boolean logoutInstance(String instanceName) {
+        try {
+            String endpoint = apiUrl + "/instance/logout/" + instanceName;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .DELETE()
+                    .timeout(Duration.ofSeconds(10));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() >= 200 && response.statusCode() < 300;
+        } catch (Exception e) {
+            log.warn("Failed to logout instance {}: {}", instanceName, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Delete an instance in Evolution API.
+     */
+    public boolean deleteInstance(String instanceName) {
+        try {
+            String endpoint = apiUrl + "/instance/delete/" + instanceName;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .DELETE()
+                    .timeout(Duration.ofSeconds(10));
+            if (apiKey != null && !apiKey.isBlank()) {
+                builder.header("apikey", apiKey);
+            }
+
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() >= 200 && response.statusCode() < 300;
+        } catch (Exception e) {
+            log.warn("Failed to delete instance {}: {}", instanceName, e.getMessage());
             return false;
         }
     }

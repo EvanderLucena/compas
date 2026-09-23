@@ -50,6 +50,9 @@ public class Patient {
     @Column(length = 30)
     private String whatsapp;
 
+    @Column(name = "whatsapp_instance_id")
+    private UUID whatsappInstanceId;
+
     private Integer age;
 
     @Enumerated(EnumType.STRING)

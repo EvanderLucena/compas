@@ -4,9 +4,11 @@ import com.compas.api.dto.whatsapp.WebhookMessageDTO;
 import com.compas.api.dto.whatsapp.WhatsAppWebhookDTO;
 import com.compas.api.model.Episode;
 import com.compas.api.model.Patient;
+import com.compas.api.model.WhatsAppInstanceStatus;
 import com.compas.api.model.WhatsAppMessage;
 import com.compas.api.repository.EpisodeRepository;
 import com.compas.api.repository.PatientRepository;
+import com.compas.api.repository.WhatsAppInstanceRepository;
 import com.compas.api.repository.WhatsAppMessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +36,7 @@ public class WebhookService {
     private final PhoneNormalizationService phoneNormalizationService;
     private final MessageQueueService messageQueueService;
     private final EvolutionApiService evolutionApiService;
+    private final WhatsAppInstanceRepository whatsAppInstanceRepository;
 
     @Value("${compas.whatsapp.unknown-response-enabled:${nutriai.whatsapp.unknown-response-enabled:true}}")
     private boolean unknownResponseEnabled = true;
@@ -54,13 +57,15 @@ public class WebhookService {
             EpisodeRepository episodeRepository,
             PhoneNormalizationService phoneNormalizationService,
             MessageQueueService messageQueueService,
-            EvolutionApiService evolutionApiService) {
+            EvolutionApiService evolutionApiService,
+            WhatsAppInstanceRepository whatsAppInstanceRepository) {
         this.whatsAppMessageRepository = whatsAppMessageRepository;
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
         this.phoneNormalizationService = phoneNormalizationService;
         this.messageQueueService = messageQueueService;
         this.evolutionApiService = evolutionApiService;
+        this.whatsAppInstanceRepository = whatsAppInstanceRepository;
     }
 
     /**
@@ -187,6 +192,29 @@ public class WebhookService {
 
             return Optional.of(new WebhookMessageDTO(
                     saved.getId(), normalizedPhone, null, null, messageContent, messageType));
+        }
+
+        // Sticky binding: bind patient to incoming instance if active and under capacity
+        if (instanceId != null && !instanceId.isBlank()) {
+            Patient patient = patientOpt.get();
+            if (patient.getWhatsappInstanceId() == null) {
+                whatsAppInstanceRepository.findByName(instanceId)
+                        .filter(inst -> Boolean.TRUE.equals(inst.getActive())
+                                && inst.getStatus() != WhatsAppInstanceStatus.BANNED
+                                && inst.getStatus() != WhatsAppInstanceStatus.DISABLED)
+                        .ifPresent(inst -> {
+                            long activeCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(inst.getId());
+                            if (activeCount < inst.getMaxPatients()) {
+                                patient.setWhatsappInstanceId(inst.getId());
+                                patientRepository.save(patient);
+                                log.info("Sticky binding: patient {} bound to WhatsApp fleet instance '{}' ({}/{})",
+                                        patient.getId(), inst.getName(), activeCount + 1, inst.getMaxPatients());
+                            } else {
+                                log.warn("Instance '{}' at capacity ({}/{}), sticky binding deferred",
+                                        inst.getName(), activeCount, inst.getMaxPatients());
+                            }
+                        });
+            }
         }
 
         // Enqueue for async AI processing after transaction commits

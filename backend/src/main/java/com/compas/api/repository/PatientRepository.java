@@ -74,4 +74,44 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
      */
     @Query("SELECT DISTINCT p.nutritionistId FROM Patient p WHERE p.whatsapp = :whatsapp")
     List<UUID> findDistinctNutritionistIdsByWhatsapp(@Param("whatsapp") String whatsapp);
+
+    /**
+     * Count active patients assigned to a WhatsApp fleet instance.
+     */
+    long countByWhatsappInstanceIdAndActiveTrue(UUID instanceId);
+
+    /**
+     * Count active patients assigned to a WhatsApp fleet instance for a specific nutritionist.
+     */
+    long countByWhatsappInstanceIdAndNutritionistIdAndActiveTrue(UUID instanceId, UUID nutritionistId);
+
+    /**
+     * Count distinct nutritionists with active patients on a WhatsApp fleet instance.
+     */
+    @Query("SELECT COUNT(DISTINCT p.nutritionistId) FROM Patient p WHERE p.whatsappInstanceId = :instanceId AND p.active = true")
+    long countDistinctNutritionistIdsByWhatsappInstanceId(@Param("instanceId") UUID instanceId);
+
+    /**
+     * Paginated list of active patients assigned to an instance.
+     */
+    Page<Patient> findByWhatsappInstanceIdAndActiveTrue(UUID instanceId, Pageable pageable);
+
+    /**
+     * Reassign patients from one fleet instance to another, with optional nutritionist scope.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = :targetInstanceId WHERE p.whatsappInstanceId = :sourceInstanceId AND p.active = true AND (:nutritionistId IS NULL OR p.nutritionistId = :nutritionistId)")
+    int reassignPatients(
+            @Param("sourceInstanceId") UUID sourceInstanceId,
+            @Param("targetInstanceId") UUID targetInstanceId,
+            @Param("nutritionistId") UUID nutritionistId);
+
+    /**
+     * Clear instance assignment from patients when an instance is removed, with optional nutritionist scope.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Patient p SET p.whatsappInstanceId = NULL WHERE p.whatsappInstanceId = :instanceId AND (:nutritionistId IS NULL OR p.nutritionistId = :nutritionistId)")
+    int clearInstanceFromPatients(
+            @Param("instanceId") UUID instanceId,
+            @Param("nutritionistId") UUID nutritionistId);
 }
