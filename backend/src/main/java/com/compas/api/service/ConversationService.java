@@ -1023,10 +1023,25 @@ public class ConversationService {
                 return true;
             }
 
-        } catch (ResourceNotFoundException | ResponseStatusException e) {
+        } catch (ResourceNotFoundException e) {
             log.info("Patient {} has no active plan/data for document {}: {}",
                     patient.getId(), docType, e.getMessage());
             sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            return true;
+
+        } catch (ResponseStatusException e) {
+            if (e.getStatusCode().is4xxClientError()) {
+                log.info("Patient {} missing data/precondition for document {}: {}",
+                        patient.getId(), docType, e.getMessage());
+                sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            } else {
+                log.error("Server error generating {} document for patient {}: {}",
+                        docType, patient.getId(), e.getMessage(), e);
+                if (message.getRetryCount() != null
+                        && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                    sendTechnicalFallback(message, patient, nutritionist);
+                }
+            }
             return true;
 
         } catch (IllegalStateException e) {
@@ -1117,70 +1132,72 @@ public class ConversationService {
                 .replaceAll("\\p{M}", "")
                 .trim();
 
-        // 1. Grocery / Shopping list
-        boolean hasGroceryKeyword = normalized.contains("compras")
-                || normalized.contains("mercado")
-                || normalized.contains("feira");
-        boolean hasListKeyword = normalized.contains("lista")
-                || normalized.contains("pdf")
-                || normalized.contains("itens")
-                || normalized.contains("manda")
-                || normalized.contains("envia");
-        if (hasGroceryKeyword && hasListKeyword) {
-            return RequestedDocumentType.GROCERY_LIST;
-        }
-
-        // 2. Biometry / Progress report
-        boolean hasBiometryKeyword = normalized.contains("biometria")
-                || normalized.contains("bioimpedancia")
-                || normalized.contains("antropometria")
-                || normalized.contains("dobras")
-                || normalized.contains("evolucao")
-                || normalized.contains("progresso");
-        boolean hasReportKeyword = normalized.contains("relatorio")
-                || normalized.contains("pdf")
-                || normalized.contains("grafico")
-                || normalized.contains("manda")
-                || normalized.contains("envia")
-                || normalized.contains("minha")
-                || normalized.contains("meu");
-        if (hasBiometryKeyword && hasReportKeyword) {
-            return RequestedDocumentType.BIOMETRY_REPORT;
-        }
-
-        // 3. Meal Plan
-        boolean hasPdfKeyword = normalized.contains("pdf");
-        boolean hasPlanKeyword = normalized.contains("plano")
-                || normalized.contains("cardapio")
-                || normalized.contains("dieta");
-
-        boolean isClinicalInquiry = normalized.contains("posso comer")
+        // Conversational/status inquiries should always be handled by LLM, not trigger document downloads
+        boolean isConversationalQuery = normalized.startsWith("como ")
+                || normalized.startsWith("qual ")
+                || normalized.startsWith("quanto ")
+                || normalized.contains("como ta")
+                || normalized.contains("como esta")
+                || normalized.contains("o que posso")
+                || normalized.contains("posso comer")
                 || normalized.contains("posso tomar")
                 || normalized.contains("posso trocar")
                 || normalized.contains("posso substituir")
-                || normalized.contains("o que posso")
                 || normalized.contains("como preparar")
                 || normalized.contains("qual alimento");
 
-        if (hasPlanKeyword && hasPdfKeyword && !isClinicalInquiry) {
-            return RequestedDocumentType.MEAL_PLAN;
+        if (isConversationalQuery && !normalized.contains("pdf") && !normalized.contains("relatorio")) {
+            return null;
         }
 
         boolean hasDeliveryVerb = normalized.contains("manda")
                 || normalized.contains("mandar")
                 || normalized.contains("envia")
                 || normalized.contains("enviar")
-                || normalized.contains("quero")
-                || normalized.contains("preciso")
                 || normalized.contains("compartilha")
-                || normalized.contains("encaminha");
+                || normalized.contains("compartilhar")
+                || normalized.contains("encaminha")
+                || normalized.contains("encaminhar")
+                || normalized.contains("baixar")
+                || normalized.contains("download");
 
-        if (hasPlanKeyword && hasDeliveryVerb && !isClinicalInquiry) {
+        boolean hasDocumentKeyword = normalized.contains("pdf")
+                || normalized.contains("documento")
+                || normalized.contains("arquivo");
+
+        // 1. Grocery / Shopping list
+        boolean hasGroceryContext = normalized.contains("compras")
+                || normalized.contains("mercado")
+                || normalized.contains("feira");
+        boolean hasListKeyword = normalized.contains("lista");
+        if (hasGroceryContext && (hasListKeyword || (hasDocumentKeyword && hasDeliveryVerb))) {
+            return RequestedDocumentType.GROCERY_LIST;
+        }
+
+        // 2. Biometry / Progress report
+        boolean hasBiometryContext = normalized.contains("biometria")
+                || normalized.contains("bioimpedancia")
+                || normalized.contains("antropometria")
+                || normalized.contains("dobras")
+                || normalized.contains("evolucao")
+                || normalized.contains("progresso");
+        boolean hasReportKeyword = normalized.contains("relatorio")
+                || normalized.contains("grafico")
+                || hasDocumentKeyword;
+        if (hasBiometryContext && hasReportKeyword) {
+            return RequestedDocumentType.BIOMETRY_REPORT;
+        }
+
+        // 3. Meal Plan
+        boolean hasPlanContext = normalized.contains("plano")
+                || normalized.contains("cardapio")
+                || normalized.contains("dieta");
+
+        if (hasPlanContext && (hasDocumentKeyword || hasDeliveryVerb)) {
             return RequestedDocumentType.MEAL_PLAN;
         }
 
-        if (hasPdfKeyword && (normalized.contains("me manda") || normalized.contains("envia")
-                || normalized.equals("pdf"))) {
+        if (hasDocumentKeyword && (hasDeliveryVerb || normalized.equals("pdf"))) {
             return RequestedDocumentType.MEAL_PLAN;
         }
 

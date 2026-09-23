@@ -9,6 +9,8 @@ import com.compas.api.dto.llm.LlmResponse;
 import com.compas.api.model.*;
 import com.compas.api.repository.*;
 import com.compas.api.exception.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -999,6 +1001,26 @@ class ConversationServiceTest {
     }
 
     @Test
+    void processMessage_when5xxResponseStatusExceptionOccurs_doesNotSendMissingDataMessage() {
+        textMessage.setMessageContent("Manda meu plano em pdf");
+        textMessage.setRetryCount(0);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId))
+                .thenThrow(new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "PDF service unavailable"));
+
+        conversationService.processMessage(messageId);
+
+        assertFalse(textMessage.getProcessed());
+        verify(evolutionApiService, never()).sendMessage(anyString(), anyString());
+        verify(whatsAppResponseRepository, never()).save(any());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
     void detectDocumentRequest_identifiesCorrectTypesAndIgnoresGeneralInquiries() {
         assertEquals(ConversationService.RequestedDocumentType.MEAL_PLAN,
                 conversationService.detectDocumentRequest("Manda meu plano em pdf"));
@@ -1009,6 +1031,11 @@ class ConversationServiceTest {
         assertEquals(ConversationService.RequestedDocumentType.BIOMETRY_REPORT,
                 conversationService.detectDocumentRequest("Relatório de evolução em pdf"));
 
+        // Conversational/status queries that should NOT trigger document delivery
+        assertNull(conversationService.detectDocumentRequest("Quero começar uma nova dieta"));
+        assertNull(conversationService.detectDocumentRequest("Preciso mudar minha dieta"));
+        assertNull(conversationService.detectDocumentRequest("Como está meu progresso?"));
+        assertNull(conversationService.detectDocumentRequest("Minha evolução tá boa?"));
         assertNull(conversationService.detectDocumentRequest("Posso comer banana no café da manhã?"));
         assertNull(conversationService.detectDocumentRequest("Almocei arroz com frango e salada"));
     }
