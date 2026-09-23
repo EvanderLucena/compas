@@ -175,7 +175,8 @@ public class WhatsAppFleetService {
             }
             if (request.status() != previousStatus
                     && (request.status() == WhatsAppInstanceStatus.BANNED
-                    || request.status() == WhatsAppInstanceStatus.DISCONNECTED)) {
+                    || (request.status() == WhatsAppInstanceStatus.DISCONNECTED
+                    && previousStatus == WhatsAppInstanceStatus.CONNECTED))) {
                 notifyAdminOfUnhealthyInstance(instance, previousStatus, request.status());
             }
         }
