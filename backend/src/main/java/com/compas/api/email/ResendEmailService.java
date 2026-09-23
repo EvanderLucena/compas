@@ -107,6 +107,48 @@ public class ResendEmailService implements EmailService {
         }
     }
 
+    @Override
+    public void sendPasswordResetEmail(String recipientEmail, String recipientName, String resetToken) {
+        String resetUrl = verificationBaseUrl + "/reset-password?token=" + resetToken;
+
+        if (shouldSimulateEmail()) {
+            LOG.info("[Email Simulation] Redefinição de senha simulada para {}", recipientEmail);
+            LOG.debug("[Email Simulation] Token de redefinição para {}: {}", recipientEmail, resetToken);
+            return;
+        }
+
+        try {
+            String htmlContent = buildPasswordResetHtml(recipientName, resetUrl);
+            Map<String, Object> payload = Map.of(
+                    "from", fromAddress,
+                    "to", List.of(recipientEmail),
+                    "subject", "Redefinição de senha — Compas 🧭",
+                    "html", htmlContent
+            );
+
+            String requestBody = objectMapper.writeValueAsString(payload);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(RESEND_API_URL))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .timeout(DEFAULT_TIMEOUT)
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                LOG.info("Email de redefinição de senha enviado com sucesso para {} via Resend", recipientEmail);
+            } else {
+                LOG.error("Falha ao enviar e-mail de redefinição via Resend para {}. Status: {}, Resposta: {}",
+                        recipientEmail, response.statusCode(), response.body());
+            }
+        } catch (Exception e) {
+            LOG.error("Erro inesperado ao disparar e-mail de redefinição de senha para {}: {}",
+                    recipientEmail, e.getMessage(), e);
+        }
+    }
+
     private boolean shouldSimulateEmail() {
         return !enabled || apiKey.isBlank() || apiKey.startsWith("test") || apiKey.contains("dummy");
     }
@@ -163,6 +205,60 @@ public class ResendEmailService implements EmailService {
         </body>
         </html>
         """.formatted(nameSafe, verificationUrl, verificationUrl, verificationUrl);
+    }
+
+    private String buildPasswordResetHtml(String recipientName, String resetUrl) {
+        String nameSafe = (recipientName != null && !recipientName.isBlank())
+                ? escapeHtml(recipientName.trim())
+                : "Nutricionista";
+
+        return """
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Redefinição de Senha — Compas</title>
+        </head>
+        <body style="margin: 0; padding: 24px; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #f8fafc;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 560px; background-color: #1e293b; border-radius: 12px; border: 1px solid #334155; overflow: hidden; margin: 0 auto;">
+            <tr>
+              <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #334155;">
+                <div style="font-size: 24px; font-weight: 700; color: #10b981; letter-spacing: -0.5px;">
+                  Compas 🧭
+                </div>
+                <div style="font-size: 12px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px;">
+                  Recuperação de Acesso
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px;">
+                <h1 style="font-size: 20px; font-weight: 600; color: #f8fafc; margin: 0 0 16px;">
+                  Olá, %s!
+                </h1>
+                <p style="font-size: 15px; line-height: 1.6; color: #cbd5e1; margin: 0 0 24px;">
+                  Recebemos uma solicitação para redefinir a senha da sua conta no Compas. Para cadastrar uma nova senha, clique no botão abaixo:
+                </p>
+                <div style="text-align: center; margin: 32px 0;">
+                  <a href="%s" style="background-color: #10b981; color: #022c22; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+                    Redefinir minha senha
+                  </a>
+                </div>
+                <p style="font-size: 13px; line-height: 1.5; color: #94a3b8; margin: 24px 0 0;">
+                  Se o botão não funcionar, copie e cole o link a seguir no seu navegador:<br>
+                  <a href="%s" style="color: #38bdf8; word-break: break-all; font-size: 12px;">%s</a>
+                </p>
+                <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #334155; font-size: 12px; color: #64748b; line-height: 1.5;">
+                  Este link é de uso único e expira em <strong>1 hora</strong>.<br>
+                  Se você não solicitou a redefinição de senha, nenhuma ação é necessária. Sua senha atual continuará segura.
+                </div>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+        """.formatted(nameSafe, resetUrl, resetUrl, resetUrl);
     }
 
     private String escapeHtml(String text) {

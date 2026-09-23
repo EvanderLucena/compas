@@ -400,4 +400,64 @@ class AuthServiceTest {
         assertEquals(originalToken, reloaded.getEmailVerificationToken(),
                 "Active token should be preserved to prevent link invalidation");
     }
+
+    @Test
+    void forgotPassword_withExistingEmail_generatesToken() {
+        SignupRequest signup = new SignupRequest(
+                "Dra. Recuperar", "recuperar@compas.app", "senha12345", "12345", "SP", "Esportiva", null, true
+        );
+        authService.signup(signup);
+
+        var result = authService.forgotPassword("recuperar@compas.app");
+        assertTrue((Boolean) result.get("success"));
+
+        Nutritionist nutri = nutritionistRepository.findByEmail("recuperar@compas.app").orElseThrow();
+        assertNotNull(nutri.getPasswordResetToken());
+        assertNotNull(nutri.getPasswordResetExpiresAt());
+        assertTrue(nutri.getPasswordResetExpiresAt().isAfter(java.time.LocalDateTime.now()));
+    }
+
+    @Test
+    void forgotPassword_withNonExistentEmail_returnsGenericSuccess() {
+        var result = authService.forgotPassword("inexistente@compas.app");
+        assertTrue((Boolean) result.get("success"));
+    }
+
+    @Test
+    void resetPassword_withValidToken_updatesPasswordAndInvalidatesToken() {
+        SignupRequest signup = new SignupRequest(
+                "Dra. Reset", "reset@compas.app", "senhaAntiga123", "99999", "RJ", "Clínica", null, true
+        );
+        authService.signup(signup);
+        authService.forgotPassword("reset@compas.app");
+
+        Nutritionist nutri = nutritionistRepository.findByEmail("reset@compas.app").orElseThrow();
+        String token = nutri.getPasswordResetToken();
+
+        var result = authService.resetPassword(token, "novaSenha456");
+        assertTrue((Boolean) result.get("success"));
+
+        Nutritionist updated = nutritionistRepository.findByEmail("reset@compas.app").orElseThrow();
+        assertNull(updated.getPasswordResetToken());
+        assertNull(updated.getPasswordResetExpiresAt());
+        assertTrue(passwordEncoder.matches("novaSenha456", updated.getPasswordHash()));
+        assertFalse(passwordEncoder.matches("senhaAntiga123", updated.getPasswordHash()));
+    }
+
+    @Test
+    void resetPassword_withExpiredToken_throwsBadRequest() {
+        SignupRequest signup = new SignupRequest(
+                "Dra. Expirada", "expirada@compas.app", "senha123", "88888", "MG", "Geral", null, true
+        );
+        authService.signup(signup);
+        authService.forgotPassword("expirada@compas.app");
+
+        Nutritionist nutri = nutritionistRepository.findByEmail("expirada@compas.app").orElseThrow();
+        nutri.setPasswordResetExpiresAt(java.time.LocalDateTime.now().minusHours(2));
+        nutritionistRepository.save(nutri);
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () ->
+                authService.resetPassword(nutri.getPasswordResetToken(), "novaSenha789")
+        );
+    }
 }

@@ -11,5 +11,6 @@ import java.util.UUID;
 public interface NutritionistRepository extends JpaRepository<Nutritionist, UUID> {
     Optional<Nutritionist> findByEmail(String email);
     Optional<Nutritionist> findByEmailVerificationToken(String token);
+    Optional<Nutritionist> findByPasswordResetToken(String token);
     boolean existsByEmail(String email);
 }

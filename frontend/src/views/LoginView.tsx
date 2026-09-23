@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useToastStore } from '../stores/toastStore';
 import { Link } from 'react-router';
 import { IconCompas } from '../components/ui/CompasLogo';
+import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
 
 function AuthLeftBranding() {
   return (
@@ -144,6 +145,7 @@ export function LoginView() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const [localError, setLocalError] = useState('');
   const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -167,9 +169,7 @@ export function LoginView() {
 
   const handleForgotPassword = (e: React.MouseEvent) => {
     e.preventDefault();
-    useToastStore
-      .getState()
-      .showSuccess('Para redefinir sua senha, entre em contato com suporte@compas.app.br');
+    setShowForgotModal(true);
   };
 
   const handleGoogleAuth = () => {
@@ -256,6 +256,12 @@ export function LoginView() {
           </p>
         </div>
       </div>
+
+      <ForgotPasswordModal
+        open={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        defaultEmail={email}
+      />
     </div>
   );
 }

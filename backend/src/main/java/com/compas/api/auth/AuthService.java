@@ -18,6 +18,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -271,6 +272,80 @@ public class AuthService {
         return Map.of(
                 "success", true,
                 "message", "Se o e-mail estiver cadastrado, um link de confirmação será enviado."
+        );
+    }
+
+    @Transactional
+    public Map<String, Object> forgotPassword(String email) {
+        if (email == null || email.isBlank()) {
+            return genericForgotPasswordResponse();
+        }
+
+        Optional<Nutritionist> nutritionistOpt = nutritionistRepository.findByEmail(email.trim().toLowerCase());
+        if (nutritionistOpt.isEmpty()) {
+            return genericForgotPasswordResponse();
+        }
+
+        Nutritionist nutritionist = nutritionistOpt.get();
+        String resetToken = UUID.randomUUID().toString().replace("-", "");
+        nutritionist.setPasswordResetToken(resetToken);
+        nutritionist.setPasswordResetExpiresAt(LocalDateTime.now().plusHours(1));
+        nutritionistRepository.save(nutritionist);
+
+        try {
+            emailService.sendPasswordResetEmail(
+                    nutritionist.getEmail(),
+                    nutritionist.getDisplayName(),
+                    resetToken
+            );
+        } catch (Exception e) {
+            LOG.warn("Falha ao enviar e-mail de redefinição de senha para {}: {}", nutritionist.getEmail(), e.getMessage());
+        }
+
+        return genericForgotPasswordResponse();
+    }
+
+    private Map<String, Object> genericForgotPasswordResponse() {
+        return Map.of(
+                "success", true,
+                "message", "Se o e-mail informado estiver cadastrado, as instruções para redefinir sua senha foram enviadas."
+        );
+    }
+
+    @Transactional
+    public Map<String, Object> resetPassword(String token, String newPassword) {
+        if (token == null || token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token de recuperação é obrigatório.");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A nova senha deve ter no mínimo 6 caracteres.");
+        }
+
+        Nutritionist nutritionist = nutritionistRepository.findByPasswordResetToken(token.trim())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Token de recuperação inválido ou já utilizado. Solicite uma nova recuperação."
+                ));
+
+        if (nutritionist.getPasswordResetExpiresAt() != null
+                && nutritionist.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Token de recuperação expirado. Solicite uma nova recuperação."
+            );
+        }
+
+        nutritionist.setPasswordHash(passwordEncoder.encode(newPassword));
+        nutritionist.setPasswordResetToken(null);
+        nutritionist.setPasswordResetExpiresAt(null);
+        nutritionistRepository.save(nutritionist);
+
+        refreshTokenRepository.deleteByNutritionistId(nutritionist.getId());
+
+        LOG.info("Senha redefinida com sucesso para nutricionista {}", nutritionist.getEmail());
+        return Map.of(
+                "success", true,
+                "message", "Senha redefinida com sucesso! Você já pode entrar com sua nova senha."
         );
     }
 

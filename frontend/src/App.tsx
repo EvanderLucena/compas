@@ -40,6 +40,9 @@ const InsightsView = lazy(() =>
 const VerifyEmailView = lazy(() =>
   import('./views/VerifyEmailView').then((m) => ({ default: m.VerifyEmailView })),
 );
+const ResetPasswordView = lazy(() =>
+  import('./views/ResetPasswordView').then((m) => ({ default: m.ResetPasswordView })),
+);
 const AdminLoginView = lazy(() =>
   import('./views/AdminLoginView').then((m) => ({ default: m.AdminLoginView })),
 );
@@ -203,6 +206,7 @@ const router = createBrowserRouter([
       },
       { path: '/logout', element: <LogoutView /> },
       { path: '/verify-email', element: <VerifyEmailView /> },
+      { path: '/reset-password', element: <ResetPasswordView /> },
       {
         path: '/admin/login',
         element: (
