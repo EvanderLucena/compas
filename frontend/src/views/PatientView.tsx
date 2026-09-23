@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useParams } from 'react-router';
+import { useParams, Link } from 'react-router';
 import { usePatient } from '../stores/patientStore';
 import { usePlan } from '../stores/planStore';
 import { mapPatientFromApi } from '../types/patient';
@@ -128,10 +128,60 @@ function PatientTabContent({
   }
 }
 
+function PatientLoadingState() {
+  return (
+    <div className="page" style={{ maxWidth: 'none', padding: 40, textAlign: 'center' }}>
+      <p style={{ color: 'var(--fg-subtle)', fontSize: 14 }}>Carregando paciente...</p>
+    </div>
+  );
+}
+
+function PatientErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const isNotFound =
+    (error as { status?: number } | null)?.status === 404 ||
+    (error as { response?: { status?: number } } | null)?.response?.status === 404;
+
+  return (
+    <div className="page" style={{ maxWidth: 'none', padding: '60px 20px', textAlign: 'center' }}>
+      <p style={{ color: 'var(--coral)', fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+        {isNotFound ? 'Paciente não encontrado' : 'Erro ao carregar paciente'}
+      </p>
+      <p style={{ color: 'var(--fg-subtle)', fontSize: 14, marginBottom: 20 }}>
+        {isNotFound
+          ? 'Este paciente não foi encontrado ou você não possui permissão para acessá-lo.'
+          : 'Não foi possível carregar os dados do paciente. Verifique sua conexão e tente novamente.'}
+      </p>
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        {!isNotFound && (
+          <button type="button" className="btn btn-primary" onClick={onRetry}>
+            Tentar novamente
+          </button>
+        )}
+        <Link to="/patients" className={isNotFound ? 'btn btn-primary' : 'btn btn-secondary'}>
+          Voltar para lista de pacientes
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PatientEmptyState() {
+  return (
+    <div className="page" style={{ maxWidth: 'none', padding: '60px 20px', textAlign: 'center' }}>
+      <p style={{ color: 'var(--fg-subtle)', fontSize: 14, marginBottom: 16 }}>
+        Sem dados reais deste paciente no momento.
+      </p>
+      <Link to="/patients" className="btn btn-secondary">
+        Voltar para lista de pacientes
+      </Link>
+    </div>
+  );
+}
+
 export function PatientView() {
   const { id } = useParams();
   const routePatientId = id ?? null;
-  const { data: apiData, isLoading, isError } = usePatient(routePatientId);
+  const { data: apiData, isLoading, isError, error, refetch } = usePatient(routePatientId);
   const { data: biometryAssessments } = usePatientBiometry(routePatientId);
   const { data: plan } = usePlan(routePatientId);
   const [tab, setTab] = React.useState<Tab>('today');
@@ -149,29 +199,13 @@ export function PatientView() {
   const patientId = id ?? patient.id;
 
   if (isLoading) {
-    return (
-      <div className="page" style={{ maxWidth: 'none', padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-subtle)', fontSize: 14 }}>Carregando paciente...</p>
-      </div>
-    );
+    return <PatientLoadingState />;
   }
   if (isError) {
-    return (
-      <div className="page" style={{ maxWidth: 'none', padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--coral)', fontSize: 14 }}>
-          Erro ao carregar paciente. Tente novamente.
-        </p>
-      </div>
-    );
+    return <PatientErrorState error={error} onRetry={() => void refetch()} />;
   }
   if (!hasRealPatient) {
-    return (
-      <div className="page" style={{ maxWidth: 'none', padding: 40, textAlign: 'center' }}>
-        <p style={{ color: 'var(--fg-subtle)', fontSize: 14 }}>
-          Sem dados reais deste paciente no momento.
-        </p>
-      </div>
-    );
+    return <PatientEmptyState />;
   }
 
   const handleEditPatient = () => {
