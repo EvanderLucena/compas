@@ -9,6 +9,7 @@ import com.compas.api.auth.dto.SignupRequest;
 import com.compas.api.dto.whatsapp.PatchExtractionRequest;
 import com.compas.api.model.*;
 import com.compas.api.repository.*;
+import com.compas.api.service.WhatsAppFleetService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,8 @@ class WhatsAppIntelligenceControllerTest {
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JwtService jwtService;
+    @Autowired private WhatsAppInstanceRepository instanceRepository;
+    @Autowired private WhatsAppFleetService whatsAppFleetService;
 
     private String accessToken;
     private UUID nutritionistId;
@@ -63,6 +66,7 @@ class WhatsAppIntelligenceControllerTest {
         whatsAppMessageRepository.deleteAll();
         episodeRepository.deleteAll();
         patientRepository.deleteAll();
+        instanceRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         nutritionistRepository.deleteAll();
 
@@ -270,6 +274,45 @@ class WhatsAppIntelligenceControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("WhatsApp não cadastrado"));
+    }
+
+    @Test
+    void getActivationLink_withFleetInstances_autoFailsOverWhenInstanceBanned() throws Exception {
+        // 1. Setup Chip A (primary) and Chip B (healthy backup)
+        WhatsAppInstance chipA = instanceRepository.save(WhatsAppInstance.builder()
+                .name("compas-chip-a")
+                .phoneNumber("5511999990001")
+                .status(WhatsAppInstanceStatus.CONNECTED)
+                .maxPatients(100)
+                .active(true)
+                .build());
+
+        WhatsAppInstance chipB = instanceRepository.save(WhatsAppInstance.builder()
+                .name("compas-chip-b")
+                .phoneNumber("5511999990002")
+                .status(WhatsAppInstanceStatus.CONNECTED)
+                .maxPatients(100)
+                .active(true)
+                .build());
+
+        // 2. Patient requests activation link -> assigned to Chip A
+        mockMvc.perform(get("/api/v1/patients/{patientId}/activation-link", patientId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.link").value("https://wa.me/5511999990001?text=Oi"));
+
+        // 3. Chip A is marked BANNED via updateInstance (which triggers autoFailover)
+        whatsAppFleetService.updateInstance(chipA.getId(),
+                new com.compas.api.dto.whatsapp.fleet.UpdateWhatsAppInstanceRequest(
+                        null, null, null, null, WhatsAppInstanceStatus.BANNED));
+
+        // 4. Patient requests activation link again -> should automatically point to Chip B!
+        mockMvc.perform(get("/api/v1/patients/{patientId}/activation-link", patientId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.link").value("https://wa.me/5511999990002?text=Oi"));
     }
 
     @Test

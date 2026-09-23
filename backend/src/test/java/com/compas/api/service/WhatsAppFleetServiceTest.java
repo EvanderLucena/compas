@@ -285,4 +285,68 @@ class WhatsAppFleetServiceTest {
         assertEquals(instanceId2, assigned.get().getId()); // picked instance2 because 20 < 120
         verify(patientRepository).save(patient);
     }
+
+    @Test
+    void autoFailover_whenInstanceBanned_migratesPatientsToHealthyInstance() {
+        instance1.setStatus(WhatsAppInstanceStatus.BANNED);
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId1)).thenReturn(15L);
+        when(instanceRepository.findByActiveTrueOrderByCreatedAtAsc()).thenReturn(List.of(instance1, instance2));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId2)).thenReturn(5L);
+        when(patientRepository.reassignPatients(instanceId1, instanceId2, null)).thenReturn(15);
+
+        int moved = fleetService.autoFailover(instanceId1);
+
+        assertEquals(15, moved);
+        verify(patientRepository).reassignPatients(instanceId1, instanceId2, null);
+    }
+
+    @Test
+    void autoFailover_whenNoPatients_returnsZero() {
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId1)).thenReturn(0L);
+
+        int moved = fleetService.autoFailover(instanceId1);
+
+        assertEquals(0, moved);
+    }
+
+    @Test
+    void updateInstance_whenStatusChangedToBanned_triggersAutoFailover() {
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(instanceRepository.save(any(WhatsAppInstance.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId1)).thenReturn(8L);
+        when(instanceRepository.findByActiveTrueOrderByCreatedAtAsc()).thenReturn(List.of(instance1, instance2));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId2)).thenReturn(2L);
+        when(patientRepository.reassignPatients(instanceId1, instanceId2, null)).thenReturn(8);
+
+        UpdateWhatsAppInstanceRequest request = new UpdateWhatsAppInstanceRequest(
+                null, null, null, null, WhatsAppInstanceStatus.BANNED
+        );
+
+        WhatsAppFleetInstanceDTO result = fleetService.updateInstance(instanceId1, request);
+
+        assertEquals(WhatsAppInstanceStatus.BANNED, result.status());
+        verify(patientRepository).reassignPatients(instanceId1, instanceId2, null);
+    }
+
+    @Test
+    void assignPatientToInstance_whenCurrentInstanceBanned_reassignsToHealthyInstance() {
+        instance1.setStatus(WhatsAppInstanceStatus.BANNED);
+        Patient patient = Patient.builder()
+                .id(UUID.randomUUID())
+                .name("Mariana")
+                .whatsappInstanceId(instanceId1)
+                .build();
+
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(instanceRepository.findByActiveTrueOrderByCreatedAtAsc()).thenReturn(List.of(instance1, instance2));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId2)).thenReturn(3L);
+
+        Optional<WhatsAppInstance> assigned = fleetService.assignPatientToInstance(patient);
+
+        assertTrue(assigned.isPresent());
+        assertEquals(instanceId2, assigned.get().getId());
+        verify(patientRepository).save(patient);
+    }
 }

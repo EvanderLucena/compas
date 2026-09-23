@@ -5,6 +5,7 @@ import com.compas.api.model.EpisodeHistoryEvent;
 import com.compas.api.model.ExtractionItem;
 import com.compas.api.model.MealExtraction;
 import com.compas.api.model.Patient;
+import com.compas.api.model.WhatsAppInstance;
 import com.compas.api.model.WhatsAppMessage;
 import com.compas.api.repository.EpisodeHistoryEventRepository;
 import com.compas.api.repository.ExtractionItemRepository;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -42,6 +44,7 @@ public class WhatsAppIntelligenceService {
     private final PatientRepository patientRepository;
     private final WhatsAppMessageRepository whatsAppMessageRepository;
     private final EpisodeHistoryEventRepository episodeHistoryEventRepository;
+    private final WhatsAppFleetService whatsAppFleetService;
     private final ObjectMapper objectMapper;
 
     @Value("${compas.whatsapp.central-number:${nutriai.whatsapp.central-number:}}")
@@ -52,12 +55,14 @@ public class WhatsAppIntelligenceService {
             ExtractionItemRepository extractionItemRepository,
             PatientRepository patientRepository,
             WhatsAppMessageRepository whatsAppMessageRepository,
-            EpisodeHistoryEventRepository episodeHistoryEventRepository) {
+            EpisodeHistoryEventRepository episodeHistoryEventRepository,
+            WhatsAppFleetService whatsAppFleetService) {
         this.mealExtractionRepository = mealExtractionRepository;
         this.extractionItemRepository = extractionItemRepository;
         this.patientRepository = patientRepository;
         this.whatsAppMessageRepository = whatsAppMessageRepository;
         this.episodeHistoryEventRepository = episodeHistoryEventRepository;
+        this.whatsAppFleetService = whatsAppFleetService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -169,16 +174,31 @@ public class WhatsAppIntelligenceService {
             phone = phone.substring(2);
         }
 
-        String targetPhone;
-        if (centralNumber != null && !centralNumber.isBlank()) {
-            String normalizedCentral = centralNumber.replaceAll("\\D", "");
-            if (normalizedCentral.length() <= 11) {
-                targetPhone = "55" + normalizedCentral;
+        String targetPhone = null;
+
+        // Route to healthy assigned WhatsApp fleet instance
+        Optional<WhatsAppInstance> assignedInst = whatsAppFleetService.assignPatientToInstance(patient);
+        if (assignedInst.isPresent() && assignedInst.get().getPhoneNumber() != null
+                && !assignedInst.get().getPhoneNumber().isBlank()) {
+            String instPhone = assignedInst.get().getPhoneNumber().replaceAll("\\D", "");
+            if (instPhone.startsWith("55") && instPhone.length() >= 12) {
+                targetPhone = instPhone;
             } else {
-                targetPhone = normalizedCentral;
+                targetPhone = "55" + instPhone;
             }
-        } else {
-            targetPhone = "55" + phone;
+        }
+
+        if (targetPhone == null || targetPhone.isBlank()) {
+            if (centralNumber != null && !centralNumber.isBlank()) {
+                String normalizedCentral = centralNumber.replaceAll("\\D", "");
+                if (normalizedCentral.length() <= 11) {
+                    targetPhone = "55" + normalizedCentral;
+                } else {
+                    targetPhone = normalizedCentral;
+                }
+            } else {
+                targetPhone = "55" + phone;
+            }
         }
 
         String link = "https://wa.me/" + targetPhone + "?text=Oi";

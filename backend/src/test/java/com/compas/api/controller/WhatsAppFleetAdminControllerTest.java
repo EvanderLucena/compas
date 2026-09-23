@@ -160,4 +160,20 @@ class WhatsAppFleetAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    void triggerFailover_asAdmin_returns200() throws Exception {
+        WhatsAppInstance inst1 = instanceRepository.save(WhatsAppInstance.builder()
+                .name("failover-source-" + System.currentTimeMillis())
+                .status(WhatsAppInstanceStatus.BANNED)
+                .maxPatients(180)
+                .active(true)
+                .build());
+
+        mockMvc.perform(post("/api/v1/admin/whatsapp/instances/" + inst1.getId() + "/failover")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.migratedCount").isNumber());
+    }
 }
