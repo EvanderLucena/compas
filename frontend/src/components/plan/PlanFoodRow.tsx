@@ -1,69 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import type { MealFood } from '../../types/plan';
 import { FOOD_UNIT_SYMBOLS } from '../../types/food';
-import { sanitizeNumberInput, parseNumberInput } from '../../utils/numberInput';
+import { EditableCell, RefInput } from './PlanFoodInputCells';
 
 interface PlanFoodRowProps {
   item: MealFood;
   isLast: boolean;
+  isReadOnly?: boolean;
+  onReadOnlyClick?: () => void;
   onReferenceAmountChange: (referenceAmount: number) => void;
   onPrepChange: (prep: string) => void;
   onRemove: () => void;
-}
-
-function EditableCell({
-  value,
-  color,
-  isNum,
-  onChange,
-  testId,
-}: {
-  value: string | number;
-  color: string;
-  isNum: boolean;
-  onChange: (val: string) => void;
-  testId?: string;
-}) {
-  const [local, setLocal] = useState(String(value));
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!ref.current || ref.current !== document.activeElement) {
-      setLocal(String(value));
-    }
-  }, [value]);
-
-  return (
-    <input
-      data-testid={testId}
-      ref={ref}
-      value={local}
-      onChange={(e) => setLocal(e.target.value)}
-      onBlur={(e) => {
-        e.target.style.borderColor = 'transparent';
-        e.target.style.background = 'transparent';
-        const synced = String(value);
-        if (e.target.value !== synced) onChange(e.target.value);
-        else setLocal(synced);
-      }}
-      onFocus={(e) => {
-        e.target.style.borderColor = 'var(--border)';
-        e.target.style.background = 'var(--surface)';
-      }}
-      style={{
-        padding: '5px 7px',
-        border: '1px solid transparent',
-        borderRadius: 5,
-        fontSize: 12.5,
-        background: 'transparent',
-        outline: 'none',
-        color,
-        width: '100%',
-        fontFamily: isNum ? 'var(--font-mono)' : 'var(--font-ui)',
-        textAlign: isNum ? 'right' : 'left',
-      }}
-    />
-  );
 }
 
 function MacroReadonly({
@@ -97,66 +44,43 @@ function MacroReadonly({
   );
 }
 
-function RefInput({
-  value,
-  onBlur,
-  testId,
-}: {
-  value: number;
-  onBlur: (newRef: number) => void;
-  testId?: string;
-}) {
-  const [localRef, setLocalRef] = useState(String(value));
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!ref.current || ref.current !== document.activeElement) {
-      setLocalRef(String(value));
-    }
-  }, [value]);
-
+function RemoveButton({ onRemove }: { onRemove: () => void }) {
   return (
-    <input
-      data-testid={testId}
-      ref={ref}
-      inputMode="numeric"
-      pattern="[0-9.,]*"
-      value={localRef}
-      onChange={(e) => setLocalRef(sanitizeNumberInput(e.target.value))}
-      onBlur={() => {
-        if (!ref.current) return;
-        ref.current.style.borderColor = 'transparent';
-        ref.current.style.background = 'transparent';
-        onBlur(parseNumberInput(localRef));
-      }}
-      onKeyDown={(e) => {
-        if (e.key.length === 1 && !/[0-9.,]/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-          e.preventDefault();
-        }
-      }}
-      onFocus={(e) => {
-        e.target.style.borderColor = 'var(--border)';
-        e.target.style.background = 'var(--surface)';
-      }}
-      style={{
-        padding: '5px 7px',
-        border: '1px solid transparent',
-        borderRadius: 5,
-        fontSize: 12.5,
-        background: 'transparent',
-        outline: 'none',
-        color: 'var(--fg)',
-        width: '100%',
-        fontFamily: 'var(--font-mono)',
-        textAlign: 'right',
-      }}
-    />
+    <div style={{ display: 'grid', placeItems: 'center' }}>
+      <button
+        data-testid="plan-food-remove-btn"
+        onClick={onRemove}
+        title="Remover"
+        style={{
+          color: 'var(--fg-subtle)',
+          display: 'grid',
+          placeItems: 'center',
+          width: 22,
+          height: 22,
+          borderRadius: 4,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--coral)';
+          e.currentTarget.style.background = 'var(--coral-dim)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--fg-subtle)';
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        <span style={{ fontSize: 13, lineHeight: 1 }}>×</span>
+      </button>
+    </div>
   );
 }
 
 function PlanFoodRowGrid({ children, isLast }: { children: React.ReactNode; isLast: boolean }) {
   return (
     <div
+      className="plans-food-row"
       style={{
         display: 'grid',
         gridTemplateColumns: '2.2fr 0.8fr 0.6fr 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 28px',
@@ -164,6 +88,7 @@ function PlanFoodRowGrid({ children, isLast }: { children: React.ReactNode; isLa
         padding: '8px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--border)',
         alignItems: 'center',
+        background: 'var(--surface)',
       }}
     >
       {children}
@@ -171,32 +96,10 @@ function PlanFoodRowGrid({ children, isLast }: { children: React.ReactNode; isLa
   );
 }
 
-function RemoveButton({ onRemove }: { onRemove: () => void }) {
-  return (
-    <button
-      data-testid="plan-food-remove-btn"
-      onClick={onRemove}
-      title="Remover"
-      style={{
-        color: 'var(--fg-subtle)',
-        padding: 4,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--coral)')}
-      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--fg-subtle)')}
-    >
-      ×
-    </button>
-  );
-}
-
 function FoodNameCell({ name }: { name: string }) {
   return (
     <div
-      className="mono"
-      title="Vinculado ao catálogo"
+      title={name}
       style={{
         padding: '5px 7px',
         fontSize: 12.5,
@@ -246,6 +149,8 @@ function MacroCells({ item, opacity }: { item: MealFood; opacity: number }) {
 export function PlanFoodRow({
   item,
   isLast,
+  isReadOnly,
+  onReadOnlyClick,
   onReferenceAmountChange,
   onPrepChange,
   onRemove,
@@ -254,6 +159,10 @@ export function PlanFoodRow({
   const unitSymbol = FOOD_UNIT_SYMBOLS[item.unit as keyof typeof FOOD_UNIT_SYMBOLS] || 'g';
 
   const handleRefBlur = (newRef: number) => {
+    if (isReadOnly) {
+      onReadOnlyClick?.();
+      return;
+    }
     if (newRef !== item.referenceAmount) {
       setMacroFlash(true);
       onReferenceAmountChange(newRef);
@@ -261,20 +170,44 @@ export function PlanFoodRow({
     }
   };
 
+  const handlePrepChange = (prep: string) => {
+    if (isReadOnly) {
+      onReadOnlyClick?.();
+      return;
+    }
+    onPrepChange(prep);
+  };
+
+  const handleRemove = () => {
+    if (isReadOnly) {
+      onReadOnlyClick?.();
+      return;
+    }
+    onRemove();
+  };
+
   return (
     <PlanFoodRowGrid isLast={isLast}>
       <FoodNameCell name={item.foodName} />
-      <RefInput value={item.referenceAmount} onBlur={handleRefBlur} testId="plan-food-ref-input" />
+      <RefInput
+        value={item.referenceAmount}
+        onBlur={handleRefBlur}
+        testId="plan-food-ref-input"
+        isReadOnly={isReadOnly}
+        onReadOnlyClick={onReadOnlyClick}
+      />
       <UnitSymbol unitSymbol={unitSymbol} />
       <EditableCell
         value={item.prep ?? ''}
         color="var(--fg-muted)"
         isNum={false}
         testId="plan-food-prep-input"
-        onChange={onPrepChange}
+        onChange={handlePrepChange}
+        isReadOnly={isReadOnly}
+        onReadOnlyClick={onReadOnlyClick}
       />
       <MacroCells item={item} opacity={macroFlash ? 0.5 : 1} />
-      <RemoveButton onRemove={onRemove} />
+      <RemoveButton onRemove={handleRemove} />
     </PlanFoodRowGrid>
   );
 }
