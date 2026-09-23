@@ -119,4 +119,10 @@ describe('PlansView', () => {
     expect(screen.getByText('2200')).toBeInTheDocument();
     expect(screen.getByText('140g')).toBeInTheDocument();
   });
+
+  it('renders download PDF buttons for meal plan and grocery list', () => {
+    render(<PlansView patientId="test-patient-id" />);
+    expect(screen.getByTestId('btn-download-plan-pdf')).toBeInTheDocument();
+    expect(screen.getByTestId('btn-download-grocery-pdf')).toBeInTheDocument();
+  });
 });

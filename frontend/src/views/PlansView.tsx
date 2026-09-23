@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useModalA11y } from '../hooks/useModalA11y';
-import { IconPlus, IconX, IconTrash, IconEdit } from '../components/icons';
+import { IconPlus, IconX, IconTrash, IconEdit, IconDownload } from '../components/icons';
+import { downloadPatientDocument } from '../api/documents';
 import { parseNumberInput } from '../utils/numberInput';
 import {
   PlanFoodRow,
@@ -285,6 +286,32 @@ export function PlansView({ patientId }: PlansViewProps) {
   });
   const [addFoodError, setAddFoodError] = useState<string | null>(null);
   const [addMealError, setAddMealError] = useState<string | null>(null);
+  const [downloadingPlan, setDownloadingPlan] = useState(false);
+  const [downloadingGrocery, setDownloadingGrocery] = useState(false);
+
+  const handleDownloadPlanPdf = async () => {
+    try {
+      setDownloadingPlan(true);
+      await downloadPatientDocument(patientId, 'meal-plan', `plano-alimentar-${patientId}.pdf`);
+      useToastStore.getState().showSuccess('Plano alimentar em PDF baixado com sucesso!');
+    } catch {
+      useToastStore.getState().showError('Erro ao baixar o PDF do plano alimentar.');
+    } finally {
+      setDownloadingPlan(false);
+    }
+  };
+
+  const handleDownloadGroceryPdf = async () => {
+    try {
+      setDownloadingGrocery(true);
+      await downloadPatientDocument(patientId, 'grocery-list', `lista-compras-${patientId}.pdf`);
+      useToastStore.getState().showSuccess('Lista de compras em PDF baixada com sucesso!');
+    } catch {
+      useToastStore.getState().showError('Erro ao baixar o PDF da lista de compras.');
+    } finally {
+      setDownloadingGrocery(false);
+    }
+  };
 
   const updatePlan = useUpdatePlan(patientId);
   const addMealSlot = useAddMealSlot(patientId);
@@ -454,6 +481,40 @@ export function PlansView({ patientId }: PlansViewProps) {
               flexWrap: 'wrap',
             }}
           >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              data-testid="btn-download-plan-pdf"
+              onClick={handleDownloadPlanPdf}
+              disabled={downloadingPlan}
+              style={{
+                fontSize: 12,
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              title="Baixar Plano Alimentar Oficial em PDF"
+            >
+              <IconDownload size={13} /> {downloadingPlan ? 'Baixando...' : 'Plano em PDF'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              data-testid="btn-download-grocery-pdf"
+              onClick={handleDownloadGroceryPdf}
+              disabled={downloadingGrocery}
+              style={{
+                fontSize: 12,
+                padding: '6px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              title="Baixar Lista de Compras da Semana em PDF"
+            >
+              <IconDownload size={13} /> {downloadingGrocery ? 'Baixando...' : 'Lista de Compras'}
+            </button>
             <SaveStatusIndicator status={saveStatus} />
           </div>
         </div>

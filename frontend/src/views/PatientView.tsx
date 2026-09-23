@@ -9,7 +9,9 @@ import type {
   HistoryEpisodeListItem,
   MacroTarget,
 } from '../types/patient';
-import { IconEdit, IconPlus } from '../components/icons';
+import { IconEdit, IconPlus, IconDownload } from '../components/icons';
+import { downloadPatientDocument } from '../api/documents';
+import { useToastStore } from '../stores/toastStore';
 import {
   EditPatientModal,
   Timeline,
@@ -963,6 +965,20 @@ function BiometryTab({
     setStatusReviewOpen(true);
   };
 
+  const [downloadingBiometry, setDownloadingBiometry] = React.useState(false);
+
+  const handleDownloadBiometryPdf = async () => {
+    try {
+      setDownloadingBiometry(true);
+      await downloadPatientDocument(patientId, 'biometry', `evolucao-biometrica-${patientId}.pdf`);
+      useToastStore.getState().showSuccess('Relatório biométrico em PDF baixado com sucesso!');
+    } catch {
+      useToastStore.getState().showError('Erro ao baixar o relatório biométrico em PDF.');
+    } finally {
+      setDownloadingBiometry(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div style={{ padding: '24px 28px' }}>
@@ -1082,13 +1098,26 @@ function BiometryTab({
             <BioCell label="% Água" value={last!.waterPercent ?? 0} unit="%" />
             <BioCell label="Gordura visceral" value={last!.visceralFatLevel ?? 0} sub="nível" />
           </div>
-          <button
-            className="btn btn-primary"
-            data-testid="btn-new-biometry"
-            onClick={() => setNewEvalOpen(true)}
-          >
-            <IconPlus size={13} /> Nova avaliação
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              data-testid="btn-download-biometry-pdf"
+              onClick={handleDownloadBiometryPdf}
+              disabled={downloadingBiometry}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              title="Baixar Relatório de Evolução Biométrica em PDF"
+            >
+              <IconDownload size={13} /> {downloadingBiometry ? 'Baixando...' : 'Relatório em PDF'}
+            </button>
+            <button
+              className="btn btn-primary"
+              data-testid="btn-new-biometry"
+              onClick={() => setNewEvalOpen(true)}
+            >
+              <IconPlus size={13} /> Nova avaliação
+            </button>
+          </div>
         </div>
       </div>
 
