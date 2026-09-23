@@ -4,6 +4,7 @@ import * as patientApi from '../api/patients';
 import type { ApiResponse, FieldError } from '../types';
 import type { PatientStatus, ObjectiveOption } from '../types/patient';
 import { useToastStore } from './toastStore';
+import { useAuthStore } from './authStore';
 
 // Zustand store for client-side UI state (filters, modals, selection)
 interface PatientUIState {
@@ -64,6 +65,8 @@ export function resolveMutationErrorMessage(error: unknown, fallbackMessage: str
 // TanStack Query hook for patient list
 export function usePatients() {
   const { searchQuery, statusFilter, objectiveFilter, currentPage, pageSize } = usePatientUIStore();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'ADMIN';
 
   const active = statusFilter === 'inactive' ? false : statusFilter === 'all' ? undefined : true;
 
@@ -81,6 +84,7 @@ export function usePatients() {
         objective: objectiveFilter !== 'all' ? objectiveFilter : undefined,
         active,
       }),
+    enabled: !isAdmin,
     retry: 1,
     placeholderData: (previousData) => previousData,
   });

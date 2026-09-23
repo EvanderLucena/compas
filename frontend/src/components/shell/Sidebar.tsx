@@ -8,6 +8,7 @@ import { IconSearch, IconHome, IconUsers, IconMeal, IconInsight } from '../icons
 import { IconCompas } from '../ui/CompasLogo';
 import type { PatientStatus } from '../../types/patient';
 import type { ViewType } from '../../stores/navigationStore';
+import { SidebarAdmin } from './SidebarAdmin';
 
 interface NavItem {
   id: string;
@@ -256,6 +257,10 @@ export function Sidebar() {
     if (q) list = list.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
     return list;
   }, [apiPatients, q, statusFilter]);
+
+  if (user?.role === 'ADMIN') {
+    return <SidebarAdmin user={user} sidebarOpen={sidebarOpen} />;
+  }
 
   return (
     <aside className={`sidebar ${sidebarOpen ? 'open' : 'collapsed'}`}>

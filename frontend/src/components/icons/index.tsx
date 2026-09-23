@@ -326,3 +326,36 @@ export function IconCopy(p: IconProps) {
     </Icon>
   );
 }
+
+export function IconRefresh(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 21h5v-5" />
+    </Icon>
+  );
+}
+
+export function IconServer(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <rect x="2" y="3" width="20" height="8" rx="2" ry="2" />
+      <rect x="2" y="13" width="20" height="8" rx="2" ry="2" />
+      <line x1="6" y1="7" x2="6.01" y2="7" />
+      <line x1="6" y1="17" x2="6.01" y2="17" />
+    </Icon>
+  );
+}
+
+export function IconQrCode(p: IconProps) {
+  return (
+    <Icon {...p}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3zM17 17h4v4h-4zM14 20h3M20 14v3" />
+    </Icon>
+  );
+}

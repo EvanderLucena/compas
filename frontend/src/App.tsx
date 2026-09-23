@@ -40,6 +40,9 @@ const InsightsView = lazy(() =>
 const VerifyEmailView = lazy(() =>
   import('./views/VerifyEmailView').then((m) => ({ default: m.VerifyEmailView })),
 );
+const AdminWhatsAppFleetView = lazy(() =>
+  import('./views/AdminWhatsAppFleetView').then((m) => ({ default: m.AdminWhatsAppFleetView })),
+);
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -51,7 +54,15 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   if (!isAuthenticated || !user) return <Navigate to="/" replace />;
 
-  if (!user.onboardingCompleted && location.pathname !== '/onboarding') {
+  if (user.role === 'ADMIN' && !location.pathname.startsWith('/admin')) {
+    return <Navigate to="/admin/whatsapp" replace />;
+  }
+
+  if (user.role !== 'ADMIN' && location.pathname.startsWith('/admin')) {
+    return <Navigate to="/home" replace />;
+  }
+
+  if (user.role !== 'ADMIN' && !user.onboardingCompleted && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -66,6 +77,7 @@ function RedirectIfAuthenticated({ children }: { children: ReactNode }) {
   if (isInitializing) return null;
 
   if (isAuthenticated && user) {
+    if (user.role === 'ADMIN') return <Navigate to="/admin/whatsapp" replace />;
     if (!user.onboardingCompleted) return <Navigate to="/onboarding" replace />;
     return <Navigate to="/home" replace />;
   }
@@ -157,6 +169,7 @@ const router = createBrowserRouter([
           { path: '/plans', element: <Navigate to="/patients" replace /> },
           { path: '/foods', element: <FoodsView /> },
           { path: '/insights', element: <InsightsView /> },
+          { path: '/admin/whatsapp', element: <AdminWhatsAppFleetView /> },
         ],
       },
     ],
