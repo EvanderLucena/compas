@@ -81,12 +81,47 @@
 
 ---
 
-## Telas P1 — A fazer
+## Telas P1 — A fazer (Ordem de Execução Aprovada)
 
-- [ ] **Integração de Pagamento & Assinaturas Stripe** (`/billing`) — Stripe Checkout integrado aos 3 planos (Iniciante R$99, Profissional R$149, Ilimitado R$199), Stripe Customer Portal para troca de cartão/faturas/cancelamento, webhook listener (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`), e controle de trial de 30 dias com bloqueio pós-vencimento.
-- [ ] **Verificação de E-mail via Resend** — `ResendEmailService` no backend com fallback gracioso local em log, endpoints `POST /api/v1/auth/verify-email` e `POST /api/v1/auth/resend-verification`, banner de aviso no topo do dashboard para contas não verificadas e tela de confirmação `/verify-email`.
-- [ ] **Painel Admin** — dashboard, nutris, instâncias WhatsApp, financeiro, logs.
-- [ ] **Ajustes do Nutri** (`/settings`) — perfil, horário de atendimento, mensagem de boas-vindas, exportar dados (além do tema que já existe).
+### 1. Documentos e PDFs do Paciente ("Trio de Ouro")
+- [ ] **Geração de PDFs Oficiais do Paciente** — motor de PDF no backend (ou frontend com headless/pdfkit/openhtmltopdf) para atender os três documentos mais solicitados:
+  - **1. Plano Alimentar Oficial:** Cabeçalho profissional com dados da nutri (nome, CRN/regional, especialidade, contato), divisões de refeições, horários, alimentos, porções em medidas caseiras, opções substitutas e orientações gerais.
+  - **2. Lista de Compras da Semana:** Agrupada por setores de supermercado (Hortifrúti, Açougue/Proteínas, Laticínios, Mercearia/Grãos) calculada proporcionalmente ao plano prescrito.
+  - **3. Relatório de Evolução Biométrica:** Gráfico de evolução de peso/%gordura, tabela com histórico de dobras cutâneas e perimetria, e deltas de evolução assinados pela nutri.
+  - Disponível para download manual no prontuário do paciente e via envio automatizado sob demanda pelo WhatsApp quando o paciente solicitar.
+
+### 2. Verificação de E-mail via Resend
+- [ ] **Confirmação de E-mail do Nutricionista** — integração com a API do Resend:
+  - Backend: `ResendEmailService` com envio de e-mail transacional contendo token seguro com expiração de 24h. Fallback gracioso para log em ambiente de desenvolvimento local.
+  - Endpoints: `POST /api/v1/auth/verify-email` e `POST /api/v1/auth/resend-verification`.
+  - Frontend: Banner sutil no topo do dashboard enquanto `emailVerified = false` (com botão de reenviar) e página pública dedicada `/verify-email?token=...` para validação.
+
+### 3. Portal Admin de Gestão da Frota WhatsApp (`/admin/whatsapp`)
+- [ ] **Painel Administrativo da Frota de Chips/Instâncias:**
+  - **Tabela de Instâncias (`whatsapp_instances`):** Registro de instâncias da Evolution API com colunas para nome, telefone, status (`CONNECTED`, `CONNECTING`, `DISCONNECTED`, `BANNED`), flag `accepts_new_patients` e contadores de nutris e pacientes vinculados.
+  - **Conexão Fácil com QR Code:** Botão "Adicionar Número" / "Reconectar" que solicita sessão à Evolution API e renderiza o QR Code em tempo real no navegador do admin para escaneamento imediato pelo celular.
+  - **Vínculo Imutável (*Sticky Affinity*):** Todo paciente tem seu `whatsapp_instance_id` fixado no banco de dados. Uma vez vinculado a um número, o paciente nunca tem seu número alterado automaticamente, garantindo continuidade do histórico e zero confusão com a nutri.
+  - **Load Balancer na Criação (*Least Loaded Active*):** Novos pacientes/nutris são alocados no chip com status `CONNECTED` que possuir a menor quantidade de pacientes ativos, respeitando a faixa ideal de **150 a 200 pacientes ativos por chip** (com trava de segurança em 220).
+  - **Monitoramento e Alertas de Queda:** Detecção de eventos `connection.update` da Evolution API. Se um chip cair, o portal exibe badge vermelho de atenção e alerta o operador.
+  - **Migração Assistida de Contingência:** Ferramenta administrativa para remanejar pacientes de um chip para outro apenas em caso excepcional de banimento definitivo pela Meta, com opção de disparo de aviso amigável de novo número.
+
+### 4. Gestão de Planos, Modo Leitura (*Read-Only*) & Fallback Amigável da IA
+- [ ] **Regras de Acesso e Modo Leitura (Nutri sem Plano Ativo / Vencido / Cancelado):**
+  - **Consulta Total Preservada (GET liberado):** O nutricionista inativo continua com acesso integral de leitura a todos os seus pacientes, dietas, avaliações e gráficos já cadastrados. Respeita a ética médica e regulamentação (CFN/LGPD), retém o profissional e evita atrito de perda de dados.
+  - **Bloqueio de Ações de Escrita (POST/PUT/DELETE bloqueados):** Proíbe cadastro de novos pacientes, edição de dietas e inserção de novas avaliações biométricas. Modal e banners informativos convidam o nutricionista a reativar sua assinatura.
+  - **Corte de IA no WhatsApp:** Desativa o processamento de mensagens pela IA para os pacientes do nutricionista sem plano ativo, eliminando custos de LLM/servidor.
+  - **Mensagem Amigável ao Paciente:** Se o paciente de uma nutri inativa mandar mensagem no WhatsApp, a IA responde de forma educada:
+    > *"Olá, [Nome]! No momento, o atendimento da assistente virtual do consultório está temporariamente pausado. Por favor, entre em contato diretamente com o(a) seu(sua) nutricionista [Dr(a). Nome]. Tenha um ótimo dia!"*
+    Isso ativa um loop de reativação orgânico (o paciente avisa a nutri, que reativa a assinatura no painel).
+  - **Padrão de Fallback Resiliente da IA em Falhas Técnicas:** Padronização da mesma postura amigável para qualquer queda de modelo, timeout de LLM ou erro temporário do servidor: nunca deixar o paciente no vácuo e nunca exibir mensagens de erro técnicas.
+
+### 5. Pagamento & Assinaturas Stripe (`/billing`), Deploys e VPS
+- [ ] **Integração Stripe & Infraestrutura Final:**
+  - Stripe Checkout para os 3 planos (Iniciante R$99, Profissional R$149, Ilimitado R$199) e opção anual com 2 meses grátis.
+  - Stripe Customer Portal para troca de cartão, histórico de faturas e cancelamento autônomo.
+  - Webhooks de sincronização de status de assinatura (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`).
+  - Período de teste (Trial de 30 dias) e transição para o Modo Leitura pós-vencimento.
+  - Configuração de containers Docker e deploy em VPS de produção.
 
 ---
 
@@ -376,7 +411,7 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 
 ---
 
-## Prioridade sugerida
+## Prioridade sugerida (Roadmap Atualizado)
 
 1. ~~Edição inline dos alimentos (PlansView)~~ ✅
 2. ~~`···` por alimento → editar/remover~~ ✅
@@ -386,6 +421,8 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 6. ~~Insights — hover no gráfico~~ ✅
 7. ~~Landing Page + Cadastro + Login + Onboarding~~ ✅
 8. ~~Landing iterada: pricing, mockups, IA, funcionalidades~~ ✅
-9. Painel Admin (mínimo viável)
-10. Tela de Pagamento
-11. Ajustes do Nutri
+9. **Geração de Documentos e PDFs do Paciente** (Plano Oficial com CRN, Lista de Compras, Relatório Biométrico)
+10. **Verificação de E-mail via Resend** (Backend Resend service + endpoints + banner dashboard + tela pública de validação)
+11. **Portal Admin da Frota WhatsApp** (Gestão de instâncias, QR Code nativo, Sticky Routing, alertas de queda e limites)
+12. **Gestão de Planos, Modo Leitura (Read-Only) & Fallback Amigável da IA** (GET liberado, escrita bloqueada, corte de IA no WhatsApp com mensagem acolhedora e fallback universal)
+13. **Pagamentos Stripe, Deploys e VPS** (Checkout, Customer Portal, Webhooks, Docker em VPS)
