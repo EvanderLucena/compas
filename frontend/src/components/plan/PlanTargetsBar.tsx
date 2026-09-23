@@ -187,9 +187,11 @@ export function PlanTargetsBar({
       carbTarget: parseNumberInput(values.carb),
       fatTarget: parseNumberInput(values.fat),
     };
-    const hasInvalid = Object.values(parsed).some((val) => !Number.isFinite(val));
+    const hasInvalid = Object.values(parsed).some((val) => !Number.isFinite(val) || val < 0);
     if (hasInvalid) {
-      useToastStore.getState().showError('Preencha metas numéricas válidas antes de salvar');
+      useToastStore
+        .getState()
+        .showError('Preencha metas numéricas positivas válidas antes de salvar');
       return;
     }
     onSaveTargets(parsed);

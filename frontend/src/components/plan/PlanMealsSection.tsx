@@ -1,15 +1,7 @@
 import { PlanMealSidebar } from './PlanMealSidebar';
 import { PlanActiveMealContent } from './PlanActiveMealContent';
-import {
-  usePlanUIStore,
-  useUpdateMealSlot,
-  useAddOption,
-  useUpdateOption,
-  useDeleteOption,
-  useUpdateFoodItem,
-} from '../../stores/planStore';
-import { useToastStore } from '../../stores/toastStore';
-import { resolveMutationErrorMessage } from '../../stores/patientStore';
+import { usePlanUIStore } from '../../stores/planStore';
+import { usePlanMealActions } from './usePlanMealActions';
 import type { MealPlan, MealSlot, MealOption } from '../../types/plan';
 
 interface PlanMealsSectionProps {
@@ -30,44 +22,14 @@ export function PlanMealsSection({
   onReadOnlyClick,
 }: PlanMealsSectionProps) {
   const planUI = usePlanUIStore();
-  const updateMealSlot = useUpdateMealSlot(patientId);
-  const addOption = useAddOption(patientId);
-  const updateOption = useUpdateOption(patientId);
-  const deleteOption = useDeleteOption(patientId);
-  const updateFoodItem = useUpdateFoodItem(patientId);
-
-  const handleRenameOption = (optionId: string, name: string) => {
-    if (!activeMeal) return;
-    updateOption.mutate(
-      { mealId: activeMeal.id, optionId, data: { name } },
-      {
-        onSuccess: () => {
-          useToastStore.getState().showSuccess('Opção renomeada com sucesso');
-        },
-        onError: (err) => {
-          const msg = resolveMutationErrorMessage(err, 'Erro ao renomear opção');
-          useToastStore.getState().showError(msg);
-        },
-      },
-    );
-  };
-
-  const handleRemoveOption = (optionId: string) => {
-    if (!activeMeal) return;
-    deleteOption.mutate(
-      { mealId: activeMeal.id, optionId },
-      {
-        onSuccess: () => {
-          useToastStore.getState().showSuccess('Opção removida');
-          planUI.setActiveOptionIndex(0);
-        },
-        onError: (err) => {
-          const msg = resolveMutationErrorMessage(err, 'Erro ao remover opção');
-          useToastStore.getState().showError(msg);
-        },
-      },
-    );
-  };
+  const {
+    handleRenameMeal,
+    handleRenameOption,
+    handleRemoveOption,
+    handleAddOption,
+    handleUpdateFoodReferenceAmount,
+    handleUpdateFoodPrep,
+  } = usePlanMealActions(patientId, activeMeal, activeOpt);
 
   return (
     <div
@@ -82,7 +44,7 @@ export function PlanMealsSection({
           planUI.setActiveMealId(mealId);
           planUI.setActiveOptionIndex(0);
         }}
-        onRenameMeal={(mealId, label) => updateMealSlot.mutate({ mealId, data: { label } })}
+        onRenameMeal={handleRenameMeal}
         onRemoveMeal={(mealId) => planUI.setPendingDeleteMealId(mealId)}
         onAddMealClick={() => planUI.setAddMealModalOpen(true)}
         onReadOnlyClick={onReadOnlyClick}
@@ -99,30 +61,11 @@ export function PlanMealsSection({
           fatTarget={plan.fatTarget}
           isReadOnly={isReadOnly}
           onSelectOption={(idx) => planUI.setActiveOptionIndex(idx)}
-          onAddOption={() =>
-            addOption.mutate({
-              mealId: activeMeal.id,
-              data: { name: `Opção ${activeMeal.options.length + 1} · Cópia` },
-            })
-          }
+          onAddOption={handleAddOption}
           onRenameOption={handleRenameOption}
           onRemoveOption={handleRemoveOption}
-          onReferenceAmountChange={(itemId, referenceAmount) =>
-            updateFoodItem.mutate({
-              mealId: activeMeal.id,
-              optionId: activeOpt.id,
-              itemId,
-              data: { referenceAmount },
-            })
-          }
-          onPrepChange={(itemId, prep) =>
-            updateFoodItem.mutate({
-              mealId: activeMeal.id,
-              optionId: activeOpt.id,
-              itemId,
-              data: { prep },
-            })
-          }
+          onReferenceAmountChange={handleUpdateFoodReferenceAmount}
+          onPrepChange={handleUpdateFoodPrep}
           onRemoveItem={(item) =>
             planUI.setPendingDeleteItem({
               mealId: activeMeal.id,
