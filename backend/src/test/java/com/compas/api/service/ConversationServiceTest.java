@@ -8,6 +8,7 @@ import com.compas.api.dto.llm.LlmRequest;
 import com.compas.api.dto.llm.LlmResponse;
 import com.compas.api.model.*;
 import com.compas.api.repository.*;
+import com.compas.api.exception.ResourceNotFoundException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -910,6 +911,90 @@ class ConversationServiceTest {
                 contains("Ainda não encontrei um plano alimentar ativo")
         );
         assertTrue(textMessage.getProcessed());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenResourceNotFoundOccursDuringDocumentRequest_sendsPoliteUnavailableMessage() {
+        textMessage.setMessageContent("Pode enviar meu plano em pdf?");
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId))
+                .thenThrow(new ResourceNotFoundException("Plano alimentar", patientId));
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+
+        conversationService.processMessage(messageId);
+
+        verify(evolutionApiService).sendMessage(
+                eq("11999998888"),
+                contains("Ainda não encontrei um plano alimentar ativo")
+        );
+        assertTrue(textMessage.getProcessed());
+        verify(whatsAppResponseRepository).save(argThat(r -> "DOCUMENT_UNAVAILABLE".equals(r.getResponseType())));
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenSendMediaDocumentFailsAndRetriesRemain_leavesMessageUnprocessed() {
+        textMessage.setMessageContent("Manda meu plano em pdf");
+        textMessage.setRetryCount(0);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId)).thenReturn(new byte[]{1, 2, 3});
+        when(evolutionApiService.sendMediaDocument(anyString(), any(), anyString(), anyString())).thenReturn(false);
+
+        conversationService.processMessage(messageId);
+
+        assertFalse(textMessage.getProcessed());
+        verify(whatsAppResponseRepository, never()).save(any());
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenSendMediaDocumentFailsAndRetriesExhausted_sendsTechnicalFallback() {
+        textMessage.setMessageContent("Manda meu plano em pdf");
+        textMessage.setRetryCount(MessageProcessorWorker.MAX_RETRIES - 1);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId)).thenReturn(new byte[]{1, 2, 3});
+        when(evolutionApiService.sendMediaDocument(anyString(), any(), anyString(), anyString())).thenReturn(false);
+        when(evolutionApiService.sendMessage(anyString(), anyString())).thenReturn(true);
+        when(whatsAppResponseRepository.save(any(WhatsAppResponse.class))).thenAnswer(i -> i.getArgument(0));
+
+        conversationService.processMessage(messageId);
+
+        verify(evolutionApiService).sendMessage(eq("11999998888"), contains("oscilação na conexão"));
+        verify(whatsAppResponseRepository, atLeastOnce()).save(argThat(r -> "TECHNICAL_FALLBACK".equals(r.getResponseType())));
+        verifyNoInteractions(llmService);
+    }
+
+    @Test
+    void processMessage_whenUnexpectedExceptionOccursDuringDocumentGeneration_doesNotSendMissingPlanMessage() {
+        textMessage.setMessageContent("Manda meu plano em pdf");
+        textMessage.setRetryCount(0);
+        when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutritionist));
+        when(whatsAppMessageRepository.existsByPatientIdAndProcessedTrue(patientId)).thenReturn(true);
+
+        when(patientDocumentService.generateMealPlanPdf(nutritionistId, patientId))
+                .thenThrow(new RuntimeException("Database connection timeout"));
+
+        conversationService.processMessage(messageId);
+
+        assertFalse(textMessage.getProcessed());
+        verify(evolutionApiService, never()).sendMessage(anyString(), anyString());
+        verify(whatsAppResponseRepository, never()).save(any());
         verifyNoInteractions(llmService);
     }
 

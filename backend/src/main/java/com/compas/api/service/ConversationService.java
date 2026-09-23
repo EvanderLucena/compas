@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.compas.api.dto.jev.JevDecision;
+import com.compas.api.exception.ResourceNotFoundException;
+import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
@@ -999,59 +1001,111 @@ public class ConversationService {
                     caption
             );
 
-            WhatsAppResponse waResponse = WhatsAppResponse.builder()
-                    .messageId(messageId)
-                    .nutritionistId(nutritionist.getId())
-                    .patientId(patient.getId())
-                    .responseType("DOCUMENT_DELIVERY")
-                    .responseContent(caption + " [" + fileName + "]")
-                    .build();
-
             if (sent) {
-                waResponse.setSentAt(LocalDateTime.now());
+                WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                        .messageId(messageId)
+                        .nutritionistId(nutritionist.getId())
+                        .patientId(patient.getId())
+                        .responseType("DOCUMENT_DELIVERY")
+                        .responseContent(caption + " [" + fileName + "]")
+                        .sentAt(LocalDateTime.now())
+                        .build();
+                whatsAppResponseRepository.save(waResponse);
+                markProcessed(message);
+                return true;
+            } else {
+                log.warn("Failed to deliver media document to sender {}, checking retry eligibility",
+                        message.getSenderPhoneNormalized());
+                if (message.getRetryCount() != null
+                        && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                    sendTechnicalFallback(message, patient, nutritionist);
+                }
+                return true;
             }
-            whatsAppResponseRepository.save(waResponse);
-            markProcessed(message);
+
+        } catch (ResourceNotFoundException | ResponseStatusException e) {
+            log.info("Patient {} has no active plan/data for document {}: {}",
+                    patient.getId(), docType, e.getMessage());
+            sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            return true;
+
+        } catch (IllegalStateException e) {
+            if (isMissingDataMessage(e.getMessage())) {
+                log.info("Patient {} has missing data for document {}: {}",
+                        patient.getId(), docType, e.getMessage());
+                sendDocumentUnavailableNotice(messageId, message, patient, nutritionist, docType);
+            } else {
+                log.error("Error generating {} document for patient {}: {}",
+                        docType, patient.getId(), e.getMessage(), e);
+                if (message.getRetryCount() != null
+                        && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                    sendTechnicalFallback(message, patient, nutritionist);
+                }
+            }
             return true;
 
         } catch (Exception e) {
-            log.warn("Failed to generate or deliver {} document for patient {}: {}",
-                    docType, patient.getId(), e.getMessage());
-
-            String fallbackMessage;
-            if (docType == RequestedDocumentType.GROCERY_LIST) {
-                fallbackMessage = "Olá, " + patient.getName() + "! Para gerar a sua lista de compras, "
-                        + "precisamos de um plano alimentar ativo no sistema. "
-                        + "Vou avisar o(a) " + nutritionist.getDisplayName() + "!";
-            } else if (docType == RequestedDocumentType.BIOMETRY_REPORT) {
-                fallbackMessage = "Olá, " + patient.getName() + "! Você ainda não possui avaliações biométricas "
-                        + "registradas no sistema para gerar o relatório de evolução. "
-                        + "Assim que tivermos seus registros, o relatório estará disponível!";
-            } else {
-                fallbackMessage = "Olá, " + patient.getName() + "! Ainda não encontrei um plano alimentar ativo "
-                        + "cadastrado no sistema para você. Vou avisar o(a) "
-                        + nutritionist.getDisplayName() + " para disponibilizá-lo!";
+            log.error("Unexpected error generating or delivering {} document for patient {}: {}",
+                    docType, patient.getId(), e.getMessage(), e);
+            if (message.getRetryCount() != null
+                    && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
+                sendTechnicalFallback(message, patient, nutritionist);
             }
-
-            WhatsAppResponse waResponse = WhatsAppResponse.builder()
-                    .messageId(messageId)
-                    .nutritionistId(nutritionist.getId())
-                    .patientId(patient.getId())
-                    .responseType("DOCUMENT_UNAVAILABLE")
-                    .responseContent(fallbackMessage)
-                    .build();
-
-            boolean sent = evolutionApiService.sendMessage(
-                    message.getSenderPhoneNormalized(),
-                    fallbackMessage
-            );
-            if (sent) {
-                waResponse.setSentAt(LocalDateTime.now());
-            }
-            whatsAppResponseRepository.save(waResponse);
-            markProcessed(message);
             return true;
         }
+    }
+
+    private void sendDocumentUnavailableNotice(
+            UUID messageId,
+            WhatsAppMessage message,
+            Patient patient,
+            Nutritionist nutritionist,
+            RequestedDocumentType docType) {
+        String fallbackMessage;
+        if (docType == RequestedDocumentType.GROCERY_LIST) {
+            fallbackMessage = "Olá, " + patient.getName() + "! Para gerar a sua lista de compras, "
+                    + "precisamos de um plano alimentar ativo no sistema. "
+                    + "Vou avisar o(a) " + nutritionist.getDisplayName() + "!";
+        } else if (docType == RequestedDocumentType.BIOMETRY_REPORT) {
+            fallbackMessage = "Olá, " + patient.getName() + "! Você ainda não possui avaliações biométricas "
+                    + "registradas no sistema para gerar o relatório de evolução. "
+                    + "Assim que tivermos seus registros, o relatório estará disponível!";
+        } else {
+            fallbackMessage = "Olá, " + patient.getName() + "! Ainda não encontrei um plano alimentar ativo "
+                    + "cadastrado no sistema para você. Vou avisar o(a) "
+                    + nutritionist.getDisplayName() + " para disponibilizá-lo!";
+        }
+
+        WhatsAppResponse waResponse = WhatsAppResponse.builder()
+                .messageId(messageId)
+                .nutritionistId(nutritionist.getId())
+                .patientId(patient.getId())
+                .responseType("DOCUMENT_UNAVAILABLE")
+                .responseContent(fallbackMessage)
+                .build();
+
+        boolean sent = evolutionApiService.sendMessage(
+                message.getSenderPhoneNormalized(),
+                fallbackMessage
+        );
+        if (sent) {
+            waResponse.setSentAt(LocalDateTime.now());
+            whatsAppResponseRepository.save(waResponse);
+            markProcessed(message);
+        } else {
+            log.warn("Failed to send document unavailable notice to {}, leaving message for retry",
+                    message.getSenderPhoneNormalized());
+        }
+    }
+
+    private boolean isMissingDataMessage(String msg) {
+        if (msg == null) {
+            return false;
+        }
+        String lower = msg.toLowerCase(Locale.ROOT);
+        return lower.contains("não encontrado")
+                || lower.contains("nao encontrado")
+                || lower.contains("nenhum plano");
     }
 
     RequestedDocumentType detectDocumentRequest(String text) {
