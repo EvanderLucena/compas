@@ -1,6 +1,6 @@
-﻿interface BioCellProps {
+interface BioCellProps {
   label: string;
-  value: number;
+  value: number | string | null | undefined;
   unit?: string;
   sub?: string;
   delta?: number;
@@ -8,6 +8,7 @@
 }
 
 export function BioCell({ label, value, unit, sub, delta, good }: BioCellProps) {
+  const isPresent = value != null && value !== '';
   return (
     <div>
       <div className="eyebrow">{label}</div>
@@ -16,9 +17,9 @@ export function BioCell({ label, value, unit, sub, delta, good }: BioCellProps) 
           className="mono tnum"
           style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.02em' }}
         >
-          {value}
+          {isPresent ? value : '—'}
         </div>
-        {unit && <div style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>{unit}</div>}
+        {isPresent && unit && <div style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>{unit}</div>}
       </div>
       {delta !== undefined && (
         <div

@@ -1,4 +1,4 @@
-﻿import type { BiometryAssessmentDTO } from '../../types/patient';
+import type { BiometryAssessmentDTO } from '../../types/patient';
 
 const BIOMETRY_SKINFOLD_LABELS: Record<string, string> = {
   peitoral: 'Peitoral',
@@ -182,25 +182,36 @@ export function BiometryMeasuresGrid({ last, prev, fmtDate }: BiometryMeasuresGr
   const lastSkinfolds = last.skinfolds ?? [];
   const lastPerimetry = last.perimetry ?? [];
 
-  if (lastSkinfolds.length === 0 || lastPerimetry.length === 0) return null;
+  if (lastSkinfolds.length === 0 && lastPerimetry.length === 0) return null;
+
+  const hasBoth = lastSkinfolds.length > 0 && lastPerimetry.length > 0;
 
   return (
     <div
       className="biometry-charts-grid"
-      style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, marginBottom: 16 }}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: hasBoth ? '1.3fr 1fr' : '1fr',
+        gap: 16,
+        marginBottom: 16,
+      }}
     >
-      <SkinfoldsCard
-        skinfolds={lastSkinfolds}
-        prevSkinfolds={prev?.skinfolds}
-        date={last.assessmentDate}
-        fmtDate={fmtDate}
-      />
-      <PerimetryCard
-        perimetry={lastPerimetry}
-        prevPerimetry={prev?.perimetry}
-        date={last.assessmentDate}
-        fmtDate={fmtDate}
-      />
+      {lastSkinfolds.length > 0 && (
+        <SkinfoldsCard
+          skinfolds={lastSkinfolds}
+          prevSkinfolds={prev?.skinfolds}
+          date={last.assessmentDate}
+          fmtDate={fmtDate}
+        />
+      )}
+      {lastPerimetry.length > 0 && (
+        <PerimetryCard
+          perimetry={lastPerimetry}
+          prevPerimetry={prev?.perimetry}
+          date={last.assessmentDate}
+          fmtDate={fmtDate}
+        />
+      )}
     </div>
   );
 }

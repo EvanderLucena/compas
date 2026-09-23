@@ -1,4 +1,4 @@
-﻿import { IconPlus, IconDownload } from '../icons';
+import { IconPlus, IconDownload } from '../icons';
 import { BioCell } from './BioCell';
 import type { BiometryAssessmentDTO } from '../../types/patient';
 
@@ -71,20 +71,20 @@ export function BiometryLatestCard({
           />
           <BioCell
             label="% Gordura"
-            value={last.bodyFatPercent ?? 0}
+            value={last.bodyFatPercent}
             unit="%"
             delta={bodyFatDelta}
             good={bodyFatDelta != null && bodyFatDelta < 0}
           />
           <BioCell
             label="Massa magra"
-            value={last.leanMassKg ?? 0}
+            value={last.leanMassKg}
             unit="kg"
             delta={leanMassDelta}
             good={leanMassDelta != null && leanMassDelta > 0}
           />
-          <BioCell label="% Água" value={last.waterPercent ?? 0} unit="%" />
-          <BioCell label="Gordura visceral" value={last.visceralFatLevel ?? 0} sub="nível" />
+          <BioCell label="% Água" value={last.waterPercent} unit="%" />
+          <BioCell label="Gordura visceral" value={last.visceralFatLevel} sub="nível" />
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           <button

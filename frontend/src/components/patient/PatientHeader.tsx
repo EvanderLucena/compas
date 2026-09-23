@@ -137,6 +137,14 @@ function PatientHeaderInfo({
   );
 }
 
+function fmtBiometryDate(iso: string | null | undefined): string {
+  if (!iso) return 'Sem avaliação';
+  const dateStr = iso.includes('T') ? iso : `${iso}T00:00:00`;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return 'Sem avaliação';
+  return d.toLocaleDateString('pt-BR');
+}
+
 function PatientHeaderStats({
   adherence,
   status,
@@ -152,9 +160,7 @@ function PatientHeaderStats({
   latestBiometryDate: string | null;
   latestWeightDelta: number;
 }) {
-  const fatSub = latestBiometryDate
-    ? new Date(latestBiometryDate).toLocaleDateString('pt-BR')
-    : 'Sem avaliação';
+  const fatSub = fmtBiometryDate(latestBiometryDate);
   const deltaPrefix = latestWeightDelta >= 0 ? '+' : '';
   return (
     <div
