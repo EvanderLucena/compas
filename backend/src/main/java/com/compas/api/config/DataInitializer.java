@@ -72,15 +72,6 @@ public class DataInitializer implements CommandLineRunner {
     @Value("${compas.seed.admin.name:${nutriai.seed.admin.name:Admin Compas}}")
     private String adminName;
 
-    @Value("${compas.seed.fleet-admin.enabled:false}")
-    private boolean fleetAdminEnabled;
-
-    @Value("${compas.seed.fleet-admin.email:${nutriai.seed.fleet-admin.email:fleet@compas.app}}")
-    private String fleetAdminEmail;
-
-    @Value("${compas.seed.fleet-admin.password:${compas.seed.admin.password:${nutriai.seed.admin.password:Admin123!}}}")
-    private String fleetAdminPassword;
-
     public DataInitializer(
             NutritionistRepository nutritionistRepository,
             PasswordEncoder passwordEncoder,
@@ -115,7 +106,6 @@ public class DataInitializer implements CommandLineRunner {
         TenantContext.executeWithBypass(() -> {
             transactionTemplate.executeWithoutResult(status -> {
                 Nutritionist demo = ensureDemoNutritionist();
-                ensureDemoAdmin();
                 List<Food> foods = ensureDemoFoods(demo.getId());
                 if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
                     ensureDemoHistoryCycle(demo.getId(), foods);
@@ -175,29 +165,6 @@ public class DataInitializer implements CommandLineRunner {
         }
         return changed ? nutritionistRepository.save(nutritionist) : nutritionist;
     }
-
-    private void ensureDemoAdmin() {
-        if (!fleetAdminEnabled) {
-            return;
-        }
-        if (nutritionistRepository.findByEmail(fleetAdminEmail).isEmpty()) {
-            nutritionistRepository.save(Nutritionist.builder()
-                    .name("Administrador Compas")
-                    .professionalName("Compas Fleet")
-                    .email(fleetAdminEmail)
-                    .passwordHash(passwordEncoder.encode(fleetAdminPassword))
-                    .crn("00000")
-                    .crnRegional("CRN-3")
-                    .role(UserRole.ADMIN)
-                    .emailVerified(true)
-                    .onboardingCompleted(true)
-                    .subscriptionTier("UNLIMITED")
-                    .patientLimit(9999)
-                    .build());
-            logger.info("Dev seed Fleet Admin created: {}", fleetAdminEmail);
-        }
-    }
-
 
     private List<Food> ensureDemoFoods(UUID nutritionistId) {
         if (foodRepository.findByNutritionistId(nutritionistId, PageRequest.of(0, 1)).hasContent()) {

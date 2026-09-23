@@ -45,6 +45,9 @@ class WhatsAppFleetServiceTest {
     @Mock
     private EvolutionApiService evolutionApiService;
 
+    @Mock
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     @InjectMocks
     private WhatsAppFleetService fleetService;
 

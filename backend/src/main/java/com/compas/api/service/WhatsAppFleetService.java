@@ -17,7 +17,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -34,14 +36,17 @@ public class WhatsAppFleetService {
     private final WhatsAppInstanceRepository instanceRepository;
     private final PatientRepository patientRepository;
     private final EvolutionApiService evolutionApiService;
+    private final TransactionTemplate transactionTemplate;
 
     public WhatsAppFleetService(
             WhatsAppInstanceRepository instanceRepository,
             PatientRepository patientRepository,
-            EvolutionApiService evolutionApiService) {
+            EvolutionApiService evolutionApiService,
+            PlatformTransactionManager transactionManager) {
         this.instanceRepository = instanceRepository;
         this.patientRepository = patientRepository;
         this.evolutionApiService = evolutionApiService;
+        this.transactionTemplate = transactionManager != null ? new TransactionTemplate(transactionManager) : null;
     }
 
     @Transactional(readOnly = true)
@@ -86,7 +91,6 @@ public class WhatsAppFleetService {
         return toDTO(instance);
     }
 
-    @Transactional
     public WhatsAppFleetInstanceDTO createInstance(CreateWhatsAppInstanceRequest request) {
         String normalizedName = request.name().trim().toLowerCase();
         if (instanceRepository.findByName(normalizedName).isPresent()) {
@@ -139,7 +143,6 @@ public class WhatsAppFleetService {
         return toDTO(updated);
     }
 
-    @Transactional
     public InstanceQrCodeResponse connectInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
 
@@ -184,7 +187,6 @@ public class WhatsAppFleetService {
         );
     }
 
-    @Transactional
     public WhatsAppFleetInstanceDTO syncInstanceStatus(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
 
@@ -209,7 +211,6 @@ public class WhatsAppFleetService {
         return toDTO(instance);
     }
 
-    @Transactional
     public void restartInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
         boolean success = evolutionApiService.restartInstance(instance.getName());
@@ -221,7 +222,6 @@ public class WhatsAppFleetService {
         instanceRepository.save(instance);
     }
 
-    @Transactional
     public void disconnectInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
         boolean success = evolutionApiService.logoutInstance(instance.getName());
@@ -236,7 +236,6 @@ public class WhatsAppFleetService {
         instanceRepository.save(instance);
     }
 
-    @Transactional
     public void deleteInstance(UUID id) {
         WhatsAppInstance instance = findInstanceOrThrow(id);
         boolean success = evolutionApiService.deleteInstance(instance.getName());
@@ -244,8 +243,15 @@ public class WhatsAppFleetService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY, "Falha ao remover instância no gateway Evolution");
         }
-        patientRepository.clearInstanceFromPatients(id, null);
-        instanceRepository.delete(instance);
+        Runnable deleteRecords = () -> {
+            patientRepository.clearInstanceFromPatients(id, null);
+            instanceRepository.delete(instance);
+        };
+        if (transactionTemplate != null) {
+            transactionTemplate.executeWithoutResult(status -> deleteRecords.run());
+        } else {
+            deleteRecords.run();
+        }
     }
 
     @Transactional

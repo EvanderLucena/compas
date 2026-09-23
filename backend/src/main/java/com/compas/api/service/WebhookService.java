@@ -4,9 +4,11 @@ import com.compas.api.dto.whatsapp.WebhookMessageDTO;
 import com.compas.api.dto.whatsapp.WhatsAppWebhookDTO;
 import com.compas.api.model.Episode;
 import com.compas.api.model.Patient;
+import com.compas.api.model.WhatsAppInstanceStatus;
 import com.compas.api.model.WhatsAppMessage;
 import com.compas.api.repository.EpisodeRepository;
 import com.compas.api.repository.PatientRepository;
+import com.compas.api.repository.WhatsAppInstanceRepository;
 import com.compas.api.repository.WhatsAppMessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +36,7 @@ public class WebhookService {
     private final PhoneNormalizationService phoneNormalizationService;
     private final MessageQueueService messageQueueService;
     private final EvolutionApiService evolutionApiService;
-    private final com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository;
+    private final WhatsAppInstanceRepository whatsAppInstanceRepository;
 
     @Value("${compas.whatsapp.unknown-response-enabled:${nutriai.whatsapp.unknown-response-enabled:true}}")
     private boolean unknownResponseEnabled = true;
@@ -56,7 +58,7 @@ public class WebhookService {
             PhoneNormalizationService phoneNormalizationService,
             MessageQueueService messageQueueService,
             EvolutionApiService evolutionApiService,
-            com.compas.api.repository.WhatsAppInstanceRepository whatsAppInstanceRepository) {
+            WhatsAppInstanceRepository whatsAppInstanceRepository) {
         this.whatsAppMessageRepository = whatsAppMessageRepository;
         this.patientRepository = patientRepository;
         this.episodeRepository = episodeRepository;
@@ -192,15 +194,26 @@ public class WebhookService {
                     saved.getId(), normalizedPhone, null, null, messageContent, messageType));
         }
 
-        // Sticky binding: if patient has no whatsappInstanceId yet, bind to incoming instance if known
+        // Sticky binding: bind patient to incoming instance if active and under capacity
         if (instanceId != null && !instanceId.isBlank()) {
             Patient patient = patientOpt.get();
             if (patient.getWhatsappInstanceId() == null) {
-                whatsAppInstanceRepository.findByName(instanceId).ifPresent(inst -> {
-                    patient.setWhatsappInstanceId(inst.getId());
-                    patientRepository.save(patient);
-                    log.info("Sticky binding: patient {} bound to WhatsApp fleet instance '{}'", patient.getId(), inst.getName());
-                });
+                whatsAppInstanceRepository.findByName(instanceId)
+                        .filter(inst -> Boolean.TRUE.equals(inst.getActive())
+                                && inst.getStatus() != WhatsAppInstanceStatus.BANNED
+                                && inst.getStatus() != WhatsAppInstanceStatus.DISABLED)
+                        .ifPresent(inst -> {
+                            long activeCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(inst.getId());
+                            if (activeCount < inst.getMaxPatients()) {
+                                patient.setWhatsappInstanceId(inst.getId());
+                                patientRepository.save(patient);
+                                log.info("Sticky binding: patient {} bound to WhatsApp fleet instance '{}' ({}/{})",
+                                        patient.getId(), inst.getName(), activeCount + 1, inst.getMaxPatients());
+                            } else {
+                                log.warn("Instance '{}' at capacity ({}/{}), sticky binding deferred",
+                                        inst.getName(), activeCount, inst.getMaxPatients());
+                            }
+                        });
             }
         }
 
