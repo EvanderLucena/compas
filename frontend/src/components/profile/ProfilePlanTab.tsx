@@ -9,10 +9,12 @@ function PlanSummaryCard({
   tier,
   formattedEndsAt,
   daysRemaining,
+  isReadOnly,
 }: {
   tier: string;
   formattedEndsAt: string;
   daysRemaining: number;
+  isReadOnly?: boolean;
 }) {
   return (
     <div
@@ -35,7 +37,7 @@ function PlanSummaryCard({
               textTransform: 'uppercase',
               padding: '3px 8px',
               borderRadius: 4,
-              background: 'var(--lime)',
+              background: isReadOnly ? 'var(--amber)' : 'var(--lime)',
               color: 'var(--ink)',
               letterSpacing: '0.04em',
             }}
@@ -43,22 +45,41 @@ function PlanSummaryCard({
             {tier}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
-            Período de Avaliação Gratuita
+            {tier === 'TRIAL' ? 'Período de Avaliação Gratuita' : `Plano ${tier}`}
           </span>
         </div>
-        <span
-          className="flex items-center gap-1.5"
-          style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600 }}
-        >
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sage)' }} />
-          Conta Ativa
-        </span>
+        {isReadOnly ? (
+          <span
+            className="flex items-center gap-1.5"
+            style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600 }}
+          >
+            <span
+              style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)' }}
+            />
+            Modo Leitura (Pausado)
+          </span>
+        ) : (
+          <span
+            className="flex items-center gap-1.5"
+            style={{ fontSize: 12, color: 'var(--sage)', fontWeight: 600 }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sage)' }} />
+            Conta Ativa
+          </span>
+        )}
       </div>
 
-      {formattedEndsAt && (
+      {isReadOnly ? (
         <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
-          Válido até <strong>{formattedEndsAt}</strong> ({daysRemaining} dias restantes)
+          Sua assinatura expirou. Seu acesso a consultas e download de documentos segue ativo em
+          modo leitura.
         </div>
+      ) : (
+        formattedEndsAt && (
+          <div style={{ fontSize: 12, color: 'var(--fg-muted)' }}>
+            Válido até <strong>{formattedEndsAt}</strong> ({daysRemaining} dias restantes)
+          </div>
+        )
       )}
     </div>
   );
@@ -187,6 +208,7 @@ export function ProfilePlanTab({ profile }: ProfilePlanTabProps) {
         tier={profile.subscriptionTier || 'TRIAL'}
         formattedEndsAt={formattedEndsAt}
         daysRemaining={daysRemaining}
+        isReadOnly={profile.readOnly}
       />
       <PatientUsageCard
         patientCount={patientCount}

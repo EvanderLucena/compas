@@ -63,6 +63,8 @@ export interface AuthUser {
   role: 'NUTRITIONIST' | 'ADMIN';
   onboardingCompleted: boolean;
   emailVerified?: boolean;
+  subscriptionActive?: boolean;
+  readOnly?: boolean;
 }
 
 export interface LoginRequest {
@@ -102,6 +104,8 @@ export interface MeResponse {
   trialEndsAt: string;
   subscriptionTier: string;
   patientLimit: number;
+  subscriptionActive?: boolean;
+  readOnly?: boolean;
 }
 
 export interface NutritionistProfile {
@@ -121,6 +125,8 @@ export interface NutritionistProfile {
   patientLimit: number;
   activePatientCount: number;
   createdAt: string;
+  subscriptionActive?: boolean;
+  readOnly?: boolean;
 }
 
 export interface UpdateProfileRequest {

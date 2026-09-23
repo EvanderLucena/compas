@@ -10,6 +10,7 @@ import {
   resolveMutationErrorMessage,
 } from '../stores/patientStore';
 import { useToastStore } from '../stores/toastStore';
+import { useAuthStore } from '../stores/authStore';
 import { IconSearch, IconPlus, IconFilter, IconArchive } from '../components/icons';
 import {
   PatientTable,
@@ -146,6 +147,9 @@ export function PatientsView() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [createPatientError, setCreatePatientError] = useState<string | null>(null);
 
+  const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
+  const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
+
   const showInactive = statusFilter === 'inactive';
 
   const patientsList = useMemo<Patient[]>(() => data?.content.map(mapPatientFromApi) ?? [], [data]);
@@ -158,9 +162,13 @@ export function PatientsView() {
 
   const toggleActive = useCallback(
     (id: string) => {
+      if (isReadOnly) {
+        openReadOnlyModal();
+        return;
+      }
       setTogglingPatientId(id);
     },
-    [setTogglingPatientId],
+    [isReadOnly, openReadOnlyModal, setTogglingPatientId],
   );
 
   const confirmToggle = useCallback(() => {
@@ -286,7 +294,16 @@ export function PatientsView() {
             {showInactive ? ' Ver ativos' : ` Inativos`}
           </button>
           {!showInactive && (
-            <button className="btn btn-primary" onClick={() => setNewPatientModalOpen(true)}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                if (isReadOnly) {
+                  openReadOnlyModal();
+                  return;
+                }
+                setNewPatientModalOpen(true);
+              }}
+            >
               <IconPlus size={13} /> Novo paciente
             </button>
           )}
