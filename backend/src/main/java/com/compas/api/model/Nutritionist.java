@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Getter
@@ -75,7 +76,7 @@ public class Nutritionist {
 
     @Column(name = "trial_ends_at")
     @Builder.Default
-    private LocalDateTime trialEndsAt = null;
+    private LocalDateTime trialEndsAt = LocalDateTime.now(ZoneOffset.UTC).plusDays(30);
 
     @Column(name = "subscription_tier")
     @Builder.Default
@@ -95,9 +96,9 @@ public class Nutritionist {
         }
         if ("TRIAL".equals(tier)) {
             if (trialEndsAt == null) {
-                return true;
+                return false;
             }
-            return trialEndsAt.isAfter(LocalDateTime.now());
+            return trialEndsAt.isAfter(LocalDateTime.now(ZoneOffset.UTC));
         }
         return false;
     }
@@ -118,7 +119,7 @@ public class Nutritionist {
 
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         createdAt = now;
         updatedAt = now;
         if (trialEndsAt == null) {
@@ -128,6 +129,6 @@ public class Nutritionist {
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now(ZoneOffset.UTC);
     }
 }

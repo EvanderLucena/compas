@@ -181,8 +181,11 @@ public class ConversationService {
             if (sent) {
                 waResponse.setSentAt(LocalDateTime.now());
                 whatsAppResponseRepository.save(waResponse);
+                markProcessed(message);
+            } else {
+                log.warn("Failed to send paused notification to sender {}, leaving message for retry",
+                        message.getSenderPhoneNormalized());
             }
-            markProcessed(message);
             return;
         }
 
@@ -918,8 +921,11 @@ public class ConversationService {
         if (sent) {
             waResponse.setSentAt(LocalDateTime.now());
             whatsAppResponseRepository.save(waResponse);
+            markProcessed(message);
+        } else {
+            log.warn("Failed to send technical fallback to sender {}, leaving message unprocessed",
+                    message.getSenderPhoneNormalized());
         }
-        markProcessed(message);
     }
 
     private void markProcessed(WhatsAppMessage message) {
