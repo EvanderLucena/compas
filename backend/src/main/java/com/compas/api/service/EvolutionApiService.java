@@ -99,8 +99,9 @@ public class EvolutionApiService {
                 return true;
             }
 
-            // Fallback for single-instance Go /send/text
-            if (response.statusCode() == 404) {
+            // Fallback for single-instance Go /send/text ONLY if targeting the default instance
+            if (response.statusCode() == 404 && this.instanceName != null
+                    && this.instanceName.equalsIgnoreCase(instance)) {
                 HttpRequest.Builder fallbackBuilder = HttpRequest.newBuilder()
                         .uri(URI.create(apiUrl + "/send/text"))
                         .header("Content-Type", "application/json")
@@ -109,7 +110,8 @@ public class EvolutionApiService {
                 if (apiKey != null && !apiKey.isBlank()) {
                     fallbackBuilder.header("apikey", apiKey);
                 }
-                HttpResponse<String> fbResponse = httpClient.send(fallbackBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                HttpResponse<String> fbResponse = httpClient.send(
+                        fallbackBuilder.build(), HttpResponse.BodyHandlers.ofString());
                 if (fbResponse.statusCode() >= 200 && fbResponse.statusCode() < 300) {
                     log.info("Message sent via /send/text fallback to {}: status={}",
                             maskPhone(targetPhone), fbResponse.statusCode());

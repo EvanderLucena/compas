@@ -81,6 +81,11 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
     long countByWhatsappInstanceIdAndActiveTrue(UUID instanceId);
 
     /**
+     * Count active patients assigned to a WhatsApp fleet instance for a specific nutritionist.
+     */
+    long countByWhatsappInstanceIdAndNutritionistIdAndActiveTrue(UUID instanceId, UUID nutritionistId);
+
+    /**
      * Count distinct nutritionists with active patients on a WhatsApp fleet instance.
      */
     @Query("SELECT COUNT(DISTINCT p.nutritionistId) FROM Patient p WHERE p.whatsappInstanceId = :instanceId AND p.active = true")

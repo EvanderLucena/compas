@@ -70,14 +70,23 @@ public class WhatsAppFleetService {
             totalAssigned += pCount;
             totalCapacity += inst.getMaxPatients();
 
+            boolean isActive = Boolean.TRUE.equals(inst.getActive());
+
             if (inst.getStatus() == WhatsAppInstanceStatus.CONNECTED) {
                 connected++;
-            } else {
+            } else if (inst.getStatus() == WhatsAppInstanceStatus.DISCONNECTED
+                    || inst.getStatus() == WhatsAppInstanceStatus.BANNED) {
                 disconnected++;
+                if (isActive) {
+                    alerts++;
+                }
+            }
+
+            if (inst.getStatus() == WhatsAppInstanceStatus.BANNED && isActive) {
                 alerts++;
             }
 
-            if (inst.getMaxPatients() > 0 && pCount >= inst.getMaxPatients() * 0.9) {
+            if (isActive && inst.getMaxPatients() > 0 && pCount >= inst.getMaxPatients() * 0.9) {
                 alerts++;
             }
         }
@@ -278,7 +287,9 @@ public class WhatsAppFleetService {
         }
 
         long targetCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(targetId);
-        long movingCount = patientRepository.countByWhatsappInstanceIdAndActiveTrue(sourceId);
+        long movingCount = nutritionistId != null
+                ? patientRepository.countByWhatsappInstanceIdAndNutritionistIdAndActiveTrue(sourceId, nutritionistId)
+                : patientRepository.countByWhatsappInstanceIdAndActiveTrue(sourceId);
         if (targetCount + movingCount > target.getMaxPatients()) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,

@@ -179,6 +179,21 @@ class WhatsAppFleetServiceTest {
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
+    @Test
+    void migratePatients_withNutritionistId_scopesMovingCount() {
+        UUID nutriId = UUID.randomUUID();
+        when(instanceRepository.findById(instanceId1)).thenReturn(Optional.of(instance1));
+        when(instanceRepository.findById(instanceId2)).thenReturn(Optional.of(instance2));
+        when(patientRepository.countByWhatsappInstanceIdAndActiveTrue(instanceId2)).thenReturn(100L);
+        when(patientRepository.countByWhatsappInstanceIdAndNutritionistIdAndActiveTrue(instanceId1, nutriId)).thenReturn(25L);
+        when(patientRepository.reassignPatients(instanceId1, instanceId2, nutriId)).thenReturn(25);
+
+        int count = fleetService.migratePatients(instanceId1, instanceId2, nutriId);
+
+        assertEquals(25, count);
+        verify(patientRepository).reassignPatients(instanceId1, instanceId2, nutriId);
+    }
+
 
     @Test
     void connectInstance_returnsQrCodeWhenAvailable() {
