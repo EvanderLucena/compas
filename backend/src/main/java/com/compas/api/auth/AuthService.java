@@ -219,24 +219,25 @@ public class AuthService {
     @Transactional
     public Map<String, Object> resendVerification(UUID currentNutritionistId, String optionalEmail) {
         Nutritionist nutritionist = resolveNutritionistForResend(currentNutritionistId, optionalEmail);
+        if (nutritionist == null) {
+            return Map.of(
+                    "success", true,
+                    "message", "Se o e-mail estiver cadastrado, um link de confirmação será enviado."
+            );
+        }
 
         if (Boolean.TRUE.equals(nutritionist.getEmailVerified())) {
             return Map.of("success", true, "message", "Este e-mail já foi verificado anteriormente.");
         }
 
-        if (nutritionist.getEmailVerificationExpiresAt() != null
-                && nutritionist.getEmailVerificationExpiresAt()
-                .isAfter(LocalDateTime.now().plusHours(23).plusMinutes(59))) {
+        if (isCooldownActive(nutritionist)) {
             throw new ResponseStatusException(
                     HttpStatus.TOO_MANY_REQUESTS,
                     "Aguarde 1 minuto antes de solicitar um novo e-mail de confirmação."
             );
         }
 
-        String verificationToken = UUID.randomUUID().toString().replace("-", "");
-        nutritionist.setEmailVerificationToken(verificationToken);
-        nutritionist.setEmailVerificationExpiresAt(LocalDateTime.now().plusHours(24));
-        nutritionistRepository.save(nutritionist);
+        String verificationToken = getOrGenerateVerificationToken(nutritionist);
 
         try {
             emailService.sendVerificationEmail(
@@ -251,6 +252,26 @@ public class AuthService {
         return Map.of("success", true, "message", "E-mail de confirmação enviado! Verifique sua caixa de entrada.");
     }
 
+    private boolean isCooldownActive(Nutritionist nutritionist) {
+        return nutritionist.getEmailVerificationExpiresAt() != null
+                && nutritionist.getEmailVerificationExpiresAt()
+                .isAfter(LocalDateTime.now().plusHours(23).plusMinutes(59));
+    }
+
+    private String getOrGenerateVerificationToken(Nutritionist nutritionist) {
+        if (nutritionist.getEmailVerificationToken() != null
+                && nutritionist.getEmailVerificationExpiresAt() != null
+                && nutritionist.getEmailVerificationExpiresAt().isAfter(LocalDateTime.now())) {
+            return nutritionist.getEmailVerificationToken();
+        }
+
+        String verificationToken = UUID.randomUUID().toString().replace("-", "");
+        nutritionist.setEmailVerificationToken(verificationToken);
+        nutritionist.setEmailVerificationExpiresAt(LocalDateTime.now().plusHours(24));
+        nutritionistRepository.save(nutritionist);
+        return verificationToken;
+    }
+
     private Nutritionist resolveNutritionistForResend(UUID currentNutritionistId, String optionalEmail) {
         if (currentNutritionistId != null) {
             return nutritionistRepository.findById(currentNutritionistId)
@@ -259,8 +280,7 @@ public class AuthService {
         }
         if (optionalEmail != null && !optionalEmail.isBlank()) {
             return nutritionistRepository.findByEmail(optionalEmail.trim().toLowerCase(Locale.ROOT))
-                    .orElseThrow(() ->
-                            new ResponseStatusException(HttpStatus.NOT_FOUND, "Nutricionista não encontrado"));
+                    .orElse(null);
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "E-mail ou usuário autenticado é obrigatório");
     }

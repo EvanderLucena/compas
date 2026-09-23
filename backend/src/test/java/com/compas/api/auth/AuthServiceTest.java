@@ -367,4 +367,37 @@ class AuthServiceTest {
         var resendResult = authService.resendVerification(created.getId(), null);
         assertTrue(resendResult.get("message").toString().contains("já foi verificado"));
     }
+
+    @Test
+    void resendVerification_withUnregisteredEmail_returnsGenericSuccess() {
+        var resendResult = authService.resendVerification(null, "inexistente@compas.app");
+        assertTrue((Boolean) resendResult.get("success"));
+        assertTrue(resendResult.get("message").toString().contains("Se o e-mail estiver cadastrado"));
+    }
+
+    @Test
+    void resendVerification_reusesActiveTokenWithoutInvalidatingLink() {
+        SignupRequest signupRequest = new SignupRequest(
+                "Dra. Ativa",
+                "ativa@compas.app",
+                "senha12345",
+                "54325",
+                "CRN-3",
+                null,
+                null,
+                true
+        );
+        AuthService.SignupResult signupResult = authService.signup(signupRequest);
+        Nutritionist created = nutritionistRepository.findById(signupResult.user().id()).orElseThrow();
+        String originalToken = created.getEmailVerificationToken();
+        created.setEmailVerificationExpiresAt(java.time.LocalDateTime.now().plusHours(22));
+        nutritionistRepository.save(created);
+
+        var resendResult = authService.resendVerification(null, "ativa@compas.app");
+        assertTrue((Boolean) resendResult.get("success"));
+
+        Nutritionist reloaded = nutritionistRepository.findById(created.getId()).orElseThrow();
+        assertEquals(originalToken, reloaded.getEmailVerificationToken(),
+                "Active token should be preserved to prevent link invalidation");
+    }
 }

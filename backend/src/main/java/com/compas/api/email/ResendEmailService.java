@@ -70,8 +70,8 @@ public class ResendEmailService implements EmailService {
         String verificationUrl = verificationBaseUrl + "/verify-email?token=" + verificationToken;
 
         if (shouldSimulateEmail()) {
-            LOG.info("[Email Simulation] Verificação para {} ({}): {}",
-                    recipientName, recipientEmail, verificationUrl);
+            LOG.info("[Email Simulation] Verificação simulada para {}", recipientEmail);
+            LOG.debug("[Email Simulation] Token de verificação para {}: {}", recipientEmail, verificationToken);
             return;
         }
 
