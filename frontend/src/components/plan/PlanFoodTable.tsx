@@ -72,10 +72,22 @@ export function PlanFoodTable({
           key={it.id}
           item={it}
           isLast={it.id === items[items.length - 1]?.id}
-          onReferenceAmountChange={(referenceAmount) =>
-            onReferenceAmountChange(it.id, referenceAmount)
-          }
-          onPrepChange={(prep) => onPrepChange(it.id, prep)}
+          isReadOnly={isReadOnly}
+          onReadOnlyClick={onReadOnlyClick}
+          onReferenceAmountChange={(referenceAmount) => {
+            if (isReadOnly) {
+              onReadOnlyClick();
+              return;
+            }
+            onReferenceAmountChange(it.id, referenceAmount);
+          }}
+          onPrepChange={(prep) => {
+            if (isReadOnly) {
+              onReadOnlyClick();
+              return;
+            }
+            onPrepChange(it.id, prep);
+          }}
           onRemove={() => {
             if (isReadOnly) {
               onReadOnlyClick();

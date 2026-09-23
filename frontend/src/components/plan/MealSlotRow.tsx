@@ -14,26 +14,18 @@ interface MealSlotRowProps {
 }
 
 function calculateMealTotals(options: MealSlot['options']) {
-  return options.reduce(
-    (a, opt) => {
-      const optT = opt.items.reduce(
-        (s, x) => ({
-          kcal: s.kcal + (Number(x.kcal) || 0),
-          prot: s.prot + (Number(x.prot) || 0),
-          carb: s.carb + (Number(x.carb) || 0),
-          fat: s.fat + (Number(x.fat) || 0),
-          fiber: s.fiber + (Number(x.fiber) || 0),
-        }),
-        { kcal: 0, prot: 0, carb: 0, fat: 0, fiber: 0 },
-      );
-      return {
-        kcal: a.kcal + optT.kcal,
-        prot: a.prot + optT.prot,
-        carb: a.carb + optT.carb,
-        fat: a.fat + optT.fat,
-        fiber: a.fiber + optT.fiber,
-      };
-    },
+  const primaryOpt = options[0];
+  if (!primaryOpt) {
+    return { kcal: 0, prot: 0, carb: 0, fat: 0, fiber: 0 };
+  }
+  return primaryOpt.items.reduce(
+    (s, x) => ({
+      kcal: s.kcal + (Number(x.kcal) || 0),
+      prot: s.prot + (Number(x.prot) || 0),
+      carb: s.carb + (Number(x.carb) || 0),
+      fat: s.fat + (Number(x.fat) || 0),
+      fiber: s.fiber + (Number(x.fiber) || 0),
+    }),
     { kcal: 0, prot: 0, carb: 0, fat: 0, fiber: 0 },
   );
 }

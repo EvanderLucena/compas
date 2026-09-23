@@ -71,30 +71,57 @@ export function usePlanMealActions(
 
   const handleAddOption = () => {
     if (!activeMeal) return;
-    addOption.mutate({
-      mealId: activeMeal.id,
-      data: { name: `Opção ${activeMeal.options.length + 1} · Cópia` },
-    });
+    addOption.mutate(
+      {
+        mealId: activeMeal.id,
+        data: { name: `Opção ${activeMeal.options.length + 1} · Cópia` },
+      },
+      {
+        onSuccess: () => {
+          useToastStore.getState().showSuccess('Opção criada com sucesso');
+        },
+        onError: (err) => {
+          const msg = resolveMutationErrorMessage(err, 'Erro ao criar nova opção');
+          useToastStore.getState().showError(msg);
+        },
+      },
+    );
   };
 
   const handleUpdateFoodReferenceAmount = (itemId: string, referenceAmount: number) => {
     if (!activeMeal || !activeOpt) return;
-    updateFoodItem.mutate({
-      mealId: activeMeal.id,
-      optionId: activeOpt.id,
-      itemId,
-      data: { referenceAmount },
-    });
+    updateFoodItem.mutate(
+      {
+        mealId: activeMeal.id,
+        optionId: activeOpt.id,
+        itemId,
+        data: { referenceAmount },
+      },
+      {
+        onError: (err) => {
+          const msg = resolveMutationErrorMessage(err, 'Erro ao atualizar quantidade do alimento');
+          useToastStore.getState().showError(msg);
+        },
+      },
+    );
   };
 
   const handleUpdateFoodPrep = (itemId: string, prep: string) => {
     if (!activeMeal || !activeOpt) return;
-    updateFoodItem.mutate({
-      mealId: activeMeal.id,
-      optionId: activeOpt.id,
-      itemId,
-      data: { prep },
-    });
+    updateFoodItem.mutate(
+      {
+        mealId: activeMeal.id,
+        optionId: activeOpt.id,
+        itemId,
+        data: { prep },
+      },
+      {
+        onError: (err) => {
+          const msg = resolveMutationErrorMessage(err, 'Erro ao atualizar forma de preparo');
+          useToastStore.getState().showError(msg);
+        },
+      },
+    );
   };
 
   return {
