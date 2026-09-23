@@ -133,6 +133,7 @@ export const useAuthStore = create<AuthState>()(
           error: null,
         });
         localStorage.removeItem('nutriai-auth');
+        localStorage.removeItem('compas-auth');
       },
 
       refreshAuth: async () => {

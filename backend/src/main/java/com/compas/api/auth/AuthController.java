@@ -136,7 +136,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @PreAuthorize("hasRole('NUTRITIONIST')")
+    @PreAuthorize("hasAnyRole('NUTRITIONIST', 'ADMIN')")
     public ResponseEntity<Map<String, Object>> logout(HttpServletResponse response) {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
         authService.logout(nutritionistId);
@@ -156,7 +156,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('NUTRITIONIST')")
+    @PreAuthorize("hasAnyRole('NUTRITIONIST', 'ADMIN')")
     public ResponseEntity<MeResponse> me() {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
         MeResponse meResponse = authService.getCurrentUser(nutritionistId);

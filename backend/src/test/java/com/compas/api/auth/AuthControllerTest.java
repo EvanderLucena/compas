@@ -37,6 +37,9 @@ class AuthControllerTest {
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Autowired
+    private JwtService jwtService;
+
     @BeforeEach
     void setUp() {
         refreshTokenRepository.deleteAll();
@@ -234,6 +237,50 @@ class AuthControllerTest {
     void me_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void me_withAdminToken_returns200WithAdminInfo() throws Exception {
+        Nutritionist admin = nutritionistRepository.save(Nutritionist.builder()
+                .name("Operador Compas")
+                .email("admin-test@compas.app")
+                .passwordHash("hashed")
+                .role(com.compas.api.model.UserRole.ADMIN)
+                .emailVerified(true)
+                .onboardingCompleted(true)
+                .subscriptionTier("UNLIMITED")
+                .patientLimit(9999)
+                .build());
+
+        String adminToken = jwtService.generateAccessToken(admin);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Operador Compas"))
+                .andExpect(jsonPath("$.email").value("admin-test@compas.app"))
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    void logout_withAdminToken_returns200() throws Exception {
+        Nutritionist admin = nutritionistRepository.save(Nutritionist.builder()
+                .name("Operador Compas")
+                .email("admin-logout-test@compas.app")
+                .passwordHash("hashed")
+                .role(com.compas.api.model.UserRole.ADMIN)
+                .emailVerified(true)
+                .onboardingCompleted(true)
+                .subscriptionTier("UNLIMITED")
+                .patientLimit(9999)
+                .build());
+
+        String adminToken = jwtService.generateAccessToken(admin);
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

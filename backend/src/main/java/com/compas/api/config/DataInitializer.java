@@ -105,6 +105,7 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         TenantContext.executeWithBypass(() -> {
             transactionTemplate.executeWithoutResult(status -> {
+                ensureAdminUser();
                 Nutritionist demo = ensureDemoNutritionist();
                 List<Food> foods = ensureDemoFoods(demo.getId());
                 if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
@@ -119,6 +120,22 @@ public class DataInitializer implements CommandLineRunner {
                 logger.info("Dev seed created: {} patients, {} foods, plans, biometry and history.", patients.size(), foods.size());
             });
         });
+    }
+
+    private void ensureAdminUser() {
+        if (nutritionistRepository.findByEmail("ops@compas.app").isEmpty()) {
+            nutritionistRepository.save(Nutritionist.builder()
+                    .name("Operador Compas")
+                    .professionalName("Compas Ops")
+                    .email("ops@compas.app")
+                    .passwordHash(passwordEncoder.encode(adminPassword))
+                    .role(UserRole.ADMIN)
+                    .emailVerified(true)
+                    .onboardingCompleted(true)
+                    .subscriptionTier("UNLIMITED")
+                    .patientLimit(9999)
+                    .build());
+        }
     }
 
     private Nutritionist ensureDemoNutritionist() {
