@@ -12,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -56,7 +55,7 @@ class SubscriptionServiceTest {
         Nutritionist nutri = Nutritionist.builder()
                 .id(nutritionistId)
                 .subscriptionTier("TRIAL")
-                .trialEndsAt(LocalDateTime.now(ZoneOffset.UTC).plusDays(10))
+                .trialEndsAt(LocalDateTime.now().plusDays(10))
                 .build();
         when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutri));
 
@@ -82,7 +81,7 @@ class SubscriptionServiceTest {
         Nutritionist nutri = Nutritionist.builder()
                 .id(nutritionistId)
                 .subscriptionTier("TRIAL")
-                .trialEndsAt(LocalDateTime.now(ZoneOffset.UTC).minusDays(1))
+                .trialEndsAt(LocalDateTime.now().minusDays(1))
                 .build();
         when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutri));
 
@@ -109,7 +108,7 @@ class SubscriptionServiceTest {
         Nutritionist nutri = Nutritionist.builder()
                 .id(nutritionistId)
                 .subscriptionTier("TRIAL")
-                .trialEndsAt(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(5))
+                .trialEndsAt(LocalDateTime.now().minusMinutes(5))
                 .build();
         when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutri));
 
@@ -130,5 +129,15 @@ class SubscriptionServiceTest {
         when(nutritionistRepository.findById(nutritionistId)).thenReturn(Optional.of(nutri));
 
         assertDoesNotThrow(() -> subscriptionService.assertSubscriptionActive(nutritionistId));
+    }
+
+    @Test
+    @DisplayName("Nutritionist.isSubscriptionActive static helper handles null tier and expired trial consistently")
+    void nutritionist_isSubscriptionActive_staticHelper() {
+        assertFalse(Nutritionist.isSubscriptionActive(null, null));
+        assertFalse(Nutritionist.isSubscriptionActive(null, LocalDateTime.now().plusDays(5)));
+        assertTrue(Nutritionist.isSubscriptionActive("PRO", null));
+        assertTrue(Nutritionist.isSubscriptionActive("TRIAL", LocalDateTime.now().plusDays(1)));
+        assertFalse(Nutritionist.isSubscriptionActive("TRIAL", LocalDateTime.now().minusDays(1)));
     }
 }

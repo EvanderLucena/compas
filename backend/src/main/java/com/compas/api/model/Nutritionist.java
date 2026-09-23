@@ -8,7 +8,6 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Getter
@@ -86,7 +85,7 @@ public class Nutritionist {
     @Builder.Default
     private Integer patientLimit = 15;
 
-    public boolean isSubscriptionActive() {
+    public static boolean isSubscriptionActive(String subscriptionTier, LocalDateTime trialEndsAt) {
         if (subscriptionTier == null) {
             return false;
         }
@@ -98,9 +97,13 @@ public class Nutritionist {
             if (trialEndsAt == null) {
                 return true;
             }
-            return trialEndsAt.isAfter(LocalDateTime.now(ZoneOffset.UTC));
+            return trialEndsAt.isAfter(LocalDateTime.now());
         }
         return false;
+    }
+
+    public boolean isSubscriptionActive() {
+        return isSubscriptionActive(subscriptionTier, trialEndsAt);
     }
 
     public boolean isReadOnly() {
@@ -115,7 +118,7 @@ public class Nutritionist {
 
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime now = LocalDateTime.now();
         createdAt = now;
         updatedAt = now;
         if (trialEndsAt == null) {
@@ -125,6 +128,6 @@ public class Nutritionist {
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now(ZoneOffset.UTC);
+        updatedAt = LocalDateTime.now();
     }
 }

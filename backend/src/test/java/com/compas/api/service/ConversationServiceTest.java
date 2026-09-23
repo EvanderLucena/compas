@@ -745,7 +745,7 @@ class ConversationServiceTest {
 
     @Test
     void processMessage_llmFailureOnLastRetry_sendsResilientTechnicalFallback() {
-        textMessage.setRetryCount(2);
+        textMessage.setRetryCount(MessageProcessorWorker.MAX_RETRIES - 1);
 
         when(whatsAppMessageRepository.findById(messageId)).thenReturn(Optional.of(textMessage));
         when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));

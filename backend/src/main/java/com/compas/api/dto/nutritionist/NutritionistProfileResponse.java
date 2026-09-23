@@ -1,5 +1,7 @@
 package com.compas.api.dto.nutritionist;
 
+import com.compas.api.model.Nutritionist;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -43,7 +45,9 @@ public record NutritionistProfileResponse(
     ) {
         this(id, name, professionalName, email, role, crn, crnRegional, specialty, whatsapp,
                 emailVerified, onboardingCompleted, trialEndsAt, subscriptionTier, patientLimit,
-                activePatientCount, createdAt, true, false);
+                activePatientCount, createdAt,
+                Nutritionist.isSubscriptionActive(subscriptionTier, trialEndsAt),
+                !Nutritionist.isSubscriptionActive(subscriptionTier, trialEndsAt));
     }
 
     public NutritionistProfileResponse(
@@ -63,6 +67,8 @@ public record NutritionistProfileResponse(
             LocalDateTime createdAt
     ) {
         this(id, name, null, email, role, crn, crnRegional, specialty, whatsapp, false,
-                onboardingCompleted, trialEndsAt, subscriptionTier, patientLimit, activePatientCount, createdAt, true, false);
+                onboardingCompleted, trialEndsAt, subscriptionTier, patientLimit, activePatientCount, createdAt,
+                Nutritionist.isSubscriptionActive(subscriptionTier, trialEndsAt),
+                !Nutritionist.isSubscriptionActive(subscriptionTier, trialEndsAt));
     }
 }

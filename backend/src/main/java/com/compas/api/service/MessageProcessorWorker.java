@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class MessageProcessorWorker {
 
     private static final Logger log = LoggerFactory.getLogger(MessageProcessorWorker.class);
-    private static final int MAX_RETRIES = 3;
+    public static final int MAX_RETRIES = 3;
 
     private final MessageQueueService messageQueueService;
     private final ConversationService conversationService;

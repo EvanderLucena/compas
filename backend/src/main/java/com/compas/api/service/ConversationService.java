@@ -297,7 +297,9 @@ public class ConversationService {
 
         if (!llmResponse.success()) {
             log.error("LLM call failed for message {}: {}", messageId, llmResponse.errorMessage());
-            if (message.getRetryCount() != null && message.getRetryCount() >= 2) {
+            // Attempt 0 is initial run, 1 is 1st retry, ..., (MAX_RETRIES - 1) is the final attempt
+            if (message.getRetryCount() != null
+                    && message.getRetryCount() >= MessageProcessorWorker.MAX_RETRIES - 1) {
                 // Last retry attempt exhausted — send friendly technical fallback (D-12)
                 sendTechnicalFallback(message, patient, nutritionist);
                 return;
