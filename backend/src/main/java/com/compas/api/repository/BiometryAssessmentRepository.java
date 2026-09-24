@@ -60,4 +60,15 @@ public interface BiometryAssessmentRepository extends JpaRepository<BiometryAsse
             @Param("id") UUID id,
             @Param("patientId") UUID patientId,
             @Param("nutritionistId") UUID nutritionistId);
+
+    @Query("""
+            select a
+            from BiometryAssessment a
+            where a.patientId = :patientId
+              and a.nutritionistId = :nutritionistId
+            order by a.assessmentDate asc
+            """)
+    List<BiometryAssessment> findByPatientIdAndNutritionistIdOrderByAssessmentDateAsc(
+            @Param("patientId") UUID patientId,
+            @Param("nutritionistId") UUID nutritionistId);
 }

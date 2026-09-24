@@ -3,6 +3,7 @@ package com.compas.api.controller;
 import com.compas.api.auth.NutritionistAccess;
 import com.compas.api.dto.ApiResponse;
 import com.compas.api.dto.biometry.BiometryAssessmentResponse;
+import com.compas.api.dto.biometry.BiometryComparisonResponse;
 import com.compas.api.dto.biometry.BiometryEvolutionSummaryResponse;
 import com.compas.api.dto.biometry.BiometryHistoryEpisodeResponse;
 import com.compas.api.dto.biometry.BiometryHistorySnapshotResponse;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -94,6 +96,19 @@ public class BiometryController {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
         BiometryEvolutionSummaryResponse response = biometryService.getBiometryEvolutionSummary(
                 nutritionistId, patientId);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @GetMapping("/compare")
+    @PreAuthorize("hasRole('NUTRITIONIST')")
+    public ResponseEntity<ApiResponse<BiometryComparisonResponse>> compare(
+            @PathVariable UUID patientId,
+            @RequestParam(required = false) UUID baseId,
+            @RequestParam(required = false) UUID targetId
+    ) {
+        UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
+        BiometryComparisonResponse response = biometryService.compareAssessments(
+                nutritionistId, patientId, baseId, targetId);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

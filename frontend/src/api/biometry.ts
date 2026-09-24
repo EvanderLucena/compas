@@ -6,7 +6,7 @@ import type {
   HistoryEpisodeListItem,
   HistorySnapshot,
 } from '../types/patient';
-import type { BiometryEvolutionSummary } from '../types/biometry';
+import type { BiometryEvolutionSummary, BiometryComparisonData } from '../types/biometry';
 
 export async function listBiometryAssessments(patientId: string): Promise<BiometryAssessmentDTO[]> {
   const response = await apiClient.get<{ success: boolean; data: BiometryAssessmentDTO[] }>(
@@ -60,6 +60,21 @@ export async function getBiometryEvolutionSummary(
 ): Promise<BiometryEvolutionSummary> {
   const response = await apiClient.get<{ success: boolean; data: BiometryEvolutionSummary }>(
     `/patients/${patientId}/biometry/evolution-summary`,
+  );
+  return response.data.data;
+}
+
+export async function getBiometryComparison(
+  patientId: string,
+  baseId?: string,
+  targetId?: string,
+): Promise<BiometryComparisonData> {
+  const params = new URLSearchParams();
+  if (baseId) params.append('baseId', baseId);
+  if (targetId) params.append('targetId', targetId);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const response = await apiClient.get<{ success: boolean; data: BiometryComparisonData }>(
+    `/patients/${patientId}/biometry/compare${qs}`,
   );
   return response.data.data;
 }

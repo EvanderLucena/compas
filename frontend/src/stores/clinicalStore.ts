@@ -52,6 +52,7 @@ function invalidateClinicalQueries(
 ) {
   queryClient.invalidateQueries({ queryKey: ['patient-biometry', patientId] });
   queryClient.invalidateQueries({ queryKey: ['biometry-evolution-summary', patientId] });
+  queryClient.invalidateQueries({ queryKey: ['biometry-comparison', patientId] });
   queryClient.invalidateQueries({ queryKey: ['patient-history', patientId] });
   queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 }
@@ -125,6 +126,25 @@ export function useBiometryEvolutionSummary(patientId: string | null) {
     queryFn: () => {
       if (!patientId) throw new Error('Patient ID is required');
       return biometryApi.getBiometryEvolutionSummary(patientId);
+    },
+    enabled: !!patientId,
+  });
+}
+
+export function useBiometryComparison(
+  patientId: string | null,
+  baseId?: string | null,
+  targetId?: string | null,
+) {
+  return useQuery({
+    queryKey: ['biometry-comparison', patientId, baseId, targetId],
+    queryFn: () => {
+      if (!patientId) throw new Error('Patient ID is required');
+      return biometryApi.getBiometryComparison(
+        patientId,
+        baseId ?? undefined,
+        targetId ?? undefined,
+      );
     },
     enabled: !!patientId,
   });

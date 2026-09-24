@@ -48,3 +48,54 @@ export interface BiometryEvolutionSummary {
   clinicalSynthesis: string;
   whatsappFeedbackMessage: string;
 }
+
+export interface SkinfoldDelta {
+  measureKey: string;
+  label: string;
+  initialMm: number | null;
+  currentMm: number | null;
+  deltaMm: number | null;
+  deltaPercent: number | null;
+}
+
+export interface BiometryComparisonData {
+  baseAssessmentId: string;
+  targetAssessmentId: string;
+  baseDate: string | null;
+  targetDate: string | null;
+  daysBetween: number;
+  baseWeight: number | null;
+  targetWeight: number | null;
+  weightDelta: number | null;
+  weightDeltaPercent: number | null;
+  baseBodyFatPercent: number | null;
+  targetBodyFatPercent: number | null;
+  bodyFatDelta: number | null;
+  baseLeanMassKg: number | null;
+  targetLeanMassKg: number | null;
+  leanMassDelta: number | null;
+  baseFatMassKg: number | null;
+  targetFatMassKg: number | null;
+  fatMassDelta: number | null;
+  baseWaterPercent: number | null;
+  targetWaterPercent: number | null;
+  waterDelta: number | null;
+  baseVisceralFat: number | null;
+  targetVisceralFat: number | null;
+  visceralFatDelta: number | null;
+  baseBmrKcal: number | null;
+  targetBmrKcal: number | null;
+  bmrDeltaKcal: number | null;
+  baseSkinfoldsSumMm: number | null;
+  targetSkinfoldsSumMm: number | null;
+  skinfoldsSumDeltaMm: number | null;
+  skinfoldsSumDeltaPercent: number | null;
+  skinfoldDeltas: SkinfoldDelta[];
+  baseWaistHipRatio: number | null;
+  targetWaistHipRatio: number | null;
+  waistHipRatioDelta: number | null;
+  perimetryDeltas: PerimetryDelta[];
+  clinicalClassification: string;
+  clinicalSynthesis: string;
+  whatsappFeedbackMessage: string;
+}
