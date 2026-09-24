@@ -373,4 +373,72 @@ class FoodSubstitutionServiceTest {
         assertEquals("Ovo de galinha cozido", response.substitutions().get(0).name());
         assertEquals(BigDecimal.valueOf(1.5), response.substitutions().get(0).suggestedAmount());
     }
+
+    @Test
+    void calculateSubstitutions_scrambledEggsWithoutCategory_classifiesAsProtein() {
+        Food ovoCozido = Food.builder()
+                .id(UUID.randomUUID())
+                .name("Ovo cozido")
+                .category("PROTEINA")
+                .unit("GRAMAS")
+                .referenceAmount(BigDecimal.valueOf(100))
+                .kcal(BigDecimal.valueOf(156))
+                .prot(BigDecimal.valueOf(12.6))
+                .carb(BigDecimal.valueOf(1.2))
+                .fat(BigDecimal.valueOf(10.6))
+                .fiber(BigDecimal.ZERO)
+                .build();
+
+        when(foodRepository.findAvailableByNutritionistIdAndCategory(nutritionistId, "PROTEINA"))
+                .thenReturn(List.of(ovoCozido));
+
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                null,
+                "Ovos mexidos",
+                BigDecimal.valueOf(100),
+                "g",
+                BigDecimal.valueOf(150),
+                BigDecimal.valueOf(13),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(10),
+                null,
+                8
+        );
+
+        FoodSubstitutionResponse response = foodSubstitutionService.calculateGeneralSubstitutions(
+                nutritionistId, req);
+
+        assertNotNull(response);
+        assertEquals("PROTEINA", response.dominantMacro());
+        assertEquals(1, response.substitutions().size());
+        assertEquals("Ovo cozido", response.substitutions().get(0).name());
+    }
+
+    @Test
+    void calculateSubstitutions_patientNotFound_fallsBackToGeneralSubstitutions() {
+        UUID nonExistentPatientId = UUID.randomUUID();
+        when(patientRepository.findByIdAndNutritionistId(nonExistentPatientId, nutritionistId))
+                .thenReturn(Optional.empty());
+        when(foodRepository.findAvailableByNutritionistIdAndCategory(nutritionistId, "CARBOIDRATO"))
+                .thenReturn(List.of(arroz, batataDoce));
+
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                null,
+                "Arroz integral",
+                BigDecimal.valueOf(100),
+                "g",
+                BigDecimal.valueOf(124),
+                BigDecimal.valueOf(2.6),
+                BigDecimal.valueOf(25.8),
+                BigDecimal.valueOf(1.0),
+                "CARBOIDRATO",
+                8
+        );
+
+        FoodSubstitutionResponse response = foodSubstitutionService.calculateSubstitutionsForPatient(
+                nutritionistId, nonExistentPatientId, req);
+
+        assertNotNull(response);
+        assertFalse(response.substitutions().isEmpty());
+    }
 }

@@ -25,7 +25,7 @@ export async function calculatePatientSubstitutions(
   request: FoodSubstitutionRequest,
 ): Promise<FoodSubstitutionResponse> {
   const res = await apiClient.post<ApiEnvelope<FoodSubstitutionResponse>>(
-    `/api/v1/patients/${patientId}/food-substitutions`,
+    `/patients/${patientId}/food-substitutions`,
     sanitizeSubstitutionRequest(request),
   );
   return res.data.data;
@@ -35,7 +35,7 @@ export async function calculateGeneralSubstitutions(
   request: FoodSubstitutionRequest,
 ): Promise<FoodSubstitutionResponse> {
   const res = await apiClient.post<ApiEnvelope<FoodSubstitutionResponse>>(
-    '/api/v1/food-substitutions/calculate',
+    '/food-substitutions/calculate',
     sanitizeSubstitutionRequest(request),
   );
   return res.data.data;

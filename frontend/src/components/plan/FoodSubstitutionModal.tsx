@@ -259,42 +259,42 @@ export function FoodSubstitutionModal({
   };
 
   const handleCopySingle = (item: FoodSubstitutionItem) => {
-    const text = `🥗 Substituição: ${item.householdPortion} de ${item.name} (${item.kcal} kcal | ${item.prot}g P | ${item.carb}g C | ${item.fat}g G)`;
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(
+      `🥗 Substituição: ${item.householdPortion} de ${item.name} (${item.kcal} kcal | ${item.prot}g P | ${item.carb}g C | ${item.fat}g G)`,
+    );
     showToastSuccess(`Substituição de ${item.name} copiada!`);
   };
 
-  const modalBackdropStyle: React.CSSProperties = {
-    position: 'fixed',
-    inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  };
-
-  const modalContainerStyle: React.CSSProperties = {
-    width: '100%',
-    maxWidth: 680,
-    maxHeight: '90vh',
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: 'var(--paper)',
-    borderRadius: 8,
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-  };
-
   return (
-    <div style={modalBackdropStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div
         ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="substitution-title"
         className="card"
-        style={modalContainerStyle}
+        style={{
+          width: '100%',
+          maxWidth: 680,
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'var(--paper)',
+          borderRadius: 8,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+        }}
       >
         <ModalTitleBar onClose={onClose} />
         <SourceFoodHeader food={sourceFood} />
