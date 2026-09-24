@@ -24,3 +24,6 @@ export { usePlanPdfDownloads } from './usePlanPdfDownloads';
 export { usePlanMealActions } from './usePlanMealActions';
 export { ApplyTemplateModal } from './ApplyTemplateModal';
 export { SaveAsTemplateModal } from './SaveAsTemplateModal';
+export { FoodSubstitutionOptionCard } from './FoodSubstitutionOptionCard';
+export { FoodSubstitutionModal } from './FoodSubstitutionModal';
+export { usePlanFoodSubstitution } from './usePlanFoodSubstitution';
