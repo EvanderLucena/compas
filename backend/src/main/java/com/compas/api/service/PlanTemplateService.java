@@ -203,16 +203,19 @@ public class PlanTemplateService {
         PlanTemplate template = planTemplateRepository.findByIdAndNutritionistIdOrSystem(templateId, nutritionistId)
                 .orElseThrow(() -> new ResourceNotFoundException("Modelo de plano", templateId));
 
+        PlanTemplateStructureDto structure = deserializeStructure(template.getStructureJson());
+        if (structure == null || structure.meals() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Estrutura do modelo corrompida ou inválida");
+        }
+
         MealPlan plan = getOrCreatePlan(episode.getId(), nutritionistId);
         updatePlanTargets(plan, template);
 
         clearExistingPlanContent(plan.getId(), nutritionistId);
 
-        PlanTemplateStructureDto structure = deserializeStructure(template.getStructureJson());
-        if (structure != null) {
-            populateMeals(plan.getId(), structure.meals());
-            populateExtras(plan.getId(), structure.extras());
-        }
+        populateMeals(plan.getId(), structure.meals());
+        populateExtras(plan.getId(), structure.extras());
 
         recordTemplateAppliedHistory(episode.getId(), nutritionistId, template);
         LOG.info("Applied template {} to patient {} plan {}", templateId, patientId, plan.getId());
@@ -251,6 +254,8 @@ public class PlanTemplateService {
         planExtraRepository.deleteAllByPlanId(planId);
     }
 
+    // Tenant isolation: MealSlot, MealOption, and MealFood entities derive tenant isolation
+    // from the parent MealPlan (planId -> MealPlan.nutritionistId).
     private void populateMeals(UUID planId, List<PlanTemplateMealDto> meals) {
         if (meals == null || meals.isEmpty()) {
             return;
@@ -390,8 +395,9 @@ public class PlanTemplateService {
         try {
             return objectMapper.readValue(json, PlanTemplateStructureDto.class);
         } catch (JsonProcessingException e) {
-            LOG.warn("Error deserializing plan template structure: {}", e.getMessage());
-            return new PlanTemplateStructureDto(List.of(), List.of());
+            LOG.error("Error deserializing plan template structure: {}", e.getMessage(), e);
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_ENTITY, "Estrutura do modelo de plano em formato JSON inválido");
         }
     }
 }

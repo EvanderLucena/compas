@@ -24,7 +24,10 @@ export function TemplateDeleteConfirmModal({
         placeItems: 'center',
         padding: 20,
       }}
-      onClick={onClose}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div
         className="card"
