@@ -7,6 +7,7 @@ import type {
   HistorySnapshot,
 } from '../types/patient';
 import type { BiometryEvolutionSummary, BiometryComparisonData } from '../types/biometry';
+import type { PatientTimelineEvent, CreateTimelineNoteRequest } from '../types/timeline';
 
 export async function listBiometryAssessments(patientId: string): Promise<BiometryAssessmentDTO[]> {
   const response = await apiClient.get<{ success: boolean; data: BiometryAssessmentDTO[] }>(
@@ -75,6 +76,24 @@ export async function getBiometryComparison(
   const qs = params.toString() ? `?${params.toString()}` : '';
   const response = await apiClient.get<{ success: boolean; data: BiometryComparisonData }>(
     `/patients/${patientId}/biometry/compare${qs}`,
+  );
+  return response.data.data;
+}
+
+export async function getPatientTimeline(patientId: string): Promise<PatientTimelineEvent[]> {
+  const response = await apiClient.get<{ success: boolean; data: PatientTimelineEvent[] }>(
+    `/patients/${patientId}/biometry/history/timeline`,
+  );
+  return response.data.data;
+}
+
+export async function addTimelineNote(
+  patientId: string,
+  data: CreateTimelineNoteRequest,
+): Promise<PatientTimelineEvent> {
+  const response = await apiClient.post<{ success: boolean; data: PatientTimelineEvent }>(
+    `/patients/${patientId}/biometry/history/notes`,
+    data,
   );
   return response.data.data;
 }

@@ -51,4 +51,11 @@ public interface EpisodeRepository extends JpaRepository<Episode, UUID> {
     List<Episode> findByPatientIdAndNutritionistIdAndEndDateIsNotNullOrderByStartDateDesc(
             @Param("patientId") UUID patientId,
             @Param("nutritionistId") UUID nutritionistId);
+
+    @Query("SELECT e FROM Episode e " +
+            "WHERE e.patientId = :patientId AND e.nutritionistId = :nutritionistId " +
+            "ORDER BY e.startDate DESC")
+    List<Episode> findByPatientIdAndNutritionistIdOrderByStartDateDesc(
+            @Param("patientId") UUID patientId,
+            @Param("nutritionistId") UUID nutritionistId);
 }
