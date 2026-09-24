@@ -288,6 +288,36 @@ class FoodSubstitutionServiceTest {
     }
 
     @Test
+    void calculateSubstitutions_unknownFoodIdWithSourceFoodName_fallsBackToSuppliedData() {
+        UUID unknownFoodId = UUID.randomUUID();
+        when(foodRepository.findAvailableById(unknownFoodId, nutritionistId))
+                .thenReturn(Optional.empty());
+        when(foodRepository.findAvailableByNutritionistIdAndCategory(nutritionistId, "CARBOIDRATO"))
+                .thenReturn(List.of(arroz, batataDoce));
+
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                unknownFoodId,
+                "Arroz branco cozido",
+                BigDecimal.valueOf(100),
+                "GRAMAS",
+                BigDecimal.valueOf(130),
+                BigDecimal.valueOf(2.7),
+                BigDecimal.valueOf(28.2),
+                BigDecimal.valueOf(0.2),
+                "CARBOIDRATO",
+                5
+        );
+
+        FoodSubstitutionResponse response = foodSubstitutionService.calculateGeneralSubstitutions(
+                nutritionistId, req);
+
+        assertNotNull(response);
+        assertEquals("Arroz branco cozido", response.sourceFoodName());
+        assertEquals(1, response.substitutions().size());
+        assertEquals("Batata doce cozida", response.substitutions().get(0).name());
+    }
+
+    @Test
     void calculateSubstitutions_missingFoodNameAndId_throwsException() {
         FoodSubstitutionRequest req = new FoodSubstitutionRequest(
                 null, "   ", BigDecimal.valueOf(100), null, null, null, null, null, null, 5);

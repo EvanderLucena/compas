@@ -11,12 +11,14 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function WeightDeltaCell({ value }: { value: number }) {
-  const color = value > 0 ? 'var(--coral-dim)' : value < 0 ? 'var(--sage-dim)' : 'var(--fg-muted)';
-  const prefix = value > 0 ? '+' : '';
+  const safeVal = Number.isFinite(value) ? value : 0;
+  const color =
+    safeVal > 0 ? 'var(--coral-dim)' : safeVal < 0 ? 'var(--sage-dim)' : 'var(--fg-muted)';
+  const prefix = safeVal > 0 ? '+' : '';
   return (
     <td className="mono tnum" style={{ fontSize: 12.5, color, padding: '14px 18px' }}>
       {prefix}
-      {value.toFixed(1)} kg
+      {safeVal.toFixed(1)} kg
     </td>
   );
 }

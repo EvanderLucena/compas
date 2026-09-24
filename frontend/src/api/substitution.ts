@@ -10,13 +10,23 @@ interface ApiEnvelope<T> {
   };
 }
 
+function sanitizeSubstitutionRequest(request: FoodSubstitutionRequest): FoodSubstitutionRequest {
+  const isUuid =
+    typeof request.foodId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(request.foodId);
+  return {
+    ...request,
+    foodId: isUuid ? request.foodId : undefined,
+  };
+}
+
 export async function calculatePatientSubstitutions(
   patientId: string,
   request: FoodSubstitutionRequest,
 ): Promise<FoodSubstitutionResponse> {
   const res = await apiClient.post<ApiEnvelope<FoodSubstitutionResponse>>(
     `/api/v1/patients/${patientId}/food-substitutions`,
-    request,
+    sanitizeSubstitutionRequest(request),
   );
   return res.data.data;
 }
@@ -26,7 +36,7 @@ export async function calculateGeneralSubstitutions(
 ): Promise<FoodSubstitutionResponse> {
   const res = await apiClient.post<ApiEnvelope<FoodSubstitutionResponse>>(
     '/api/v1/food-substitutions/calculate',
-    request,
+    sanitizeSubstitutionRequest(request),
   );
   return res.data.data;
 }

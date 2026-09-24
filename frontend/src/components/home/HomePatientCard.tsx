@@ -148,8 +148,8 @@ export function HomePatientCard({ p, onNavigate }: HomePatientCardProps) {
         }}
       >
         <span className="mono tnum">
-          {weight}kg · {delta > 0 ? '+' : ''}
-          {delta.toFixed(1)}
+          {typeof weight === 'number' && weight > 0 ? `${weight}kg` : '—'} ·{' '}
+          {Number.isFinite(delta) ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)}` : '0.0'}
         </span>
       </div>
     </div>

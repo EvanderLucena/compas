@@ -163,8 +163,10 @@ function CardStats({ patient: p }: { patient: Patient }) {
         }}
       >
         <span className="mono tnum">
-          {p.weight}kg · {p.weightDelta > 0 ? '+' : ''}
-          {p.weightDelta.toFixed(1)}
+          {typeof p.weight === 'number' && p.weight > 0 ? `${p.weight}kg` : '—'} ·{' '}
+          {Number.isFinite(p.weightDelta)
+            ? `${p.weightDelta > 0 ? '+' : ''}${p.weightDelta.toFixed(1)}`
+            : '0.0'}
         </span>
       </div>
     </>

@@ -14,7 +14,13 @@ function PatientAvatar({
   status: DetailedPatient['status'];
 }) {
   const badgeColor =
-    status === 'ontrack' ? 'var(--sage)' : status === 'warning' ? 'var(--amber)' : 'var(--coral)';
+    status === 'ontrack'
+      ? 'var(--sage)'
+      : status === 'warning'
+        ? 'var(--amber)'
+        : status === 'danger'
+          ? 'var(--coral)'
+          : 'var(--border)';
   return (
     <div
       style={{
@@ -74,7 +80,8 @@ function PatientHeaderInfo({
         style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
       >
         <span>
-          Paciente · {patient.id.toUpperCase()} · acompanhamento desde {patient.since}
+          Paciente · {(patient.id || '').toUpperCase()} · acompanhamento desde{' '}
+          {patient.since || '—'}
         </span>
         {!patient.active && (
           <span
@@ -120,7 +127,10 @@ function PatientHeaderInfo({
         </span>
         <span>·</span>
         <span>
-          {heightLabel} · {latestBiometryWeight} kg
+          {heightLabel} ·{' '}
+          {Number.isFinite(latestBiometryWeight) && latestBiometryWeight > 0
+            ? `${latestBiometryWeight} kg`
+            : 'Peso não informado'}
         </span>
         <span>·</span>
         <span style={{ color: 'var(--fg)' }}>{patient.objective}</span>
@@ -167,15 +177,27 @@ function PatientHeaderStats({
       className="patient-header-stats-row"
       style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}
     >
-      <HeaderStat label="Adesão 7d" value={`${adherence}%`} status={status} />
+      <HeaderStat
+        label="Adesão 7d"
+        value={`${Number.isFinite(adherence) ? adherence : 0}%`}
+        status={status || 'warning'}
+      />
       <div
         className="patient-header-dividers"
         style={{ width: 1, height: 44, background: 'var(--border)' }}
       />
       <HeaderStat
         label="Peso"
-        value={`${latestBiometryWeight.toFixed(1)} kg`}
-        sub={`${deltaPrefix}${latestWeightDelta.toFixed(1)} kg / 30d`}
+        value={
+          Number.isFinite(latestBiometryWeight) && latestBiometryWeight > 0
+            ? `${latestBiometryWeight.toFixed(1)} kg`
+            : '—'
+        }
+        sub={
+          Number.isFinite(latestWeightDelta) && latestBiometryWeight > 0
+            ? `${deltaPrefix}${latestWeightDelta.toFixed(1)} kg / 30d`
+            : undefined
+        }
         good={latestWeightDelta <= 0}
       />
       <div
@@ -184,7 +206,7 @@ function PatientHeaderStats({
       />
       <HeaderStat
         label="% gordura"
-        value={latestBiometryBodyFat != null ? `${latestBiometryBodyFat}%` : '—'}
+        value={Number.isFinite(latestBiometryBodyFat) ? `${latestBiometryBodyFat}%` : '—'}
         sub={fatSub}
       />
     </div>

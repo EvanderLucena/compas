@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   PlanSkeleton,
   PlanHeader,
@@ -43,9 +43,8 @@ export function PlansView({ patientId }: PlansViewProps) {
 
   const updatePlan = useUpdatePlan(patientId);
 
-  const meals = plan?.meals ?? [];
-  const extras = plan?.extras ?? [];
-  const firstMealId = plan?.meals[0]?.id;
+  const meals = useMemo(() => plan?.meals ?? [], [plan?.meals]);
+  const extras = useMemo(() => plan?.extras ?? [], [plan?.extras]);
 
   const { activeMeal, activeOpt } = getActiveMealAndOption(
     meals,
@@ -54,10 +53,14 @@ export function PlansView({ patientId }: PlansViewProps) {
   );
 
   useEffect(() => {
-    if (firstMealId && !planUI.activeMealId) {
-      planUI.setActiveMealId(firstMealId);
+    if (meals.length > 0) {
+      const activeMealExists = meals.some((m: MealSlot) => m.id === planUI.activeMealId);
+      if (!planUI.activeMealId || !activeMealExists) {
+        planUI.setActiveMealId(meals[0].id);
+        planUI.setActiveOptionIndex(0);
+      }
     }
-  }, [firstMealId, planUI]);
+  }, [patientId, meals, planUI]);
 
   if (isLoading || !plan) {
     return <PlanSkeleton />;
