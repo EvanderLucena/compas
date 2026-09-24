@@ -5,6 +5,8 @@ import * as subStore from '../../stores/substitutionStore';
 import type { MealFood } from '../../types/plan';
 import type { FoodSubstitutionResponse } from '../../types/substitution';
 
+type SubCalculatorReturn = ReturnType<typeof subStore.useFoodSubstitutionCalculator>;
+
 vi.mock('../../stores/substitutionStore', () => ({
   useFoodSubstitutionCalculator: vi.fn(),
 }));
@@ -81,18 +83,12 @@ const mockResponse: FoodSubstitutionResponse = {
   ],
 };
 
-describe('FoodSubstitutionModal', () => {
+describe('FoodSubstitutionModal - Render & States', () => {
   const mockMutate = vi.fn();
   const mockOnClose = vi.fn();
-  const mockOnApply = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
-    });
   });
 
   it('renders loading state when calculation is pending', () => {
@@ -101,7 +97,7 @@ describe('FoodSubstitutionModal', () => {
       data: undefined,
       isPending: true,
       isError: false,
-    } as any);
+    } as unknown as SubCalculatorReturn);
 
     render(
       <FoodSubstitutionModal isOpen={true} onClose={mockOnClose} sourceFood={mockSourceFood} />,
@@ -123,7 +119,7 @@ describe('FoodSubstitutionModal', () => {
       data: undefined,
       isPending: false,
       isError: true,
-    } as any);
+    } as unknown as SubCalculatorReturn);
 
     render(
       <FoodSubstitutionModal isOpen={true} onClose={mockOnClose} sourceFood={mockSourceFood} />,
@@ -140,15 +136,10 @@ describe('FoodSubstitutionModal', () => {
       data: mockResponse,
       isPending: false,
       isError: false,
-    } as any);
+    } as unknown as SubCalculatorReturn);
 
     render(
-      <FoodSubstitutionModal
-        isOpen={true}
-        onClose={mockOnClose}
-        sourceFood={mockSourceFood}
-        onApplySubstitution={mockOnApply}
-      />,
+      <FoodSubstitutionModal isOpen={true} onClose={mockOnClose} sourceFood={mockSourceFood} />,
     );
 
     expect(screen.getByText(/100g de Peito de frango grelhado/i)).toBeInTheDocument();
@@ -157,6 +148,21 @@ describe('FoodSubstitutionModal', () => {
     expect(screen.getByText('98% compatível')).toBeInTheDocument();
     expect(screen.getByText('Ovo de galinha cozido')).toBeInTheDocument();
   });
+});
+
+describe('FoodSubstitutionModal - Actions', () => {
+  const mockMutate = vi.fn();
+  const mockOnClose = vi.fn();
+  const mockOnApply = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+  });
 
   it('triggers apply substitution callback when clicking apply button', () => {
     vi.mocked(subStore.useFoodSubstitutionCalculator).mockReturnValue({
@@ -164,7 +170,7 @@ describe('FoodSubstitutionModal', () => {
       data: mockResponse,
       isPending: false,
       isError: false,
-    } as any);
+    } as unknown as SubCalculatorReturn);
 
     render(
       <FoodSubstitutionModal
@@ -193,7 +199,7 @@ describe('FoodSubstitutionModal', () => {
       data: mockResponse,
       isPending: false,
       isError: false,
-    } as any);
+    } as unknown as SubCalculatorReturn);
 
     render(
       <FoodSubstitutionModal isOpen={true} onClose={mockOnClose} sourceFood={mockSourceFood} />,
@@ -213,7 +219,7 @@ describe('FoodSubstitutionModal', () => {
       data: mockResponse,
       isPending: false,
       isError: false,
-    } as any);
+    } as unknown as SubCalculatorReturn);
 
     render(
       <FoodSubstitutionModal
