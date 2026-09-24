@@ -218,6 +218,12 @@ public class FoodSubstitutionService {
         return sName.equalsIgnoreCase(cName);
     }
 
+    private boolean isUnitBased(String unit) {
+        if (unit == null) return false;
+        String u = unit.trim().toLowerCase(Locale.ROOT);
+        return u.equals("un") || u.equals("unidade") || u.equals("und") || u.equals("unidades");
+    }
+
     private FoodSubstitutionItemResponse evaluateCandidate(
             SourceFoodData source,
             Food candidate,
@@ -230,8 +236,8 @@ public class FoodSubstitutionService {
         if (suggestedAmount == null) {
             return null;
         }
-        boolean isUnitBased = candidate.getUnit() != null && "UNIDADE".equalsIgnoreCase(candidate.getUnit());
-        BigDecimal minThreshold = isUnitBased ? BigDecimal.valueOf(0.5) : BigDecimal.valueOf(5);
+        boolean isUnit = isUnitBased(candidate.getUnit());
+        BigDecimal minThreshold = isUnit ? BigDecimal.valueOf(0.5) : BigDecimal.valueOf(5);
         if (suggestedAmount.compareTo(minThreshold) < 0) {
             return null;
         }
@@ -256,11 +262,25 @@ public class FoodSubstitutionService {
             }
         }
 
+        if ("PROTEINA".equalsIgnoreCase(dominantMacro) && source.prot().compareTo(BigDecimal.valueOf(5.0)) >= 0) {
+            double sourceP = source.prot().doubleValue();
+            double candP = candProt.doubleValue();
+            if (candP < sourceP * 0.55 || candP > sourceP * 1.60) {
+                return null;
+            }
+        } else if ("CARBOIDRATO".equalsIgnoreCase(dominantMacro) && source.carb().compareTo(BigDecimal.valueOf(15.0)) >= 0) {
+            double sourceC = source.carb().doubleValue();
+            double candC = candCarb.doubleValue();
+            if (candC < sourceC * 0.55 || candC > sourceC * 1.60) {
+                return null;
+            }
+        }
+
         int habitCount = getHabitCount(candidate.getName(), habitFrequency);
         boolean isHabit = habitCount > 0;
         String habitBadge = isHabit ? String.format("Consumido %dx pelo paciente", habitCount) : null;
 
-        int score = calculateScore(source.kcal(), deltaKcal, isHabit, candidate.getCategory(), dominantMacro);
+        int score = calculateScore(source, candidate, deltaKcal, deltaProt, deltaCarb, isHabit, dominantMacro);
         String reason = buildClinicalReason(dominantMacro, deltaKcal, isHabit);
         String portionDesc = buildPortionDescription(candidate, suggestedAmount);
 
@@ -311,7 +331,7 @@ public class FoodSubstitutionService {
     }
 
     private BigDecimal roundPractically(BigDecimal raw, String unit) {
-        if ("UNIDADE".equalsIgnoreCase(unit)) {
+        if (isUnitBased(unit)) {
             double val = raw.doubleValue();
             double rounded = Math.round(val * 2.0) / 2.0;
             return BigDecimal.valueOf(Math.max(0.5, rounded));
@@ -331,14 +351,139 @@ public class FoodSubstitutionService {
     }
 
     private int calculateScore(
-            BigDecimal sourceKcal, BigDecimal deltaKcal, boolean isHabit, String candCat, String dominantMacro) {
-        double dev = sourceKcal.compareTo(ZERO) > 0
-                ? Math.abs(deltaKcal.doubleValue()) / sourceKcal.doubleValue() : 0.0;
-        double closeness = Math.max(0, 100.0 - (dev * 100.0));
-        double score = closeness * 0.55;
-        if (isHabit) score += 30.0;
-        if (candCat != null && candCat.equalsIgnoreCase(dominantMacro)) score += 15.0;
+            SourceFoodData source,
+            Food candidate,
+            BigDecimal deltaKcal,
+            BigDecimal deltaProt,
+            BigDecimal deltaCarb,
+            boolean isHabit,
+            String dominantMacro) {
+        double kcalDev = source.kcal().compareTo(ZERO) > 0
+                ? Math.abs(deltaKcal.doubleValue()) / source.kcal().doubleValue() : 0.0;
+        double kcalCloseness = Math.max(0, 1.0 - (kcalDev / 0.45));
+        double score = kcalCloseness * 45.0;
+
+        if ("PROTEINA".equalsIgnoreCase(dominantMacro) && source.prot().compareTo(ZERO) > 0) {
+            double protDev = Math.abs(deltaProt.doubleValue()) / source.prot().doubleValue();
+            double protCloseness = Math.max(0, 1.0 - (protDev / 0.50));
+            score += protCloseness * 25.0;
+        } else if ("CARBOIDRATO".equalsIgnoreCase(dominantMacro) && source.carb().compareTo(ZERO) > 0) {
+            double carbDev = Math.abs(deltaCarb.doubleValue()) / source.carb().doubleValue();
+            double carbCloseness = Math.max(0, 1.0 - (carbDev / 0.50));
+            score += carbCloseness * 25.0;
+        } else {
+            score += kcalCloseness * 25.0;
+        }
+
+        if (candidate.getCategory() != null && candidate.getCategory().equalsIgnoreCase(dominantMacro)) {
+            score += 10.0;
+        }
+
+        int affinity = computeAffinityBonus(source.name(), candidate.getName());
+        score += affinity;
+
+        if (isHabit) {
+            score += 10.0;
+        }
+
         return Math.min(100, Math.max(10, (int) Math.round(score)));
+    }
+
+    private int computeAffinityBonus(String sourceName, String candidateName) {
+        String s = normalize(sourceName);
+        String c = normalize(candidateName);
+
+        int bonus = 0;
+
+        boolean sourceRaw = s.contains("cru") || s.contains("crua");
+        boolean candRaw = c.contains("cru") || c.contains("crua");
+        if (candRaw && !sourceRaw) {
+            boolean rawRequiringCooking = c.contains("carne") || c.contains("bovin") || c.contains("frango")
+                    || c.contains("galinha") || c.contains("suin") || c.contains("porco") || c.contains("peixe")
+                    || c.contains("atum") || c.contains("bacalhau") || c.contains("camarao") || c.contains("picanha")
+                    || c.contains("charque") || c.contains("acem") || c.contains("patinho") || c.contains("contrafile")
+                    || c.contains("mignon") || c.contains("peru") || c.contains("abadejo") || c.contains("arroz")
+                    || c.contains("macarrao") || c.contains("massa") || c.contains("pastel") || c.contains("farinha")
+                    || c.contains("fuba") || c.contains("amido") || c.contains("feijao") || c.contains("mandioca")
+                    || c.contains("batata") || c.contains("ovo");
+            if (rawRequiringCooking) {
+                bonus -= 35;
+            }
+        }
+
+        boolean sEgg = s.contains("ovo") || s.contains("ovos") || s.contains("omelete");
+        boolean cEgg = c.contains("ovo") || c.contains("ovos") || c.contains("omelete") || c.contains("clara");
+        if (sEgg) {
+            if (cEgg) {
+                bonus += 25;
+            } else if (c.contains("ricota") || c.contains("minas") || c.contains("cottage")
+                    || c.contains("tofu") || c.contains("requeijao") || c.contains("queijo")) {
+                bonus += 15;
+            }
+            return bonus;
+        }
+
+        boolean sPoultry = s.contains("frango") || s.contains("galinha") || s.contains("peru") || s.contains("chester");
+        boolean cPoultry = c.contains("frango") || c.contains("galinha") || c.contains("peru") || c.contains("chester");
+        if (sPoultry) {
+            if (cPoultry) {
+                bonus += 20;
+            } else if (c.contains("peixe") || c.contains("atum") || c.contains("tilapia") || c.contains("patinho") || c.contains("bovin")) {
+                bonus += 10;
+            }
+            return bonus;
+        }
+
+        boolean sBeef = s.contains("carne") || s.contains("bovin") || s.contains("patinho")
+                || s.contains("alcatra") || s.contains("mignon") || s.contains("acem") || s.contains("contrafile");
+        boolean cBeef = c.contains("carne") || c.contains("bovin") || c.contains("patinho")
+                || c.contains("alcatra") || c.contains("mignon") || c.contains("acem") || c.contains("contrafile");
+        if (sBeef) {
+            if (cBeef) {
+                bonus += 20;
+            } else if (cPoultry || c.contains("peixe") || c.contains("suin")) {
+                bonus += 10;
+            }
+            return bonus;
+        }
+
+        boolean sFish = s.contains("peixe") || s.contains("atum") || s.contains("tilapia")
+                || s.contains("salmao") || s.contains("pescada") || s.contains("camarao") || s.contains("bacalhau");
+        boolean cFish = c.contains("peixe") || c.contains("atum") || c.contains("tilapia")
+                || c.contains("salmao") || c.contains("pescada") || c.contains("camarao") || c.contains("bacalhau");
+        if (sFish) {
+            if (cFish) {
+                bonus += 20;
+            } else if (cPoultry) {
+                bonus += 10;
+            }
+            return bonus;
+        }
+
+        boolean sRice = s.contains("arroz");
+        boolean cRice = c.contains("arroz");
+        if (sRice && cRice) {
+            bonus += 20;
+            return bonus;
+        }
+
+        boolean sTuber = s.contains("batata") || s.contains("mandioca") || s.contains("aipim")
+                || s.contains("macaxeira") || s.contains("inhame") || s.contains("mandioquinha");
+        boolean cTuber = c.contains("batata") || c.contains("mandioca") || c.contains("aipim")
+                || c.contains("macaxeira") || c.contains("inhame") || c.contains("mandioquinha");
+        if (sTuber && cTuber) {
+            bonus += 20;
+            return bonus;
+        }
+
+        boolean sBread = s.contains("pao") || s.contains("torrada") || s.contains("tapioca") || s.contains("wrap");
+        boolean cBread = c.contains("pao") || c.contains("torrada") || c.contains("tapioca") || c.contains("wrap");
+        if (sBread && cBread) {
+            bonus += 20;
+            return bonus;
+        }
+
+        return bonus;
     }
 
     private String buildClinicalReason(String dominantMacro, BigDecimal deltaKcal, boolean isHabit) {
@@ -351,10 +496,26 @@ public class FoodSubstitutionService {
     }
 
     private String buildPortionDescription(Food food, BigDecimal suggestedAmount) {
-        String unit = food.getUnit() != null ? food.getUnit().toLowerCase(Locale.ROOT) : "g";
-        String amountFormatted = formatNumber(suggestedAmount) + unit;
+        String rawUnit = food.getUnit() != null ? food.getUnit().trim() : "g";
+        String amountFormatted;
+        if (isUnitBased(rawUnit)) {
+            String u = suggestedAmount.compareTo(BigDecimal.ONE) == 0 ? "unidade" : "unidades";
+            amountFormatted = formatNumber(suggestedAmount) + " " + u;
+        } else if (rawUnit.equalsIgnoreCase("gramas") || rawUnit.equalsIgnoreCase("g")) {
+            amountFormatted = formatNumber(suggestedAmount) + "g";
+        } else if (rawUnit.equalsIgnoreCase("mililitros") || rawUnit.equalsIgnoreCase("ml")) {
+            amountFormatted = formatNumber(suggestedAmount) + "ml";
+        } else {
+            amountFormatted = formatNumber(suggestedAmount) + " " + rawUnit.toLowerCase(Locale.ROOT);
+        }
+
         if (food.getPortionLabel() != null && !food.getPortionLabel().isBlank()) {
-            return amountFormatted + " (" + food.getPortionLabel() + ")";
+            String label = food.getPortionLabel().trim();
+            String normLabel = normalize(label);
+            String normAmount = normalize(amountFormatted);
+            if (!normLabel.equalsIgnoreCase(normAmount) && !label.equalsIgnoreCase(formatNumber(suggestedAmount) + " un")) {
+                return amountFormatted + " (" + label + ")";
+            }
         }
         return amountFormatted;
     }
