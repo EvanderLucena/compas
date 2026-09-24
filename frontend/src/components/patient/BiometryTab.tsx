@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import type { BiometryAssessmentDTO, PatientStatus } from '../../types/patient';
 import { IconPlus } from '../icons';
 import { downloadPatientDocument } from '../../api/documents';
@@ -12,6 +12,7 @@ import { BiometryLatestCard } from './BiometryLatestCard';
 import { BiometryEvolutionChartCard } from './BiometryEvolutionChartCard';
 import { BiometryMeasuresGrid } from './BiometryMeasuresGrid';
 import { BiometryHistoryTable } from './BiometryHistoryTable';
+import { BiometryComparisonCard } from './BiometryComparisonCard';
 
 interface BiometryTabProps {
   patientId: string;
@@ -33,11 +34,137 @@ function fmtDate(iso: string | null | undefined) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
+function BiometryViewModeNav({
+  viewMode,
+  onSetViewMode,
+}: {
+  viewMode: 'overview' | 'comparison';
+  onSetViewMode: (mode: 'overview' | 'comparison') => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        flexWrap: 'wrap',
+        gap: 12,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          gap: 4,
+          backgroundColor: 'var(--paper-2)',
+          padding: 4,
+          borderRadius: 8,
+          border: '1px solid var(--border)',
+        }}
+      >
+        <button
+          type="button"
+          className={`btn ${viewMode === 'overview' ? 'btn-primary' : 'btn-subtle'}`}
+          style={{ fontSize: 13, padding: '6px 16px' }}
+          onClick={() => onSetViewMode('overview')}
+        >
+          Visão Geral
+        </button>
+        <button
+          type="button"
+          data-testid="btn-toggle-comparison"
+          className={`btn ${viewMode === 'comparison' ? 'btn-primary' : 'btn-subtle'}`}
+          style={{ fontSize: 13, padding: '6px 16px' }}
+          onClick={() => onSetViewMode('comparison')}
+        >
+          📊 Comparar Avaliações
+        </button>
+      </div>
+
+      {viewMode === 'overview' ? (
+        <button
+          type="button"
+          className="btn btn-subtle"
+          style={{ fontSize: 13, padding: '6px 14px' }}
+          onClick={() => onSetViewMode('comparison')}
+        >
+          📊 Abrir Comparador Evolutivo
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-subtle"
+          style={{ fontSize: 13, padding: '6px 14px' }}
+          onClick={() => onSetViewMode('overview')}
+        >
+          ← Voltar para Visão Geral
+        </button>
+      )}
+    </div>
+  );
+}
+
+interface BiometryOverviewCardsProps {
+  last: BiometryAssessmentDTO;
+  prev?: BiometryAssessmentDTO;
+  list: BiometryAssessmentDTO[];
+  patientId: string;
+  metric: string;
+  onSetMetric: (m: string) => void;
+  downloadingBiometry: boolean;
+  onDownloadPdf: () => void;
+  onNewEval: () => void;
+  fmtDate: (iso: string | null | undefined) => string;
+}
+
+function BiometryOverviewCards({
+  last,
+  prev,
+  list,
+  patientId,
+  metric,
+  onSetMetric,
+  downloadingBiometry,
+  onDownloadPdf,
+  onNewEval,
+  fmtDate,
+}: BiometryOverviewCardsProps) {
+  return (
+    <>
+      <BiometryLatestCard
+        last={last}
+        prev={prev}
+        downloadingBiometry={downloadingBiometry}
+        onDownloadPdf={onDownloadPdf}
+        onNewEval={onNewEval}
+        fmtDate={fmtDate}
+      />
+
+      <BiometryEvolutionCard patientId={patientId} />
+
+      {list.length >= 2 && (
+        <BiometryEvolutionChartCard
+          list={list}
+          metric={metric}
+          onSetMetric={onSetMetric}
+          metricCfg={METRIC_CONFIG}
+          fmtDate={fmtDate}
+        />
+      )}
+
+      <BiometryMeasuresGrid last={last} prev={prev} fmtDate={fmtDate} />
+
+      <BiometryHistoryTable list={list} fmtDate={fmtDate} />
+    </>
+  );
+}
+
 export function BiometryTab({ patientId, patientStatus }: BiometryTabProps) {
   const { data: assessments, isLoading } = usePatientBiometry(patientId);
   const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
   const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
   const [metric, setMetric] = useState('all');
+  const [viewMode, setViewMode] = useState<'overview' | 'comparison'>('overview');
   const [newEvalOpen, setNewEvalOpen] = useState(false);
   const [statusReviewOpen, setStatusReviewOpen] = useState(false);
   const [downloadingBiometry, setDownloadingBiometry] = useState(false);
@@ -115,30 +242,30 @@ export function BiometryTab({ patientId, patientStatus }: BiometryTabProps) {
 
   return (
     <div style={{ padding: '24px 28px' }}>
-      <BiometryLatestCard
-        last={last!}
-        prev={prev}
-        downloadingBiometry={downloadingBiometry}
-        onDownloadPdf={handleDownloadBiometryPdf}
-        onNewEval={handleOpenNewEval}
-        fmtDate={fmtDate}
-      />
+      {list.length >= 2 && <BiometryViewModeNav viewMode={viewMode} onSetViewMode={setViewMode} />}
 
-      <BiometryEvolutionCard patientId={patientId} />
-
-      {list.length >= 2 && (
-        <BiometryEvolutionChartCard
+      {viewMode === 'comparison' && list.length >= 2 ? (
+        <BiometryComparisonCard
+          patientId={patientId}
+          assessments={list}
+          fmtDate={fmtDate}
+          onDownloadPdf={handleDownloadBiometryPdf}
+          downloadingPdf={downloadingBiometry}
+        />
+      ) : (
+        <BiometryOverviewCards
+          last={last!}
+          prev={prev}
           list={list}
+          patientId={patientId}
           metric={metric}
           onSetMetric={setMetric}
-          metricCfg={METRIC_CONFIG}
+          downloadingBiometry={downloadingBiometry}
+          onDownloadPdf={handleDownloadBiometryPdf}
+          onNewEval={handleOpenNewEval}
           fmtDate={fmtDate}
         />
       )}
-
-      <BiometryMeasuresGrid last={last!} prev={prev} fmtDate={fmtDate} />
-
-      <BiometryHistoryTable list={list} fmtDate={fmtDate} />
 
       {newEvalOpen && (
         <NewBiometryModal

@@ -1,12 +1,14 @@
 package com.compas.api.service;
 
 import com.compas.api.dto.biometry.BiometryAssessmentResponse;
+import com.compas.api.dto.biometry.BiometryComparisonResponse;
 import com.compas.api.dto.biometry.BiometryEvolutionSummaryResponse;
 import com.compas.api.dto.biometry.BiometryHistoryEpisodeResponse;
 import com.compas.api.dto.biometry.BiometryHistorySnapshotResponse;
 import com.compas.api.dto.biometry.CreateBiometryAssessmentRequest;
 import com.compas.api.dto.biometry.EpisodeHistoryEventResponse;
 import com.compas.api.dto.biometry.PerimetryDeltaResponse;
+import com.compas.api.dto.biometry.SkinfoldDeltaResponse;
 import com.compas.api.dto.biometry.UpdateBiometryAssessmentRequest;
 import com.compas.api.exception.ResourceNotFoundException;
 import com.compas.api.model.BiometryAssessment;
@@ -67,6 +69,18 @@ public class BiometryService {
             Map.entry("panturrilha_d", "Panturrilha Direita"),
             Map.entry("panturrilha_e", "Panturrilha Esquerda"),
             Map.entry("torax", "Tórax")
+    );
+
+    private static final Map<String, String> SKINFOLD_LABELS = Map.ofEntries(
+            Map.entry("peitoral", "Peitoral"),
+            Map.entry("axilar_medio", "Axilar Médio"),
+            Map.entry("triceps", "Tríceps"),
+            Map.entry("subescapular", "Subescapular"),
+            Map.entry("abdominal", "Abdominal"),
+            Map.entry("suprailiaco", "Suprailíaco"),
+            Map.entry("coxa", "Coxa"),
+            Map.entry("biceps", "Bíceps"),
+            Map.entry("panturrilha", "Panturrilha")
     );
 
     private final BiometryAssessmentRepository assessmentRepository;
@@ -454,6 +468,44 @@ public class BiometryService {
     }
 
     @Transactional(readOnly = true)
+    public BiometryComparisonResponse compareAssessments(
+            UUID nutritionistId, UUID patientId, UUID baseId, UUID targetId) {
+        Patient patient = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
+
+        List<BiometryAssessment> allAssessments = assessmentRepository
+                .findByPatientIdAndNutritionistIdOrderByAssessmentDateAsc(patientId, nutritionistId);
+
+        if (allAssessments.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Paciente não possui avaliações biométricas cadastradas para comparação");
+        }
+
+        BiometryAssessment baseAssessment;
+        BiometryAssessment targetAssessment;
+
+        if (baseId != null) {
+            baseAssessment = allAssessments.stream()
+                    .filter(a -> a.getId().equals(baseId))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Avaliação base", baseId));
+        } else {
+            baseAssessment = allAssessments.get(0);
+        }
+
+        if (targetId != null) {
+            targetAssessment = allAssessments.stream()
+                    .filter(a -> a.getId().equals(targetId))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Avaliação comparada", targetId));
+        } else {
+            targetAssessment = allAssessments.get(allAssessments.size() - 1);
+        }
+
+        return buildComparisonResponse(patient, baseAssessment, targetAssessment, nutritionistId);
+    }
+
+    @Transactional(readOnly = true)
     public String getBiometryContextForWhatsApp(UUID patientId, UUID nutritionistId) {
         try {
             BiometryEvolutionSummaryResponse summary = getBiometryEvolutionSummary(nutritionistId, patientId);
@@ -623,16 +675,21 @@ public class BiometryService {
                 .findByAssessmentIdAndNutritionistIdOrderBySortOrder(initialAssessmentId, nutritionistId);
         List<BiometryPerimetry> latestList = perimetryRepository
                 .findByAssessmentIdAndNutritionistIdOrderBySortOrder(latestAssessmentId, nutritionistId);
+        return buildPerimetryDeltasFromLists(initialList, latestList);
+    }
 
-        Map<String, BigDecimal> initialMap = new HashMap<>();
-        for (BiometryPerimetry p : initialList) {
-            initialMap.put(p.getMeasureKey(), p.getValueCm());
+    private List<PerimetryDeltaResponse> buildPerimetryDeltasFromLists(
+            List<BiometryPerimetry> baseList, List<BiometryPerimetry> targetList) {
+        Map<String, BigDecimal> baseMap = new HashMap<>();
+        for (BiometryPerimetry p : baseList) {
+            baseMap.put(p.getMeasureKey(), p.getValueCm());
         }
 
         List<PerimetryDeltaResponse> deltas = new ArrayList<>();
-        for (BiometryPerimetry curr : latestList) {
-            BigDecimal initVal = initialMap.getOrDefault(curr.getMeasureKey(), curr.getValueCm());
-            BigDecimal delta = curr.getValueCm().subtract(initVal);
+        for (BiometryPerimetry curr : targetList) {
+            BigDecimal initVal = baseMap.getOrDefault(curr.getMeasureKey(), curr.getValueCm());
+            BigDecimal delta = (curr.getValueCm() != null && initVal != null)
+                    ? curr.getValueCm().subtract(initVal) : BigDecimal.ZERO;
             deltas.add(new PerimetryDeltaResponse(
                     curr.getMeasureKey(),
                     resolvePerimetryLabel(curr.getMeasureKey()),
@@ -744,5 +801,288 @@ public class BiometryService {
                 break;
             }
         }
+    }
+
+    private BiometryComparisonResponse buildComparisonResponse(
+            Patient patient, BiometryAssessment base, BiometryAssessment target, UUID nutritionistId) {
+
+        long daysBetween = 0L;
+        if (base.getAssessmentDate() != null && target.getAssessmentDate() != null) {
+            daysBetween = ChronoUnit.DAYS.between(base.getAssessmentDate(), target.getAssessmentDate());
+        }
+
+        BigDecimal weightDelta = computeDelta(target.getWeight(), base.getWeight());
+        BigDecimal weightDeltaPercent = computeDeltaPercent(base.getWeight(), target.getWeight());
+
+        BigDecimal bodyFatDelta = computeDelta(target.getBodyFatPercent(), base.getBodyFatPercent());
+
+        BigDecimal leanMassDelta = computeDelta(target.getLeanMassKg(), base.getLeanMassKg());
+        BigDecimal leanMassDeltaPercent = computeDeltaPercent(base.getLeanMassKg(), target.getLeanMassKg());
+
+        BigDecimal baseFatMass = computeFatMass(base.getWeight(), base.getBodyFatPercent());
+        BigDecimal targetFatMass = computeFatMass(target.getWeight(), target.getBodyFatPercent());
+        BigDecimal fatMassDelta = computeDelta(targetFatMass, baseFatMass);
+        BigDecimal fatMassDeltaPercent = computeDeltaPercent(baseFatMass, targetFatMass);
+
+        BigDecimal waterDelta = computeDelta(target.getWaterPercent(), base.getWaterPercent());
+
+        Integer visceralDelta = (base.getVisceralFatLevel() != null && target.getVisceralFatLevel() != null)
+                ? target.getVisceralFatLevel() - base.getVisceralFatLevel()
+                : null;
+
+        Integer bmrDelta = (base.getBmrKcal() != null && target.getBmrKcal() != null)
+                ? target.getBmrKcal() - base.getBmrKcal()
+                : null;
+
+        List<BiometrySkinfold> baseSkinfolds = skinfoldRepository
+                .findByAssessmentIdAndNutritionistIdOrderBySortOrder(base.getId(), nutritionistId);
+        List<BiometrySkinfold> targetSkinfolds = skinfoldRepository
+                .findByAssessmentIdAndNutritionistIdOrderBySortOrder(target.getId(), nutritionistId);
+
+        BigDecimal baseSkinfoldsSum = computeSkinfoldsSum(baseSkinfolds);
+        BigDecimal targetSkinfoldsSum = computeSkinfoldsSum(targetSkinfolds);
+        BigDecimal skinfoldsSumDelta = (baseSkinfoldsSum != null && targetSkinfoldsSum != null)
+                ? targetSkinfoldsSum.subtract(baseSkinfoldsSum) : null;
+        BigDecimal skinfoldsSumDeltaPercent = computeDeltaPercent(baseSkinfoldsSum, targetSkinfoldsSum);
+
+        List<SkinfoldDeltaResponse> skinfoldDeltas = buildSkinfoldDeltasFromLists(baseSkinfolds, targetSkinfolds);
+
+        List<BiometryPerimetry> basePerimetries = perimetryRepository
+                .findByAssessmentIdAndNutritionistIdOrderBySortOrder(base.getId(), nutritionistId);
+        List<BiometryPerimetry> targetPerimetries = perimetryRepository
+                .findByAssessmentIdAndNutritionistIdOrderBySortOrder(target.getId(), nutritionistId);
+
+        BigDecimal baseWaistHipRatio = computeWaistHipRatio(basePerimetries);
+        BigDecimal targetWaistHipRatio = computeWaistHipRatio(targetPerimetries);
+        BigDecimal waistHipRatioDelta = computeDelta(targetWaistHipRatio, baseWaistHipRatio);
+
+        List<PerimetryDeltaResponse> perimetryDeltas = buildPerimetryDeltasFromLists(
+                basePerimetries, targetPerimetries);
+
+        String classification = classifyProgression(fatMassDelta, leanMassDelta, weightDelta);
+        String clinicalSynthesis = generateComparisonClinicalSynthesis(
+                base, target, weightDelta, fatMassDelta, leanMassDelta, skinfoldsSumDelta, perimetryDeltas);
+        String whatsappMessage = generateComparisonWhatsAppMessage(
+                patient.getName(), base, target, weightDelta, fatMassDelta, leanMassDelta, perimetryDeltas);
+
+        return new BiometryComparisonResponse(
+                base.getId(),
+                target.getId(),
+                base.getAssessmentDate(),
+                target.getAssessmentDate(),
+                daysBetween,
+                base.getWeight(),
+                target.getWeight(),
+                weightDelta,
+                weightDeltaPercent,
+                base.getBodyFatPercent(),
+                target.getBodyFatPercent(),
+                bodyFatDelta,
+                base.getLeanMassKg(),
+                target.getLeanMassKg(),
+                leanMassDelta,
+                baseFatMass,
+                targetFatMass,
+                fatMassDelta,
+                base.getWaterPercent(),
+                target.getWaterPercent(),
+                waterDelta,
+                base.getVisceralFatLevel(),
+                target.getVisceralFatLevel(),
+                visceralDelta,
+                base.getBmrKcal(),
+                target.getBmrKcal(),
+                bmrDelta,
+                baseSkinfoldsSum,
+                targetSkinfoldsSum,
+                skinfoldsSumDelta,
+                skinfoldsSumDeltaPercent,
+                skinfoldDeltas,
+                baseWaistHipRatio,
+                targetWaistHipRatio,
+                waistHipRatioDelta,
+                perimetryDeltas,
+                classification,
+                clinicalSynthesis,
+                whatsappMessage
+        );
+    }
+
+    private BigDecimal computeDeltaPercent(BigDecimal initial, BigDecimal current) {
+        if (initial == null || current == null || initial.compareTo(BigDecimal.ZERO) == 0) {
+            return null;
+        }
+        return current.subtract(initial)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(initial, 1, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal computeSkinfoldsSum(List<BiometrySkinfold> skinfolds) {
+        if (skinfolds == null || skinfolds.isEmpty()) {
+            return null;
+        }
+        BigDecimal sum = BigDecimal.ZERO;
+        boolean hasAny = false;
+        for (BiometrySkinfold s : skinfolds) {
+            if (s.getValueMm() != null) {
+                sum = sum.add(s.getValueMm());
+                hasAny = true;
+            }
+        }
+        return hasAny ? sum.setScale(1, RoundingMode.HALF_UP) : null;
+    }
+
+    private BigDecimal computeWaistHipRatio(List<BiometryPerimetry> perimetries) {
+        BigDecimal waist = null;
+        BigDecimal hip = null;
+        for (BiometryPerimetry p : perimetries) {
+            if ("cintura".equalsIgnoreCase(p.getMeasureKey())) {
+                waist = p.getValueCm();
+            } else if ("quadril".equalsIgnoreCase(p.getMeasureKey())) {
+                hip = p.getValueCm();
+            }
+        }
+        if (waist != null && hip != null && hip.compareTo(BigDecimal.ZERO) > 0) {
+            return waist.divide(hip, 2, RoundingMode.HALF_UP);
+        }
+        return null;
+    }
+
+    private List<SkinfoldDeltaResponse> buildSkinfoldDeltasFromLists(
+            List<BiometrySkinfold> baseList, List<BiometrySkinfold> targetList) {
+        Map<String, BigDecimal> baseMap = new HashMap<>();
+        for (BiometrySkinfold s : baseList) {
+            baseMap.put(s.getMeasureKey(), s.getValueMm());
+        }
+
+        List<SkinfoldDeltaResponse> deltas = new ArrayList<>();
+        for (BiometrySkinfold curr : targetList) {
+            BigDecimal initVal = baseMap.getOrDefault(curr.getMeasureKey(), curr.getValueMm());
+            BigDecimal delta = (curr.getValueMm() != null && initVal != null)
+                    ? curr.getValueMm().subtract(initVal) : null;
+            BigDecimal deltaPercent = computeDeltaPercent(initVal, curr.getValueMm());
+            deltas.add(new SkinfoldDeltaResponse(
+                    curr.getMeasureKey(),
+                    resolveSkinfoldLabel(curr.getMeasureKey()),
+                    initVal,
+                    curr.getValueMm(),
+                    delta,
+                    deltaPercent
+            ));
+        }
+        return deltas;
+    }
+
+    private String resolveSkinfoldLabel(String measureKey) {
+        if (measureKey == null) {
+            return "";
+        }
+        return SKINFOLD_LABELS.getOrDefault(measureKey.toLowerCase(), measureKey);
+    }
+
+    private String classifyProgression(
+            BigDecimal fatMassDelta, BigDecimal leanMassDelta, BigDecimal weightDelta) {
+        if (fatMassDelta != null && fatMassDelta.compareTo(BigDecimal.ZERO) < 0
+                && leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) > 0) {
+            return "RECOMPOSICAO_CORPORAL";
+        }
+        if (fatMassDelta != null && fatMassDelta.compareTo(BigDecimal.ZERO) < 0) {
+            return "EMAGRECIMENTO";
+        }
+        if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) > 0) {
+            return "HIPERTROFIA";
+        }
+        if (weightDelta != null && weightDelta.compareTo(BigDecimal.ZERO) < 0) {
+            return "REDUCAO_PONDERAL";
+        }
+        if (weightDelta != null && weightDelta.compareTo(BigDecimal.ZERO) > 0) {
+            return "AUMENTO_PONDERAL";
+        }
+        return "MANUTENCAO";
+    }
+
+    private String generateComparisonClinicalSynthesis(
+            BiometryAssessment base,
+            BiometryAssessment target,
+            BigDecimal weightDelta,
+            BigDecimal fatMassDelta,
+            BigDecimal leanMassDelta,
+            BigDecimal skinfoldsSumDelta,
+            List<PerimetryDeltaResponse> perimetries) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Comparativo entre %s e %s: ",
+                base.getAssessmentDate(), target.getAssessmentDate()));
+
+        if (fatMassDelta != null && fatMassDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("Redução de %.1f kg de massa gorda", fatMassDelta.abs()));
+            if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append(String.format(" com ganho de +%.1f kg de massa magra (recomposição corporal positiva).",
+                        leanMassDelta));
+            } else if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) < 0) {
+                sb.append(String.format(" com variação de %.1f kg de massa magra.", leanMassDelta));
+            } else {
+                sb.append(" com manutenção da massa magra.");
+            }
+        } else if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) > 0) {
+            sb.append(String.format("Ganho de massa magra de +%.1f kg.", leanMassDelta));
+        } else if (weightDelta != null && weightDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("Redução de peso total de %.1f kg.", weightDelta.abs()));
+        } else {
+            sb.append("Estabilidade dos parâmetros ponderais no intervalo.");
+        }
+
+        if (skinfoldsSumDelta != null && skinfoldsSumDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format(" Diminuição de %.1f mm no somatório de dobras cutâneas.",
+                    skinfoldsSumDelta.abs()));
+        }
+
+        for (PerimetryDeltaResponse p : perimetries) {
+            if ("cintura".equalsIgnoreCase(p.measureKey()) && p.deltaCm() != null
+                    && p.deltaCm().compareTo(BigDecimal.ZERO) < 0) {
+                sb.append(String.format(" Redução de %.1f cm na circunferência da cintura.",
+                        p.deltaCm().abs()));
+                break;
+            }
+        }
+
+        return sb.toString();
+    }
+
+    private String generateComparisonWhatsAppMessage(
+            String patientName,
+            BiometryAssessment base,
+            BiometryAssessment target,
+            BigDecimal weightDelta,
+            BigDecimal fatMassDelta,
+            BigDecimal leanMassDelta,
+            List<PerimetryDeltaResponse> perimetries) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Olá, ").append(patientName).append("! ");
+        sb.append("Aqui está o comparativo da sua evolução entre ")
+                .append(base.getAssessmentDate())
+                .append(" e ")
+                .append(target.getAssessmentDate())
+                .append(": 🎉\n");
+
+        if (fatMassDelta != null && fatMassDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("• Gordura eliminada: %.1f kg a menos!\n", fatMassDelta.abs()));
+            if (leanMassDelta != null && leanMassDelta.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append(String.format("• Massa magra: +%.1f kg conquistados (recomposição corporal incrível!)\n",
+                        leanMassDelta));
+            }
+        } else if (weightDelta != null && weightDelta.compareTo(BigDecimal.ZERO) < 0) {
+            sb.append(String.format("• Peso total: %.1f kg eliminados!\n", weightDelta.abs()));
+        }
+
+        for (PerimetryDeltaResponse p : perimetries) {
+            if ("cintura".equalsIgnoreCase(p.measureKey()) && p.deltaCm() != null
+                    && p.deltaCm().compareTo(BigDecimal.ZERO) < 0) {
+                sb.append(String.format("• Cintura: -%.1f cm\n", p.deltaCm().abs()));
+                break;
+            }
+        }
+
+        sb.append("Parabéns pela dedicação aos treinos e ao plano nutricional. Seguimos com foco! 💪🚀");
+        return sb.toString();
     }
 }

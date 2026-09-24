@@ -403,4 +403,41 @@ class BiometryControllerTest {
                 .andExpect(jsonPath("$.data.clinicalSynthesis").isString())
                 .andExpect(jsonPath("$.data.whatsappFeedbackMessage").isString());
     }
+
+    @Test
+    void compare_returns200WithComparisonEnvelope() throws Exception {
+        BiometryAssessment a1 = assessmentRepository.save(BiometryAssessment.builder()
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 1, 10))
+                .weight(new BigDecimal("80.00"))
+                .bodyFatPercent(new BigDecimal("20.00"))
+                .leanMassKg(new BigDecimal("64.00"))
+                .build());
+
+        BiometryAssessment a2 = assessmentRepository.save(BiometryAssessment.builder()
+                .patientId(patientId)
+                .episodeId(episodeId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 2, 10))
+                .weight(new BigDecimal("78.00"))
+                .bodyFatPercent(new BigDecimal("18.00"))
+                .leanMassKg(new BigDecimal("63.96"))
+                .build());
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/biometry/compare", patientId)
+                        .param("baseId", a1.getId().toString())
+                        .param("targetId", a2.getId().toString())
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.baseAssessmentId").value(a1.getId().toString()))
+                .andExpect(jsonPath("$.data.targetAssessmentId").value(a2.getId().toString()))
+                .andExpect(jsonPath("$.data.weightDelta").value(-2.00))
+                .andExpect(jsonPath("$.data.bodyFatDelta").value(-2.00))
+                .andExpect(jsonPath("$.data.clinicalClassification").isString())
+                .andExpect(jsonPath("$.data.clinicalSynthesis").isString())
+                .andExpect(jsonPath("$.data.whatsappFeedbackMessage").isString());
+    }
 }

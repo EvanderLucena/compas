@@ -632,4 +632,115 @@ class BiometryServiceTest {
         assertThrows(com.compas.api.exception.SubscriptionRequiredException.class,
                 () -> biometryService.createAssessment(nutritionistId, patientId, req));
     }
+
+    @Test
+    void compareAssessments_whenAssessmentsExist_returnsDetailedComparison() {
+        UUID a1Id = UUID.randomUUID();
+        BiometryAssessment a1 = BiometryAssessment.builder()
+                .id(a1Id)
+                .episodeId(activeEpisode.getId())
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 1, 10))
+                .weight(new BigDecimal("80.00"))
+                .bodyFatPercent(new BigDecimal("20.00"))
+                .leanMassKg(new BigDecimal("64.00"))
+                .waterPercent(new BigDecimal("55.00"))
+                .visceralFatLevel(5)
+                .bmrKcal(1600)
+                .build();
+
+        UUID a2Id = UUID.randomUUID();
+        BiometryAssessment a2 = BiometryAssessment.builder()
+                .id(a2Id)
+                .episodeId(activeEpisode.getId())
+                .patientId(patientId)
+                .nutritionistId(nutritionistId)
+                .assessmentDate(LocalDate.of(2025, 2, 10))
+                .weight(new BigDecimal("78.00"))
+                .bodyFatPercent(new BigDecimal("17.00"))
+                .leanMassKg(new BigDecimal("64.74"))
+                .waterPercent(new BigDecimal("57.00"))
+                .visceralFatLevel(4)
+                .bmrKcal(1620)
+                .build();
+
+        BiometrySkinfold s1 = BiometrySkinfold.builder()
+                .id(UUID.randomUUID())
+                .assessment(a1)
+                .nutritionistId(nutritionistId)
+                .measureKey("triceps")
+                .valueMm(new BigDecimal("15.0"))
+                .sortOrder(1)
+                .build();
+
+        BiometrySkinfold s2 = BiometrySkinfold.builder()
+                .id(UUID.randomUUID())
+                .assessment(a2)
+                .nutritionistId(nutritionistId)
+                .measureKey("triceps")
+                .valueMm(new BigDecimal("12.0"))
+                .sortOrder(1)
+                .build();
+
+        BiometryPerimetry p1 = BiometryPerimetry.builder()
+                .id(UUID.randomUUID())
+                .assessment(a1)
+                .nutritionistId(nutritionistId)
+                .measureKey("cintura")
+                .valueCm(new BigDecimal("85.0"))
+                .sortOrder(1)
+                .build();
+
+        BiometryPerimetry p2 = BiometryPerimetry.builder()
+                .id(UUID.randomUUID())
+                .assessment(a2)
+                .nutritionistId(nutritionistId)
+                .measureKey("cintura")
+                .valueCm(new BigDecimal("81.0"))
+                .sortOrder(1)
+                .build();
+
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(assessmentRepository.findByPatientIdAndNutritionistIdOrderByAssessmentDateAsc(patientId, nutritionistId))
+                .thenReturn(List.of(a1, a2));
+        when(skinfoldRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(a1Id, nutritionistId))
+                .thenReturn(List.of(s1));
+        when(skinfoldRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(a2Id, nutritionistId))
+                .thenReturn(List.of(s2));
+        when(perimetryRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(a1Id, nutritionistId))
+                .thenReturn(List.of(p1));
+        when(perimetryRepository.findByAssessmentIdAndNutritionistIdOrderBySortOrder(a2Id, nutritionistId))
+                .thenReturn(List.of(p2));
+
+        BiometryComparisonResponse comp = biometryService.compareAssessments(nutritionistId, patientId, null, null);
+
+        assertNotNull(comp);
+        assertEquals(a1Id, comp.baseAssessmentId());
+        assertEquals(a2Id, comp.targetAssessmentId());
+        assertEquals(31, comp.daysBetween());
+        assertEquals(new BigDecimal("-2.00"), comp.weightDelta());
+        assertEquals(new BigDecimal("-3.00"), comp.bodyFatDelta());
+        assertEquals("RECOMPOSICAO_CORPORAL", comp.clinicalClassification());
+        assertEquals(new BigDecimal("15.0"), comp.baseSkinfoldsSumMm());
+        assertEquals(new BigDecimal("12.0"), comp.targetSkinfoldsSumMm());
+        assertEquals(new BigDecimal("-3.0"), comp.skinfoldsSumDeltaMm());
+        assertEquals(1, comp.skinfoldDeltas().size());
+        assertEquals("Tríceps", comp.skinfoldDeltas().get(0).label());
+        assertEquals(new BigDecimal("-3.0"), comp.skinfoldDeltas().get(0).deltaMm());
+        assertEquals(1, comp.perimetryDeltas().size());
+        assertEquals(new BigDecimal("-4.0"), comp.perimetryDeltas().get(0).deltaCm());
+        assertTrue(comp.clinicalSynthesis().contains("Redução de"));
+        assertTrue(comp.whatsappFeedbackMessage().contains("🎉"));
+    }
+
+    @Test
+    void compareAssessments_whenNoAssessmentsExist_throwsBadRequest() {
+        when(patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)).thenReturn(Optional.of(patient));
+        when(assessmentRepository.findByPatientIdAndNutritionistIdOrderByAssessmentDateAsc(patientId, nutritionistId))
+                .thenReturn(List.of());
+
+        assertThrows(ResponseStatusException.class,
+                () -> biometryService.compareAssessments(nutritionistId, patientId, null, null));
+    }
 }
