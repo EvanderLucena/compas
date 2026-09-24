@@ -5,10 +5,13 @@ import { useToastStore } from './toastStore';
 
 export function useFoodSubstitutionCalculator(patientId?: string | null) {
   const showToastError = useToastStore((s) => s.showError);
+  const isUuid =
+    typeof patientId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(patientId);
 
   return useMutation<FoodSubstitutionResponse, Error, FoodSubstitutionRequest>({
     mutationFn: (request) => {
-      if (patientId) {
+      if (isUuid && patientId) {
         return calculatePatientSubstitutions(patientId, request);
       }
       return calculateGeneralSubstitutions(request);

@@ -191,8 +191,9 @@ public class FoodSubstitutionService {
         double cCal = source.carb().doubleValue() * 4.0;
         double fCal = source.fat().doubleValue() * 9.0;
 
-        if (pCal / kcal >= 0.35) return "PROTEINA";
-        if (cCal / kcal >= 0.45) return "CARBOIDRATO";
+        if (cCal / kcal >= 0.50) return "CARBOIDRATO";
+        if (pCal / kcal >= 0.28 || (source.prot().doubleValue() >= 8.0 && pCal / kcal >= 0.20)) return "PROTEINA";
+        if (cCal / kcal >= 0.40) return "CARBOIDRATO";
         if (fCal / kcal >= 0.45) return "GORDURA";
         return "CALORIAS";
     }

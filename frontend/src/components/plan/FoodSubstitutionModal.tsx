@@ -4,7 +4,6 @@ import type { FoodSubstitutionItem } from '../../types/substitution';
 import { useFoodSubstitutionCalculator } from '../../stores/substitutionStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useModalA11y } from '../../hooks/useModalA11y';
-import { FoodSubstitutionOptionCard } from './FoodSubstitutionOptionCard';
 
 interface FoodSubstitutionModalProps {
   isOpen: boolean;
@@ -107,70 +106,7 @@ function ModalTitleBar({ onClose }: { onClose: () => void }) {
   );
 }
 
-interface ModalBodyContentProps {
-  isPending: boolean;
-  isError: boolean;
-  substitutions?: FoodSubstitutionItem[];
-  onApplySubstitution?: (targetItem: FoodSubstitutionItem) => void;
-  onCopySingle: (item: FoodSubstitutionItem) => void;
-  isReadOnly?: boolean;
-  isApplying?: boolean;
-  onRetry?: () => void;
-}
-
-function ModalBodyContent({
-  isPending,
-  isError,
-  substitutions,
-  onApplySubstitution,
-  onCopySingle,
-  isReadOnly,
-  isApplying,
-  onRetry,
-}: ModalBodyContentProps) {
-  if (isPending) {
-    return (
-      <div style={{ flex: 1, padding: 40, textAlign: 'center', color: 'var(--fg-muted)' }}>
-        Calculando equivalências e hábitos do paciente...
-      </div>
-    );
-  }
-  if (isError) {
-    return (
-      <div style={{ flex: 1, padding: 30, textAlign: 'center' }}>
-        <div style={{ color: 'var(--coral)', marginBottom: 12 }}>
-          Falha ao carregar substituições do catálogo TACO.
-        </div>
-        {onRetry && (
-          <button type="button" className="btn btn-secondary text-xs" onClick={onRetry}>
-            Tentar novamente
-          </button>
-        )}
-      </div>
-    );
-  }
-  if (!substitutions || substitutions.length === 0) {
-    return (
-      <div style={{ flex: 1, padding: 30, textAlign: 'center', color: 'var(--fg-muted)' }}>
-        Nenhum alimento substituto encontrado com proporção equivalente no catálogo.
-      </div>
-    );
-  }
-  return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-      {substitutions.map((sub) => (
-        <FoodSubstitutionOptionCard
-          key={sub.foodId}
-          item={sub}
-          onApply={onApplySubstitution}
-          onCopySingle={onCopySingle}
-          isReadOnly={isReadOnly}
-          isApplying={isApplying}
-        />
-      ))}
-    </div>
-  );
-}
+import { ModalBodyContent } from './FoodSubstitutionModalContent';
 
 function ModalFooter({
   onCopyAll,
@@ -259,42 +195,42 @@ export function FoodSubstitutionModal({
   };
 
   const handleCopySingle = (item: FoodSubstitutionItem) => {
-    const text = `🥗 Substituição: ${item.householdPortion} de ${item.name} (${item.kcal} kcal | ${item.prot}g P | ${item.carb}g C | ${item.fat}g G)`;
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(
+      `🥗 Substituição: ${item.householdPortion} de ${item.name} (${item.kcal} kcal | ${item.prot}g P | ${item.carb}g C | ${item.fat}g G)`,
+    );
     showToastSuccess(`Substituição de ${item.name} copiada!`);
   };
 
-  const modalBackdropStyle: React.CSSProperties = {
-    position: 'fixed',
-    inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  };
-
-  const modalContainerStyle: React.CSSProperties = {
-    width: '100%',
-    maxWidth: 680,
-    maxHeight: '90vh',
-    display: 'flex',
-    flexDirection: 'column',
-    backgroundColor: 'var(--paper)',
-    borderRadius: 8,
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-  };
-
   return (
-    <div style={modalBackdropStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div
         ref={containerRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="substitution-title"
         className="card"
-        style={modalContainerStyle}
+        style={{
+          width: '100%',
+          maxWidth: 680,
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'var(--paper)',
+          borderRadius: 8,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+        }}
       >
         <ModalTitleBar onClose={onClose} />
         <SourceFoodHeader food={sourceFood} />
