@@ -6,8 +6,11 @@ import {
   PlanExtrasTab,
   PlanModals,
   usePlanPdfDownloads,
+  ApplyTemplateModal,
+  SaveAsTemplateModal,
 } from '../components/plan';
 import { usePlan, usePlanUIStore, useUpdatePlan } from '../stores/planStore';
+import { usePlanTemplateUIStore } from '../stores/planTemplateStore';
 import { useAuthStore } from '../stores/authStore';
 import type { MealSlot, MealOption } from '../types/plan';
 
@@ -30,6 +33,8 @@ export function PlansView({ patientId }: PlansViewProps) {
   const planUI = usePlanUIStore();
   const isReadOnly = useAuthStore((s) => Boolean(s.user?.readOnly));
   const openReadOnlyModal = useAuthStore((s) => s.openReadOnlyModal);
+
+  const templateUI = usePlanTemplateUIStore();
 
   const [section, setSection] = useState<'meals' | 'extras'>('meals');
 
@@ -80,6 +85,8 @@ export function PlansView({ patientId }: PlansViewProps) {
         downloadingGrocery={downloadingGrocery}
         isReadOnly={isReadOnly}
         onReadOnlyClick={openReadOnlyModal}
+        onOpenApplyTemplate={() => templateUI.setApplyModalOpen(true)}
+        onOpenSaveTemplate={() => templateUI.setSaveModalOpen(true)}
       />
 
       {section === 'extras' ? (
@@ -106,6 +113,23 @@ export function PlansView({ patientId }: PlansViewProps) {
         activeOpt={activeOpt}
         meals={meals}
       />
+
+      {templateUI.applyModalOpen && (
+        <ApplyTemplateModal
+          patientId={patientId}
+          onClose={() => templateUI.setApplyModalOpen(false)}
+          isReadOnly={isReadOnly}
+          onReadOnlyClick={openReadOnlyModal}
+        />
+      )}
+
+      {templateUI.saveModalOpen && (
+        <SaveAsTemplateModal
+          patientId={patientId}
+          plan={plan}
+          onClose={() => templateUI.setSaveModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
