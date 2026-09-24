@@ -121,4 +121,22 @@ describe('ConfirmModal', () => {
     expect(cancelBtn.disabled).toBe(true);
     expect(confirmBtn.disabled).toBe(true);
   });
+
+  it('does not call onClose when clicking on the backdrop overlay if isPending is true', () => {
+    const handleClose = vi.fn();
+    render(
+      <ConfirmModal
+        isOpen={true}
+        title="Confirmar"
+        description="Aguarde..."
+        isPending={true}
+        onClose={handleClose}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    const overlay = screen.getByTestId('confirm-modal-overlay');
+    fireEvent.click(overlay);
+    expect(handleClose).not.toHaveBeenCalled();
+  });
 });

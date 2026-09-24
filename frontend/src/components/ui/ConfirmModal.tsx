@@ -72,7 +72,7 @@ export function ConfirmModal({
         placeItems: 'center',
         padding: 20,
       }}
-      onClick={onClose}
+      onClick={isPending ? undefined : onClose}
     >
       <div
         ref={containerRef}
