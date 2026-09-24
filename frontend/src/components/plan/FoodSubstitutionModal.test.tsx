@@ -233,4 +233,27 @@ describe('FoodSubstitutionModal - Actions', () => {
 
     expect(screen.queryByRole('button', { name: /Substituir no Plano/i })).not.toBeInTheDocument();
   });
+
+  it('disables apply button and shows substituting text when isApplying is true', () => {
+    vi.mocked(subStore.useFoodSubstitutionCalculator).mockReturnValue({
+      mutate: mockMutate,
+      data: mockResponse,
+      isPending: false,
+      isError: false,
+    } as unknown as SubCalculatorReturn);
+
+    render(
+      <FoodSubstitutionModal
+        isOpen={true}
+        onClose={mockOnClose}
+        sourceFood={mockSourceFood}
+        onApplySubstitution={mockOnApply}
+        isApplying={true}
+      />,
+    );
+
+    const applyingButtons = screen.getAllByRole('button', { name: /Substituindo\.\.\./i });
+    expect(applyingButtons).toHaveLength(2);
+    expect(applyingButtons[0]).toBeDisabled();
+  });
 });

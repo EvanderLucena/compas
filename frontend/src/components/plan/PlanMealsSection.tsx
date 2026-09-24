@@ -37,6 +37,7 @@ export function PlanMealsSection({
     openSubstitutionModal,
     closeSubstitutionModal,
     handleApplySubstitution,
+    isApplying,
   } = usePlanFoodSubstitution(patientId, activeMeal, activeOpt);
 
   return (
@@ -98,6 +99,7 @@ export function PlanMealsSection({
           patientId={patientId}
           onApplySubstitution={handleApplySubstitution}
           isReadOnly={isReadOnly}
+          isApplying={isApplying}
         />
       )}
     </>

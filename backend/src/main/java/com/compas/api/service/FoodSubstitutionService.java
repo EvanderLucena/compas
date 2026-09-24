@@ -120,28 +120,32 @@ public class FoodSubstitutionService {
     private SourceFoodData resolveSourceFood(UUID nutritionistId, FoodSubstitutionRequest request) {
         BigDecimal amount = request.sourceAmount();
         if (request.foodId() != null) {
-            Optional<Food> optFood = foodRepository.findAvailableById(request.foodId(), nutritionistId);
-            if (optFood.isPresent()) {
-                Food food = optFood.get();
-                BigDecimal ref = food.getReferenceAmount() != null && food.getReferenceAmount().compareTo(ZERO) > 0
-                        ? food.getReferenceAmount() : HUNDRED;
-                BigDecimal ratio = amount.divide(ref, 6, RoundingMode.HALF_UP);
-                return new SourceFoodData(
-                        food.getId(),
-                        food.getName(),
-                        amount,
-                        food.getUnit() != null ? food.getUnit() : "GRAMAS",
-                        food.getCategory(),
-                        food.getKcal().multiply(ratio),
-                        food.getProt().multiply(ratio),
-                        food.getCarb().multiply(ratio),
-                        food.getFat().multiply(ratio),
-                        food.getFiber() != null ? food.getFiber().multiply(ratio) : ZERO
-                );
-            }
+            Food food = foodRepository.findAvailableById(request.foodId(), nutritionistId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Alimento de origem com ID " + request.foodId() + " não encontrado no catálogo."));
+            BigDecimal ref = food.getReferenceAmount() != null && food.getReferenceAmount().compareTo(ZERO) > 0
+                    ? food.getReferenceAmount() : HUNDRED;
+            BigDecimal ratio = amount.divide(ref, 6, RoundingMode.HALF_UP);
+            return new SourceFoodData(
+                    food.getId(),
+                    food.getName(),
+                    amount,
+                    food.getUnit() != null ? food.getUnit() : "GRAMAS",
+                    food.getCategory(),
+                    food.getKcal().multiply(ratio),
+                    food.getProt().multiply(ratio),
+                    food.getCarb().multiply(ratio),
+                    food.getFat().multiply(ratio),
+                    food.getFiber() != null ? food.getFiber().multiply(ratio) : ZERO
+            );
         }
 
-        String name = request.sourceFoodName() != null ? request.sourceFoodName().trim() : "Alimento";
+        if (request.sourceFoodName() == null || request.sourceFoodName().trim().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Nome do alimento de origem é obrigatório quando foodId não é informado.");
+        }
+
+        String name = request.sourceFoodName().trim();
         String unit = request.sourceUnit() != null ? request.sourceUnit().toUpperCase(Locale.ROOT) : "GRAMAS";
         String cat = request.category() != null ? request.category().toUpperCase(Locale.ROOT) : "OUTRO";
         BigDecimal kcal = request.sourceKcal() != null ? request.sourceKcal() : BigDecimal.valueOf(100);
@@ -199,7 +203,12 @@ public class FoodSubstitutionService {
                 ? candidate.getReferenceAmount() : HUNDRED;
 
         BigDecimal suggestedAmount = calculateSuggestedAmount(source, candidate, candRef, dominantMacro);
-        if (suggestedAmount == null || suggestedAmount.compareTo(BigDecimal.valueOf(5)) < 0) {
+        if (suggestedAmount == null) {
+            return null;
+        }
+        boolean isUnitBased = candidate.getUnit() != null && "UNIDADE".equalsIgnoreCase(candidate.getUnit());
+        BigDecimal minThreshold = isUnitBased ? BigDecimal.valueOf(0.5) : BigDecimal.valueOf(5);
+        if (suggestedAmount.compareTo(minThreshold) < 0) {
             return null;
         }
 

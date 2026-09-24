@@ -5,6 +5,7 @@ interface FoodSubstitutionOptionCardProps {
   onApply?: (item: FoodSubstitutionItem) => void;
   onCopySingle: (item: FoodSubstitutionItem) => void;
   isReadOnly?: boolean;
+  isApplying?: boolean;
 }
 
 function CardHeader({ item }: { item: FoodSubstitutionItem }) {
@@ -99,6 +100,7 @@ export function FoodSubstitutionOptionCard({
   onApply,
   onCopySingle,
   isReadOnly,
+  isApplying,
 }: FoodSubstitutionOptionCardProps) {
   const isPositiveDelta = item.deltaKcal >= 0;
   const deltaSign = isPositiveDelta ? '+' : '';
@@ -163,9 +165,15 @@ export function FoodSubstitutionOptionCard({
             type="button"
             className="btn btn-primary"
             onClick={() => onApply(item)}
-            style={{ fontSize: 11.5, padding: '3px 10px' }}
+            disabled={isApplying}
+            style={{
+              fontSize: 11.5,
+              padding: '3px 10px',
+              opacity: isApplying ? 0.7 : 1,
+              cursor: isApplying ? 'not-allowed' : 'pointer',
+            }}
           >
-            Substituir no Plano
+            {isApplying ? 'Substituindo...' : 'Substituir no Plano'}
           </button>
         )}
       </div>

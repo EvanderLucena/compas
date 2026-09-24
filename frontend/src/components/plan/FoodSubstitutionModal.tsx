@@ -13,6 +13,7 @@ interface FoodSubstitutionModalProps {
   patientId?: string | null;
   onApplySubstitution?: (targetItem: FoodSubstitutionItem) => void;
   isReadOnly?: boolean;
+  isApplying?: boolean;
 }
 
 function SourceFoodHeader({ food }: { food: MealFood }) {
@@ -113,6 +114,7 @@ interface ModalBodyContentProps {
   onApplySubstitution?: (targetItem: FoodSubstitutionItem) => void;
   onCopySingle: (item: FoodSubstitutionItem) => void;
   isReadOnly?: boolean;
+  isApplying?: boolean;
 }
 
 function ModalBodyContent({
@@ -122,6 +124,7 @@ function ModalBodyContent({
   onApplySubstitution,
   onCopySingle,
   isReadOnly,
+  isApplying,
 }: ModalBodyContentProps) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
@@ -145,6 +148,7 @@ function ModalBodyContent({
             onApply={onApplySubstitution}
             onCopySingle={onCopySingle}
             isReadOnly={isReadOnly}
+            isApplying={isApplying}
           />
         ))
       )}
@@ -196,6 +200,7 @@ export function FoodSubstitutionModal({
   patientId,
   onApplySubstitution,
   isReadOnly,
+  isApplying,
 }: FoodSubstitutionModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   useModalA11y({ onClose, containerRef });
@@ -279,11 +284,12 @@ export function FoodSubstitutionModal({
           onApplySubstitution={onApplySubstitution}
           onCopySingle={handleCopySingle}
           isReadOnly={isReadOnly}
+          isApplying={isApplying}
         />
         <ModalFooter
           onCopyAll={handleCopyAll}
           onClose={onClose}
-          disabled={!data || data.substitutions.length === 0}
+          disabled={Boolean(isApplying || !data || data.substitutions.length === 0)}
         />
       </div>
     </div>

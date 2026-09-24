@@ -23,7 +23,14 @@ export function usePlanFoodSubstitution(
   };
 
   const handleApplySubstitution = (targetSub: FoodSubstitutionItem) => {
-    if (!activeMeal || !activeOpt || !substitutingFood) return;
+    if (addFoodItem.isPending || deleteFoodItem.isPending) return;
+
+    if (!activeMeal || !activeOpt || !substitutingFood) {
+      useToastStore
+        .getState()
+        .showError('Não foi possível identificar a refeição ativa para aplicar a substituição.');
+      return;
+    }
 
     const sourceItem = substitutingFood;
     const portion = targetSub.suggestedAmount;
@@ -38,7 +45,7 @@ export function usePlanFoodSubstitution(
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (createdItem) => {
           deleteFoodItem.mutate(
             {
               mealId: activeMeal.id,
@@ -51,12 +58,18 @@ export function usePlanFoodSubstitution(
                 setSubstitutingFood(null);
               },
               onError: (err) => {
+                if (createdItem?.id) {
+                  deleteFoodItem.mutate({
+                    mealId: activeMeal.id,
+                    optionId: activeOpt.id,
+                    itemId: createdItem.id,
+                  });
+                }
                 const msg = resolveMutationErrorMessage(
                   err,
-                  'Alimento adicionado, mas falhou ao remover o anterior',
+                  'Falha ao remover o alimento original. A substituição foi desfeita.',
                 );
                 useToastStore.getState().showError(msg);
-                setSubstitutingFood(null);
               },
             },
           );

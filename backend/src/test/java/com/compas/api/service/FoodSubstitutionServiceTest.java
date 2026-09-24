@@ -273,4 +273,74 @@ class FoodSubstitutionServiceTest {
         assertThrows(ResourceNotFoundException.class, () ->
                 foodSubstitutionService.calculateSubstitutionsForPatient(nutritionistId, patientId, req));
     }
+
+    @Test
+    void calculateSubstitutions_sourceFoodIdNotFound_throwsException() {
+        UUID unknownFoodId = UUID.randomUUID();
+        when(foodRepository.findAvailableById(unknownFoodId, nutritionistId))
+                .thenReturn(Optional.empty());
+
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                unknownFoodId, null, BigDecimal.valueOf(100), null, null, null, null, null, null, 5);
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                foodSubstitutionService.calculateGeneralSubstitutions(nutritionistId, req));
+    }
+
+    @Test
+    void calculateSubstitutions_missingFoodNameAndId_throwsException() {
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                null, "   ", BigDecimal.valueOf(100), null, null, null, null, null, null, 5);
+
+        assertThrows(IllegalArgumentException.class, () ->
+                foodSubstitutionService.calculateGeneralSubstitutions(nutritionistId, req));
+    }
+
+    @Test
+    void calculateSubstitutions_unitBasedCandidate_preservesLowUnitCount() {
+        Food queijo = Food.builder()
+                .id(UUID.randomUUID())
+                .name("Queijo minas frescal")
+                .category("PROTEINA")
+                .unit("GRAMAS")
+                .referenceAmount(BigDecimal.valueOf(100))
+                .kcal(BigDecimal.valueOf(260))
+                .prot(BigDecimal.valueOf(17))
+                .carb(BigDecimal.valueOf(3))
+                .fat(BigDecimal.valueOf(20))
+                .fiber(BigDecimal.ZERO)
+                .portionLabel("1 fatia média · 50g")
+                .build();
+
+        Food ovo = Food.builder()
+                .id(UUID.randomUUID())
+                .name("Ovo de galinha cozido")
+                .category("PROTEINA")
+                .unit("UNIDADE")
+                .referenceAmount(BigDecimal.ONE)
+                .portionLabel("1 unidade")
+                .kcal(BigDecimal.valueOf(70))
+                .prot(BigDecimal.valueOf(6))
+                .carb(BigDecimal.valueOf(0.5))
+                .fat(BigDecimal.valueOf(5))
+                .fiber(BigDecimal.ZERO)
+                .build();
+
+        when(foodRepository.findAvailableById(queijo.getId(), nutritionistId))
+                .thenReturn(Optional.of(queijo));
+        when(foodRepository.findAvailableByNutritionistIdAndCategory(nutritionistId, "PROTEINA"))
+                .thenReturn(List.of(queijo, ovo));
+
+        // 50g queijo (8.5g prot, 130 kcal) -> ~1.5 ovos (9g prot, 105 kcal, delta -25 kcal, 19% dev)
+        // 1.5 is well below 5, but because unit is UNIDADE, it is preserved!
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                queijo.getId(), null, BigDecimal.valueOf(50), null, null, null, null, null, null, 5);
+
+        FoodSubstitutionResponse response = foodSubstitutionService.calculateGeneralSubstitutions(nutritionistId, req);
+
+        assertNotNull(response);
+        assertEquals(1, response.substitutions().size());
+        assertEquals("Ovo de galinha cozido", response.substitutions().get(0).name());
+        assertEquals(BigDecimal.valueOf(1.5), response.substitutions().get(0).suggestedAmount());
+    }
 }
