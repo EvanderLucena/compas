@@ -15,6 +15,46 @@ interface BiometryComparisonCardProps {
   downloadingPdf?: boolean;
 }
 
+function BiometryComparisonHeader({ daysBetween }: { daysBetween?: number }) {
+  return (
+    <div
+      className="card-h"
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '16px 20px',
+        borderBottom: '1px solid var(--border)',
+        backgroundColor: 'var(--paper)',
+      }}
+    >
+      <div>
+        <div className="title" style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+          Comparativo Evolutivo Biométrico
+        </div>
+        <div className="sub" style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>
+          ANÁLISE COMPARATIVA DE PROGRESSO · RETORNO CLÍNICO
+        </div>
+      </div>
+      {daysBetween !== undefined && (
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            padding: '4px 10px',
+            borderRadius: 6,
+            backgroundColor: 'var(--paper-2)',
+            color: 'var(--fg-muted)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          Intervalo: {daysBetween} dias
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BiometryComparisonCard({
   patientId,
   assessments,
@@ -22,13 +62,11 @@ export function BiometryComparisonCard({
   onDownloadPdf,
   downloadingPdf,
 }: BiometryComparisonCardProps) {
-  // Default base: first assessment (marco zero); target: latest assessment
   const [baseId, setBaseId] = useState<string>(() => assessments[0]?.id ?? '');
   const [targetId, setTargetId] = useState<string>(
     () => assessments[assessments.length - 1]?.id ?? '',
   );
 
-  // Keep ids in sync if assessments change
   useEffect(() => {
     if (assessments.length >= 2) {
       if (!assessments.some((a) => a.id === baseId)) {
@@ -73,44 +111,8 @@ export function BiometryComparisonCard({
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div
-        className="card-h"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border)',
-          backgroundColor: 'var(--paper)',
-        }}
-      >
-        <div>
-          <div className="title" style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-            Comparativo Evolutivo Biométrico
-          </div>
-          <div className="sub" style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 2 }}>
-            ANÁLISE COMPARATIVA DE PROGRESSO · RETORNO CLÍNICO
-          </div>
-        </div>
-        {comparison && (
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              padding: '4px 10px',
-              borderRadius: 6,
-              backgroundColor: 'var(--paper-2)',
-              color: 'var(--fg-muted)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            Intervalo: {comparison.daysBetween} dias
-          </div>
-        )}
-      </div>
+      <BiometryComparisonHeader daysBetween={comparison?.daysBetween} />
 
-      {/* Selectors */}
       <BiometryComparisonSelectors
         assessments={assessments}
         baseId={baseId}
@@ -122,7 +124,6 @@ export function BiometryComparisonCard({
         fmtDate={fmtDate}
       />
 
-      {/* Content states */}
       {isLoading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--fg-muted)' }}>
           Calculando comparativo biométrico...

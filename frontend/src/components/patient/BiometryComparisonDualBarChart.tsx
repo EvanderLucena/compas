@@ -12,6 +12,15 @@ interface MetricBarData {
   targetVal: number;
 }
 
+function fmtDatePtBr(iso?: string | null): string {
+  if (!iso) return '—';
+  const parts = iso.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return iso;
+}
+
 interface BarItemProps {
   item: MetricBarData;
   maxVal: number;
@@ -108,7 +117,9 @@ function DualBarChartLegend({
             display: 'inline-block',
           }}
         />
-        <span style={{ color: 'var(--fg-muted)' }}>Base ({baseDate ?? 'Inicial'})</span>
+        <span style={{ color: 'var(--fg-muted)' }}>
+          Base ({baseDate ? fmtDatePtBr(baseDate) : 'Inicial'})
+        </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span
@@ -121,7 +132,7 @@ function DualBarChartLegend({
           }}
         />
         <span style={{ color: 'var(--ink)', fontWeight: 600 }}>
-          Retorno ({targetDate ?? 'Atual'})
+          Retorno ({targetDate ? fmtDatePtBr(targetDate) : 'Atual'})
         </span>
       </div>
     </div>

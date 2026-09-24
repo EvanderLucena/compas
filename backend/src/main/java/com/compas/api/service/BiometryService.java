@@ -808,7 +808,7 @@ public class BiometryService {
 
         long daysBetween = 0L;
         if (base.getAssessmentDate() != null && target.getAssessmentDate() != null) {
-            daysBetween = ChronoUnit.DAYS.between(base.getAssessmentDate(), target.getAssessmentDate());
+            daysBetween = Math.abs(ChronoUnit.DAYS.between(base.getAssessmentDate(), target.getAssessmentDate()));
         }
 
         BigDecimal weightDelta = computeDelta(target.getWeight(), base.getWeight());
