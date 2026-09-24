@@ -110,6 +110,7 @@ public class DataInitializer implements CommandLineRunner {
                 List<Food> foods = ensureDemoFoods(demo.getId());
                 if (!patientRepository.findAllByNutritionistId(demo.getId()).isEmpty()) {
                     ensureDemoHistoryCycle(demo.getId(), foods);
+                    ensureEvanderDemoData(demo.getId(), foods);
                     logger.info("Dev seed already has patients, skipping demo clinical data. Foods available: {}.", foods.size());
                     return;
                 }
@@ -117,6 +118,7 @@ public class DataInitializer implements CommandLineRunner {
                 List<Patient> patients = createDemoPatients(demo.getId());
                 createDemoClinicalData(demo.getId(), patients, foods);
                 ensureDemoHistoryCycle(demo.getId(), foods);
+                ensureEvanderDemoData(demo.getId(), foods);
                 logger.info("Dev seed created: {} patients, {} foods, plans, biometry and history.", patients.size(), foods.size());
             });
         });
@@ -356,6 +358,212 @@ public class DataInitializer implements CommandLineRunner {
                     .metadataJson("{\"objective\":\"EMAGRECIMENTO\"}")
                     .build());
         }
+    }
+
+    private void ensureEvanderDemoData(UUID nutritionistId, List<Food> foods) {
+        Patient evander = patientRepository.findAllByNutritionistId(nutritionistId).stream()
+                .filter(p -> p.getName() != null && p.getName().toLowerCase().contains("evander"))
+                .findFirst()
+                .orElse(null);
+        if (evander == null) {
+            evander = patientRepository.save(Patient.builder()
+                    .nutritionistId(nutritionistId)
+                    .name("Evander")
+                    .initials("EV")
+                    .birthDate(LocalDate.of(1993, 2, 26))
+                    .sex("M")
+                    .heightCm(186)
+                    .whatsapp("+5511999887766")
+                    .age(33)
+                    .objective(PatientObjective.HIPERTROFIA)
+                    .status(PatientStatus.ONTRACK)
+                    .adherence(92)
+                    .weight(bd("82.20"))
+                    .weightDelta(bd("-4.30"))
+                    .tag("recomposição")
+                    .active(true)
+                    .build());
+        } else {
+            evander.setWeight(bd("82.20"));
+            evander.setWeightDelta(bd("-4.30"));
+            evander.setObjective(PatientObjective.HIPERTROFIA);
+            evander.setStatus(PatientStatus.ONTRACK);
+            evander.setAdherence(92);
+            patientRepository.save(evander);
+        }
+
+        if (historyEventRepository.existsBySourceRefAndNutritionistId(
+                "seed-evander-cycle1", nutritionistId)) {
+            return;
+        }
+
+        final Patient patient = evander;
+
+        // 1. Ciclo 1 (Fechado - Emagrecimento e Adaptacao)
+        LocalDateTime start1 = LocalDateTime.now().minusMonths(9);
+        LocalDateTime end1 = LocalDateTime.now().minusMonths(6);
+        Episode cycle1 = episodeRepository.save(Episode.builder()
+                .patientId(patient.getId())
+                .nutritionistId(nutritionistId)
+                .startDate(start1)
+                .endDate(end1)
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle1.getId())
+                .eventType("EPISODE_OPENED")
+                .eventAt(start1)
+                .title("Inicio do Ciclo 1: Emagrecimento")
+                .description("Anamnese inicial e definicao de plano hipocalorico sustentavel.")
+                .sourceRef("seed-evander-cycle1")
+                .metadataJson("{\"objective\":\"EMAGRECIMENTO\"}")
+                .build());
+
+        assessmentRepository.save(BiometryAssessment.builder()
+                .nutritionistId(nutritionistId)
+                .patientId(patient.getId())
+                .episodeId(cycle1.getId())
+                .assessmentDate(start1.toLocalDate().plusDays(3))
+                .weight(bd("89.40"))
+                .bodyFatPercent(bd("26.20"))
+                .leanMassKg(bd("65.90"))
+                .waterPercent(bd("52.00"))
+                .visceralFatLevel(9)
+                .bmrKcal(1850)
+                .notes("Avaliacao inicial Ciclo 1. Sedentario recente, queixa de baixa energia.")
+                .build());
+
+        if (foods != null && !foods.isEmpty()) {
+            createPlan(nutritionistId, cycle1, foods, 1);
+        }
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle1.getId())
+                .eventType("PLAN_CREATED")
+                .eventAt(start1.plusDays(4))
+                .title("Plano Fase 1 Publicado (2.100 kcal)")
+                .description("Plano com 5 refeicoes, foco em aporte proteico de 1.8g/kg e fibras.")
+                .sourceRef("seed-evander-cycle1")
+                .build());
+
+        assessmentRepository.save(BiometryAssessment.builder()
+                .nutritionistId(nutritionistId)
+                .patientId(patient.getId())
+                .episodeId(cycle1.getId())
+                .assessmentDate(start1.toLocalDate().plusDays(55))
+                .weight(bd("85.80"))
+                .bodyFatPercent(bd("23.50"))
+                .leanMassKg(bd("65.60"))
+                .waterPercent(bd("54.20"))
+                .visceralFatLevel(8)
+                .bmrKcal(1820)
+                .notes("Reavaliacao 60 dias Ciclo 1. Perda de 3.6kg de gordura pura.")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle1.getId())
+                .eventType("CONSULTATION")
+                .eventAt(end1.minusDays(5))
+                .title("Consulta de Conclusao do Ciclo 1")
+                .description("Meta do ciclo 1 batida com louvor. Paciente pronto para pausa programada.")
+                .sourceRef("seed-evander-cycle1")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle1.getId())
+                .eventType("EPISODE_CLOSED")
+                .eventAt(end1)
+                .title("Ciclo 1 Finalizado (-3.6 kg)")
+                .description("Encerramento do primeiro ciclo de adaptacao metabolica.")
+                .sourceRef("seed-evander-cycle1")
+                .metadataJson("{\"objective\":\"EMAGRECIMENTO\"}")
+                .build());
+
+        // 2. Ciclo 2 (Ativo - Recomposicao e Hipertrofia)
+        Episode cycle2 = episodeRepository
+                .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(
+                        patient.getId(), nutritionistId)
+                .orElseGet(() -> episodeRepository.save(Episode.builder()
+                        .patientId(patient.getId())
+                        .nutritionistId(nutritionistId)
+                        .startDate(LocalDateTime.now().minusMonths(3))
+                        .build()));
+
+        LocalDateTime c2Start = cycle2.getStartDate();
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("CONSULTATION")
+                .eventAt(c2Start.plusDays(1))
+                .title("Consulta de Retorno: Nova Fase Hipertrofia")
+                .description("Definicao de objetivos: ganho de massa muscular com controle rigido de gordura.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("PLAN_CREATED")
+                .eventAt(c2Start.plusDays(2))
+                .title("Plano Hipertrofia & Definicao v2 (2.400 kcal)")
+                .description("6 refeicoes balanceadas: 175g Proteina, 260g Carboidrato, 70g Gordura.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("PRESCRIPTION")
+                .eventAt(c2Start.plusDays(5))
+                .title("Prescricao de Suplementacao Manipulada")
+                .description("Creatina Creapure 5g pos-treino, Omega 3 TG 2g com almoco, Vitamina D3 2.000 UI.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("MEAL_EXTRACTION")
+                .eventAt(c2Start.plusDays(20))
+                .title("Almoco registrado via WhatsApp")
+                .description("4 itens: Peito de frango grelhado 180g, arroz integral, feijao carioca, salada verde.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("PLAN_UPDATED")
+                .eventAt(c2Start.plusDays(40))
+                .title("Ajuste Nutricional: Carbo Pre/Pos-treino")
+                .description("Aumento de 30g de carboidratos complexos no pre-treino para melhorar rendimento.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("GOAL_ACHIEVED")
+                .eventAt(LocalDateTime.now().minusDays(8))
+                .title("Marco Clinico: Gordura Corporal < 20%")
+                .description("Gordura reduzida para 19.5% com ganho de massa magra comprovado na biometria.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
+
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(cycle2.getId())
+                .eventType("NOTE")
+                .eventAt(LocalDateTime.now().minusDays(3))
+                .title("Anotacao Clinica: Evolucao e Aderencia")
+                .description("Paciente com excelente rotina de treinos e dieta, alta aderencia aos manipulados.")
+                .sourceRef("seed-evander-cycle2")
+                .build());
     }
 
     private void createHistoricalAssessments(UUID nutritionistId, Patient patient, Episode episode, LocalDateTime start) {

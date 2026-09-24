@@ -440,4 +440,45 @@ class BiometryControllerTest {
                 .andExpect(jsonPath("$.data.clinicalSynthesis").isString())
                 .andExpect(jsonPath("$.data.whatsappFeedbackMessage").isString());
     }
+
+    @Test
+    void getTimeline_returnsTimelineEvents() throws Exception {
+        historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .episodeId(episodeId)
+                .nutritionistId(nutritionistId)
+                .eventType("CONSULTATION")
+                .eventAt(LocalDateTime.now())
+                .title("Consulta de Retorno")
+                .description("Evolução positiva.")
+                .sourceRef("test")
+                .build());
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/biometry/history/timeline", patientId)
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].title").value("Consulta de Retorno"))
+                .andExpect(jsonPath("$.data[0].currentEpisode").value(true));
+    }
+
+    @Test
+    void addTimelineNote_createsNoteAndReturnsEvent() throws Exception {
+        String noteJson = """
+                {
+                    "title": "Anotação Teste",
+                    "description": "Detalhes clínicos"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/patients/{patientId}/biometry/history/notes", patientId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(noteJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.title").value("Anotação Teste"))
+                .andExpect(jsonPath("$.data.eventType").value("NOTE"))
+                .andExpect(jsonPath("$.data.currentEpisode").value(true));
+    }
 }

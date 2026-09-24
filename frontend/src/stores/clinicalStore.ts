@@ -6,6 +6,7 @@ import type {
   CreateBiometryAssessmentRequest,
   UpdateBiometryAssessmentRequest,
 } from '../types/patient';
+import type { CreateTimelineNoteRequest } from '../types/timeline';
 import { useToastStore } from './toastStore';
 import { resolveMutationErrorMessage } from './patientStore';
 
@@ -54,6 +55,7 @@ function invalidateClinicalQueries(
   queryClient.invalidateQueries({ queryKey: ['biometry-evolution-summary', patientId] });
   queryClient.invalidateQueries({ queryKey: ['biometry-comparison', patientId] });
   queryClient.invalidateQueries({ queryKey: ['patient-history', patientId] });
+  queryClient.invalidateQueries({ queryKey: ['patient-timeline', patientId] });
   queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 }
 
@@ -147,5 +149,31 @@ export function useBiometryComparison(
       );
     },
     enabled: !!patientId,
+  });
+}
+
+export function usePatientTimeline(patientId: string | null) {
+  return useQuery({
+    queryKey: ['patient-timeline', patientId],
+    queryFn: () => {
+      if (!patientId) throw new Error('Patient ID is required');
+      return biometryApi.getPatientTimeline(patientId);
+    },
+    enabled: !!patientId,
+  });
+}
+
+export function useAddTimelineNote(patientId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateTimelineNoteRequest) => biometryApi.addTimelineNote(patientId, data),
+    onSuccess: () => {
+      invalidateClinicalQueries(queryClient, patientId);
+    },
+    onError: (error) => {
+      useToastStore
+        .getState()
+        .showError(resolveMutationErrorMessage(error, 'Erro ao salvar anotação — tente novamente'));
+    },
   });
 }

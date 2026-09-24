@@ -16,7 +16,15 @@ public interface EpisodeHistoryEventRepository {
             UUID episodeId,
             UUID nutritionistId);
 
+    List<EpisodeHistoryEvent> findByEpisodeIdInAndNutritionistIdOrderByEventAtDesc(
+            List<UUID> episodeIds,
+            UUID nutritionistId);
+
     Optional<EpisodeHistoryEvent> findBySourceRefAndNutritionistId(
+            String sourceRef,
+            UUID nutritionistId);
+
+    boolean existsBySourceRefAndNutritionistId(
             String sourceRef,
             UUID nutritionistId);
 }

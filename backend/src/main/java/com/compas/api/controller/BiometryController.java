@@ -8,6 +8,8 @@ import com.compas.api.dto.biometry.BiometryEvolutionSummaryResponse;
 import com.compas.api.dto.biometry.BiometryHistoryEpisodeResponse;
 import com.compas.api.dto.biometry.BiometryHistorySnapshotResponse;
 import com.compas.api.dto.biometry.CreateBiometryAssessmentRequest;
+import com.compas.api.dto.biometry.CreateTimelineNoteRequest;
+import com.compas.api.dto.biometry.PatientTimelineEventResponse;
 import com.compas.api.dto.biometry.UpdateBiometryAssessmentRequest;
 import com.compas.api.service.BiometryService;
 import jakarta.validation.Valid;
@@ -84,7 +86,27 @@ public class BiometryController {
             @PathVariable UUID episodeId
     ) {
         UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
-        BiometryHistorySnapshotResponse response = biometryService.getHistorySnapshot(nutritionistId, patientId, episodeId);
+        BiometryHistorySnapshotResponse response = biometryService.getHistorySnapshot(
+                nutritionistId, patientId, episodeId);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @GetMapping("/history/timeline")
+    public ResponseEntity<ApiResponse<List<PatientTimelineEventResponse>>> getTimeline(
+            @PathVariable UUID patientId
+    ) {
+        UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
+        List<PatientTimelineEventResponse> response = biometryService.getPatientTimeline(nutritionistId, patientId);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @PostMapping("/history/notes")
+    public ResponseEntity<ApiResponse<PatientTimelineEventResponse>> addTimelineNote(
+            @PathVariable UUID patientId,
+            @RequestBody @Valid CreateTimelineNoteRequest request
+    ) {
+        UUID nutritionistId = NutritionistAccess.getCurrentNutritionistId();
+        PatientTimelineEventResponse response = biometryService.addTimelineNote(nutritionistId, patientId, request);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

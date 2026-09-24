@@ -6,7 +6,9 @@ import com.compas.api.dto.biometry.BiometryEvolutionSummaryResponse;
 import com.compas.api.dto.biometry.BiometryHistoryEpisodeResponse;
 import com.compas.api.dto.biometry.BiometryHistorySnapshotResponse;
 import com.compas.api.dto.biometry.CreateBiometryAssessmentRequest;
+import com.compas.api.dto.biometry.CreateTimelineNoteRequest;
 import com.compas.api.dto.biometry.EpisodeHistoryEventResponse;
+import com.compas.api.dto.biometry.PatientTimelineEventResponse;
 import com.compas.api.dto.biometry.PerimetryDeltaResponse;
 import com.compas.api.dto.biometry.SkinfoldDeltaResponse;
 import com.compas.api.dto.biometry.UpdateBiometryAssessmentRequest;
@@ -41,10 +43,12 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -295,6 +299,102 @@ public class BiometryService {
                 episodeId, episode.getStartDate(), episode.getEndDate(),
                 resolveEpisodeObjective(timelineEvents, patient),
                 mealSlotCount, foodItemCount, assessmentResponses, eventResponses);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PatientTimelineEventResponse> getPatientTimeline(UUID nutritionistId, UUID patientId) {
+        patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
+
+        List<Episode> episodes = episodeRepository
+                .findByPatientIdAndNutritionistIdOrderByStartDateDesc(patientId, nutritionistId);
+
+        if (episodes.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> episodeIds = episodes.stream().map(Episode::getId).toList();
+        List<EpisodeHistoryEvent> events = historyEventRepository
+                .findByEpisodeIdInAndNutritionistIdOrderByEventAtDesc(episodeIds, nutritionistId);
+
+        Map<UUID, Episode> episodeMap = episodes.stream()
+                .collect(Collectors.toMap(Episode::getId, e -> e, (a, b) -> a));
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("MMM yyyy", Locale.forLanguageTag("pt-BR"));
+
+        return events.stream().map(ev -> {
+            Episode ep = episodeMap.get(ev.getEpisodeId());
+            boolean isCurrent = ep != null && ep.getEndDate() == null;
+            String episodeTitle;
+            if (ep == null) {
+                episodeTitle = "Geral";
+            } else if (isCurrent) {
+                episodeTitle = "Ciclo Atual (Em andamento)";
+            } else {
+                String startStr = ep.getStartDate() != null ? ep.getStartDate().format(fmt) : "";
+                String endStr = ep.getEndDate() != null ? ep.getEndDate().format(fmt) : "";
+                episodeTitle = "Ciclo Anterior (" + startStr + " - " + endStr + ")";
+            }
+
+            return new PatientTimelineEventResponse(
+                    ev.getId(),
+                    ev.getEpisodeId(),
+                    episodeTitle,
+                    isCurrent,
+                    ev.getEventType(),
+                    ev.getEventAt(),
+                    ev.getTitle(),
+                    ev.getDescription(),
+                    ev.getSourceRef(),
+                    ev.getMetadataJson()
+            );
+        }).toList();
+    }
+
+    @Transactional
+    public PatientTimelineEventResponse addTimelineNote(
+            UUID nutritionistId,
+            UUID patientId,
+            CreateTimelineNoteRequest request
+    ) {
+        patientRepository.findByIdAndNutritionistId(patientId, nutritionistId)
+                .orElseThrow(() -> new ResourceNotFoundException("Paciente", patientId));
+
+        Episode activeEpisode = episodeRepository
+                .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId)
+                .orElseGet(() -> episodeRepository.save(Episode.builder()
+                        .patientId(patientId)
+                        .nutritionistId(nutritionistId)
+                        .startDate(LocalDateTime.now())
+                        .build()));
+
+        LocalDateTime eventTime = request.eventAt() != null ? request.eventAt() : LocalDateTime.now();
+
+        EpisodeHistoryEvent event = historyEventRepository.save(EpisodeHistoryEvent.builder()
+                .nutritionistId(nutritionistId)
+                .episodeId(activeEpisode.getId())
+                .eventType("NOTE")
+                .eventAt(eventTime)
+                .title(request.title().trim())
+                .description(request.description() != null ? request.description().trim() : null)
+                .sourceRef("manual-note")
+                .build());
+
+        boolean isCurrent = activeEpisode.getEndDate() == null;
+        String episodeTitle = isCurrent ? "Ciclo Atual (Em andamento)" : "Ciclo Registrado";
+
+        return new PatientTimelineEventResponse(
+                event.getId(),
+                event.getEpisodeId(),
+                episodeTitle,
+                isCurrent,
+                event.getEventType(),
+                event.getEventAt(),
+                event.getTitle(),
+                event.getDescription(),
+                event.getSourceRef(),
+                event.getMetadataJson()
+        );
     }
 
     private String resolveEpisodeObjective(List<EpisodeHistoryEvent> timelineEvents, Patient patient) {
