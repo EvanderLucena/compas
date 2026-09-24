@@ -11,6 +11,7 @@ import {
   InsightsTab,
   TodayTab,
   BiometryTab,
+  PrescriptionsTab,
   HistoryTab,
   PatientHeader,
 } from '../components/patient';
@@ -115,6 +116,10 @@ function PatientTabContent({
       return <PlansView patientId={patientId} />;
     case 'biometry':
       return <BiometryTab patientId={patientId} patientStatus={patient.status} />;
+    case 'prescriptions':
+      return (
+        <PrescriptionsTab patientId={patientId} patientPhone={patient.whatsapp ?? undefined} />
+      );
     case 'insights':
       return (
         <InsightsTab

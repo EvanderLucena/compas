@@ -2,7 +2,7 @@ import { IconEdit } from '../icons';
 import { WhatsAppActivationRow } from './WhatsAppActivationRow';
 import type { DetailedPatient } from '../../types/patient';
 
-export type Tab = 'today' | 'plan' | 'biometry' | 'insights' | 'history';
+export type Tab = 'today' | 'plan' | 'biometry' | 'prescriptions' | 'insights' | 'history';
 
 import { HeaderStat } from './HeaderStat';
 
@@ -195,6 +195,7 @@ const TABS: { k: Tab; label: string }[] = [
   { k: 'today', label: 'Hoje' },
   { k: 'plan', label: 'Plano' },
   { k: 'biometry', label: 'Biometria' },
+  { k: 'prescriptions', label: 'Prescrições' },
   { k: 'insights', label: 'Inteligência' },
   { k: 'history', label: 'Histórico' },
 ];
