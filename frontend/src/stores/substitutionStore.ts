@@ -10,13 +10,9 @@ export function useFoodSubstitutionCalculator(patientId?: string | null) {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(patientId);
 
   return useMutation<FoodSubstitutionResponse, Error, FoodSubstitutionRequest>({
-    mutationFn: async (request) => {
+    mutationFn: (request) => {
       if (isUuid && patientId) {
-        try {
-          return await calculatePatientSubstitutions(patientId, request);
-        } catch {
-          return await calculateGeneralSubstitutions(request);
-        }
+        return calculatePatientSubstitutions(patientId, request);
       }
       return calculateGeneralSubstitutions(request);
     },

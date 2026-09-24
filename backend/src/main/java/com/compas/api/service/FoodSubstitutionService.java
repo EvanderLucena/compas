@@ -62,11 +62,7 @@ public class FoodSubstitutionService {
     @Transactional(readOnly = true)
     public FoodSubstitutionResponse calculateSubstitutionsForPatient(
             UUID nutritionistId, UUID patientId, FoodSubstitutionRequest request) {
-        Optional<Patient> patientOpt = patientRepository.findByIdAndNutritionistId(patientId, nutritionistId);
-        if (patientOpt.isEmpty()) {
-            return calculateGeneralSubstitutions(nutritionistId, request);
-        }
-        Patient patient = patientOpt.get();
+        Patient patient = verifyPatientAndGet(nutritionistId, patientId);
         Map<String, Integer> patientHabitFrequency = loadPatientFoodHabits(nutritionistId, patient.getId());
         return computeSubstitutions(nutritionistId, request, patientHabitFrequency, patient.getName());
     }
@@ -188,15 +184,6 @@ public class FoodSubstitutionService {
         if ("VEGETAL".equalsIgnoreCase(source.category())) return "VEGETAL";
         if ("FRUTA".equalsIgnoreCase(source.category())) return "FRUTA";
 
-        if (source.name() != null) {
-            String norm = normalize(source.name());
-            if (norm.contains("ovo") || norm.contains("frango") || norm.contains("carne")
-                    || norm.contains("peixe") || norm.contains("atum") || norm.contains("queijo")
-                    || norm.contains("whey") || norm.contains("tofu")) {
-                return "PROTEINA";
-            }
-        }
-
         double kcal = source.kcal().doubleValue();
         if (kcal <= 5) return "CALORIAS";
 
@@ -204,8 +191,9 @@ public class FoodSubstitutionService {
         double cCal = source.carb().doubleValue() * 4.0;
         double fCal = source.fat().doubleValue() * 9.0;
 
+        if (cCal / kcal >= 0.50) return "CARBOIDRATO";
         if (pCal / kcal >= 0.28 || (source.prot().doubleValue() >= 8.0 && pCal / kcal >= 0.20)) return "PROTEINA";
-        if (cCal / kcal >= 0.45) return "CARBOIDRATO";
+        if (cCal / kcal >= 0.40) return "CARBOIDRATO";
         if (fCal / kcal >= 0.45) return "GORDURA";
         return "CALORIAS";
     }

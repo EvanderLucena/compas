@@ -415,12 +415,10 @@ class FoodSubstitutionServiceTest {
     }
 
     @Test
-    void calculateSubstitutions_patientNotFound_fallsBackToGeneralSubstitutions() {
+    void calculateSubstitutions_patientNotFound_throwsResourceNotFoundException() {
         UUID nonExistentPatientId = UUID.randomUUID();
         when(patientRepository.findByIdAndNutritionistId(nonExistentPatientId, nutritionistId))
                 .thenReturn(Optional.empty());
-        when(foodRepository.findAvailableByNutritionistIdAndCategory(nutritionistId, "CARBOIDRATO"))
-                .thenReturn(List.of(arroz, batataDoce));
 
         FoodSubstitutionRequest req = new FoodSubstitutionRequest(
                 null,
@@ -435,10 +433,7 @@ class FoodSubstitutionServiceTest {
                 8
         );
 
-        FoodSubstitutionResponse response = foodSubstitutionService.calculateSubstitutionsForPatient(
-                nutritionistId, nonExistentPatientId, req);
-
-        assertNotNull(response);
-        assertFalse(response.substitutions().isEmpty());
+        assertThrows(ResourceNotFoundException.class, () ->
+                foodSubstitutionService.calculateSubstitutionsForPatient(nutritionistId, nonExistentPatientId, req));
     }
 }
