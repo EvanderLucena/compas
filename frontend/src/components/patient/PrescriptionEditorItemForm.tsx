@@ -103,6 +103,61 @@ function ItemDoseFormRow({
   );
 }
 
+function ItemHeaderRow({ index, onRemove }: { index: number; onRemove: (index: number) => void }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+      }}
+    >
+      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink)' }}>Item #{index + 1}</span>
+      <button
+        type="button"
+        className="btn btn-subtle"
+        onClick={() => onRemove(index)}
+        style={{ fontSize: 12, padding: '2px 8px', color: 'var(--coral)' }}
+      >
+        Remover
+      </button>
+    </div>
+  );
+}
+
+function ItemInstructionsRow({
+  instructions,
+  onChange,
+}: {
+  instructions: string;
+  onChange: (val: string) => void;
+}) {
+  return (
+    <div>
+      <label
+        style={{
+          display: 'block',
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--fg-muted)',
+          marginBottom: 4,
+        }}
+      >
+        Observações Clínicas / Manipulação (Opcional)
+      </label>
+      <input
+        type="text"
+        className="input"
+        placeholder="Ex: Preferir matéria-prima com selo Creapure; dissolver em 200ml."
+        value={instructions}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: '100%', fontSize: 13 }}
+      />
+    </div>
+  );
+}
+
 export function PrescriptionEditorItemForm({
   index,
   item,
@@ -123,26 +178,7 @@ export function PrescriptionEditorItemForm({
         marginBottom: 12,
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 10,
-        }}
-      >
-        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink)' }}>
-          Item #{index + 1}
-        </span>
-        <button
-          type="button"
-          className="btn btn-subtle"
-          onClick={() => onRemove(index)}
-          style={{ fontSize: 12, padding: '2px 8px', color: 'var(--coral)' }}
-        >
-          Remover
-        </button>
-      </div>
+      <ItemHeaderRow index={index} onRemove={onRemove} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 8 }}>
         <div>
@@ -220,27 +256,10 @@ export function PrescriptionEditorItemForm({
         />
       </div>
 
-      <div>
-        <label
-          style={{
-            display: 'block',
-            fontSize: 11,
-            fontWeight: 600,
-            color: 'var(--fg-muted)',
-            marginBottom: 4,
-          }}
-        >
-          Observações Clínicas / Manipulação (Opcional)
-        </label>
-        <input
-          type="text"
-          className="input"
-          placeholder="Ex: Preferir matéria-prima com selo Creapure; dissolver em 200ml."
-          value={item.instructions ?? ''}
-          onChange={(e) => updateField('instructions', e.target.value)}
-          style={{ width: '100%', fontSize: 13 }}
-        />
-      </div>
+      <ItemInstructionsRow
+        instructions={item.instructions ?? ''}
+        onChange={(val) => updateField('instructions', val)}
+      />
     </div>
   );
 }

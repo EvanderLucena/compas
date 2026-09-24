@@ -6,6 +6,7 @@ import type {
   PrescriptionStatus,
 } from '../../types/prescription';
 import { useCreatePrescription, useUpdatePrescription } from '../../stores/prescriptionStore';
+import { useToastStore } from '../../stores/toastStore';
 import { useModalA11y } from '../../hooks/useModalA11y';
 import { PrescriptionEditorFormBody } from './PrescriptionEditorFormBody';
 
@@ -91,6 +92,23 @@ function PrescriptionEditorFooter({
   );
 }
 
+function getInitialItems(initialPrescription?: Prescription | null): PrescriptionItemInput[] {
+  if (initialPrescription && initialPrescription.items.length > 0) {
+    return initialPrescription.items.map((it) => ({
+      name: it.name,
+      category: it.category,
+      dosage: it.dosage,
+      form: it.form,
+      timing: it.timing,
+      duration: it.duration,
+      isContinuous: it.isContinuous,
+      instructions: it.instructions ?? '',
+      displayOrder: it.displayOrder,
+    }));
+  }
+  return [{ ...DEFAULT_ITEM }];
+}
+
 export function PrescriptionEditorModal({
   isOpen,
   onClose,
@@ -101,28 +119,16 @@ export function PrescriptionEditorModal({
   const containerRef = useRef<HTMLDivElement>(null);
   useModalA11y({ onClose, containerRef });
 
+  const showToastError = useToastStore((s) => s.showError);
   const createMutation = useCreatePrescription(patientId);
   const updateMutation = useUpdatePrescription(patientId);
 
   const [title, setTitle] = useState(initialPrescription?.title ?? 'Prescrição & Suplementação');
   const [notes, setNotes] = useState(initialPrescription?.notes ?? '');
   const [status, setStatus] = useState<PrescriptionStatus>(initialPrescription?.status ?? 'ACTIVE');
-  const [items, setItems] = useState<PrescriptionItemInput[]>(() => {
-    if (initialPrescription && initialPrescription.items.length > 0) {
-      return initialPrescription.items.map((it) => ({
-        name: it.name,
-        category: it.category,
-        dosage: it.dosage,
-        form: it.form,
-        timing: it.timing,
-        duration: it.duration,
-        isContinuous: it.isContinuous,
-        instructions: it.instructions ?? '',
-        displayOrder: it.displayOrder,
-      }));
-    }
-    return [{ ...DEFAULT_ITEM }];
-  });
+  const [items, setItems] = useState<PrescriptionItemInput[]>(() =>
+    getInitialItems(initialPrescription),
+  );
   const [showCatalog, setShowCatalog] = useState(false);
 
   if (!isOpen) return null;
@@ -131,8 +137,13 @@ export function PrescriptionEditorModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const validItems = items.filter((it) => it.name.trim() !== '' && it.dosage.trim() !== '');
-    if (validItems.length === 0) return;
+    const validItems = items.filter(
+      (it) => it.name.trim() !== '' && it.dosage.trim() !== '' && it.timing.trim() !== '',
+    );
+    if (validItems.length === 0) {
+      showToastError('Adicione pelo menos um item completo com nome, dosagem e horário.');
+      return;
+    }
 
     if (initialPrescription) {
       updateMutation.mutate(
