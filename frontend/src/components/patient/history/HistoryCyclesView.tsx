@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { usePatientHistoryEpisodes, useHistoricalEpisode } from '../../../stores/clinicalStore';
+import {
+  usePatientHistoryEpisodes,
+  useHistoricalEpisode,
+  usePatientTimeline,
+} from '../../../stores/clinicalStore';
 import type { HistoryEpisodeListItem, HistorySnapshot } from '../../../types/patient';
 import { IconScale, IconPlan } from '../../icons';
 
@@ -193,38 +197,63 @@ export function HistoryCyclesView({ patientId }: HistoryCyclesViewProps) {
     selectedEpisodeId,
   );
 
+  const { data: timeline } = usePatientTimeline(patientId);
   const episodeList: HistoryEpisodeListItem[] = episodes ?? [];
+  const activeEvents = (timeline ?? []).filter((ev) => ev.currentEpisode);
+  const hasActiveCycle = activeEvents.length > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div
-        className="card"
-        style={{
-          padding: '16px 20px',
-          border: '1.5px solid var(--lime, #10b981)',
-          backgroundColor: 'var(--surface, #ffffff)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span className="chip ontrack">
-                <span className="d" />
-                Ciclo Atual (Em andamento)
-              </span>
+      {hasActiveCycle ? (
+        <div
+          className="card"
+          style={{
+            padding: '16px 20px',
+            border: '1.5px solid var(--lime, #10b981)',
+            backgroundColor: 'var(--surface, #ffffff)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span className="chip ontrack">
+                  <span className="d" />
+                  Ciclo Atual (Em andamento)
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+                {activeEvents.length}{' '}
+                {activeEvents.length === 1 ? 'registro clínico' : 'registros clínicos'} no ciclo
+                atual com plano alimentar e acompanhamento ativo via WhatsApp.
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
-              Acompanhamento ativo com plano alimentar e registros ao vivo via WhatsApp.
+            <div
+              className="mono"
+              style={{ fontSize: 11.5, color: 'var(--sage, #10b981)', fontWeight: 600 }}
+            >
+              ATIVO
             </div>
-          </div>
-          <div
-            className="mono"
-            style={{ fontSize: 11.5, color: 'var(--sage, #10b981)', fontWeight: 600 }}
-          >
-            ATIVO
           </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className="card"
+          style={{
+            padding: '14px 18px',
+            backgroundColor: 'var(--surface-2)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
+            Nenhum ciclo de acompanhamento em andamento no momento.
+          </div>
+          <span className="chip neutral" style={{ fontSize: 11 }}>
+            SEM CICLO ATIVO
+          </span>
+        </div>
+      )}
 
       <div>
         <div className="eyebrow" style={{ marginBottom: 10 }}>

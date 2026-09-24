@@ -7,10 +7,16 @@ interface TimelineNoteFormProps {
   onClose: () => void;
 }
 
+function getInitialLocalDateTime(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+}
+
 export function TimelineNoteForm({ patientId, onClose }: TimelineNoteFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 16));
+  const [date, setDate] = useState(getInitialLocalDateTime);
   const addNoteMutation = useAddTimelineNote(patientId);
 
   const handleSubmit = (e: React.FormEvent) => {

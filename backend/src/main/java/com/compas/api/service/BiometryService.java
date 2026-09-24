@@ -362,18 +362,11 @@ public class BiometryService {
 
         Episode activeEpisode = episodeRepository
                 .findFirstByPatientIdAndNutritionistIdAndEndDateIsNullOrderByStartDateDesc(patientId, nutritionistId)
-                .orElseGet(() -> {
-                    List<Episode> episodes = episodeRepository
-                            .findByPatientIdAndNutritionistIdOrderByStartDateDesc(patientId, nutritionistId);
-                    if (!episodes.isEmpty()) {
-                        return episodes.get(0);
-                    }
-                    return episodeRepository.save(Episode.builder()
-                            .patientId(patientId)
-                            .nutritionistId(nutritionistId)
-                            .startDate(LocalDateTime.now())
-                            .build());
-                });
+                .orElseGet(() -> episodeRepository.save(Episode.builder()
+                        .patientId(patientId)
+                        .nutritionistId(nutritionistId)
+                        .startDate(LocalDateTime.now())
+                        .build()));
 
         LocalDateTime eventTime = request.eventAt() != null ? request.eventAt() : LocalDateTime.now();
 
