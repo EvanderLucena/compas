@@ -77,6 +77,75 @@ function PrescriptionsEmptyState({ onNew }: { onNew: () => void }) {
   );
 }
 
+function PrescriptionsList({
+  activeRx,
+  pastPrescriptions,
+  patientId,
+  patientPhone,
+  onEdit,
+}: {
+  activeRx?: Prescription;
+  pastPrescriptions: Prescription[];
+  patientId: string;
+  patientPhone?: string;
+  onEdit: (rx: Prescription) => void;
+}) {
+  return (
+    <>
+      {activeRx && (
+        <div style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--fg-muted)',
+              textTransform: 'uppercase',
+              marginBottom: 10,
+              letterSpacing: '0.05em',
+            }}
+          >
+            Prescrição Atual (Em Andamento)
+          </div>
+          <PrescriptionCard
+            prescription={activeRx}
+            patientId={patientId}
+            patientPhone={patientPhone}
+            onEdit={onEdit}
+            isActive={true}
+          />
+        </div>
+      )}
+
+      {pastPrescriptions.length > 0 && (
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--fg-muted)',
+              textTransform: 'uppercase',
+              marginBottom: 10,
+              letterSpacing: '0.05em',
+            }}
+          >
+            Histórico de Prescrições Anteriores ({pastPrescriptions.length})
+          </div>
+          {pastPrescriptions.map((rx) => (
+            <PrescriptionCard
+              key={rx.id}
+              prescription={rx}
+              patientId={patientId}
+              patientPhone={patientPhone}
+              onEdit={onEdit}
+              isActive={false}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function PrescriptionsTab({ patientId, patientPhone }: PrescriptionsTabProps) {
   const { data: prescriptions, isLoading, isError } = usePrescriptions(patientId);
   const { data: catalog } = usePrescriptionCatalog(patientId);
@@ -112,62 +181,18 @@ export function PrescriptionsTab({ patientId, patientPhone }: PrescriptionsTabPr
       ) : !prescriptions || prescriptions.length === 0 ? (
         <PrescriptionsEmptyState onNew={handleOpenCreate} />
       ) : (
-        <>
-          {activeRx && (
-            <div style={{ marginBottom: 28 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--fg-muted)',
-                  textTransform: 'uppercase',
-                  marginBottom: 10,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                Prescrição Atual (Em Andamento)
-              </div>
-              <PrescriptionCard
-                prescription={activeRx}
-                patientId={patientId}
-                patientPhone={patientPhone}
-                onEdit={handleOpenEdit}
-                isActive={true}
-              />
-            </div>
-          )}
-
-          {pastPrescriptions.length > 0 && (
-            <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--fg-muted)',
-                  textTransform: 'uppercase',
-                  marginBottom: 10,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                Histórico de Prescrições Anteriores ({pastPrescriptions.length})
-              </div>
-              {pastPrescriptions.map((rx) => (
-                <PrescriptionCard
-                  key={rx.id}
-                  prescription={rx}
-                  patientId={patientId}
-                  patientPhone={patientPhone}
-                  onEdit={handleOpenEdit}
-                  isActive={false}
-                />
-              ))}
-            </div>
-          )}
-        </>
+        <PrescriptionsList
+          activeRx={activeRx}
+          pastPrescriptions={pastPrescriptions}
+          patientId={patientId}
+          patientPhone={patientPhone}
+          onEdit={handleOpenEdit}
+        />
       )}
 
       {modalOpen && (
         <PrescriptionEditorModal
+          key={editingRx?.id ?? 'new'}
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           patientId={patientId}

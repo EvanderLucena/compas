@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type {
   Prescription,
   PrescriptionCatalogItem,
@@ -130,6 +130,16 @@ export function PrescriptionEditorModal({
     getInitialItems(initialPrescription),
   );
   const [showCatalog, setShowCatalog] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(initialPrescription?.title ?? 'Prescrição & Suplementação');
+      setNotes(initialPrescription?.notes ?? '');
+      setStatus(initialPrescription?.status ?? 'ACTIVE');
+      setItems(getInitialItems(initialPrescription));
+      setShowCatalog(false);
+    }
+  }, [isOpen, initialPrescription]);
 
   if (!isOpen) return null;
 
