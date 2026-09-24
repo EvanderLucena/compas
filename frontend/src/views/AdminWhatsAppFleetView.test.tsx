@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AdminWhatsAppFleetView } from './AdminWhatsAppFleetView';
 import type { WhatsAppFleetInstance, FleetSummary } from '../types/whatsappFleet';
 
@@ -49,6 +49,9 @@ const mockUIState = {
   setStatusFilter: vi.fn(),
 };
 
+const mockDisconnectMutate = vi.fn();
+const mockDeleteMutate = vi.fn();
+
 vi.mock('../stores/adminWhatsappStore', () => ({
   useWhatsAppFleet: () => ({
     data: [mockInstance],
@@ -63,8 +66,8 @@ vi.mock('../stores/adminWhatsappStore', () => ({
   useAdminWhatsappUIStore: () => mockUIState,
   useSyncFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRestartFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDisconnectFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDeleteFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDisconnectFleetInstance: () => ({ mutateAsync: mockDisconnectMutate, isPending: false }),
+  useDeleteFleetInstance: () => ({ mutateAsync: mockDeleteMutate, isPending: false }),
   useCreateFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useConnectFleetInstance: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -102,5 +105,38 @@ describe('AdminWhatsAppFleetView', () => {
     expect(screen.getByText('Todos')).toBeInTheDocument();
     expect(screen.getByText('Conectados')).toBeInTheDocument();
     expect(screen.getByText('Desconectados')).toBeInTheDocument();
+  });
+
+  it('opens ConfirmModal when disconnect is clicked and triggers mutation on confirm', async () => {
+    render(<AdminWhatsAppFleetView />);
+
+    const actionsBtn = screen.getByTitle('Mais ações');
+    fireEvent.click(actionsBtn);
+
+    const disconnectBtn = screen.getByText('Desconectar Chip');
+    fireEvent.click(disconnectBtn);
+
+    expect(screen.getByRole('heading', { name: 'Desconectar Chip WhatsApp' })).toBeInTheDocument();
+    expect(screen.getByText(/Deseja realmente desconectar o chip/)).toBeInTheDocument();
+
+    const confirmBtn = screen.getByTestId('confirm-modal-button');
+    fireEvent.click(confirmBtn);
+
+    expect(mockDisconnectMutate).toHaveBeenCalledWith('inst-1');
+  });
+
+  it('shows error toast and blocks delete when chip has linked patients', () => {
+    render(<AdminWhatsAppFleetView />);
+
+    const actionsBtn = screen.getByTitle('Mais ações');
+    fireEvent.click(actionsBtn);
+
+    const deleteBtn = screen.getByText('Excluir Instância');
+    fireEvent.click(deleteBtn);
+
+    // Does NOT open confirm modal because patientCount > 0
+    expect(
+      screen.queryByRole('heading', { name: 'Excluir Chip WhatsApp' }),
+    ).not.toBeInTheDocument();
   });
 });

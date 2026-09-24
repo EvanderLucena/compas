@@ -8,12 +8,14 @@ import {
   useDisconnectFleetInstance,
   useDeleteFleetInstance,
 } from '../stores/adminWhatsappStore';
+import { useToastStore } from '../stores/toastStore';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { FleetSummaryCards } from '../components/admin/whatsapp/FleetSummaryCards';
 import { FleetInstanceCard } from '../components/admin/whatsapp/FleetInstanceCard';
 import { FleetFilterBar } from '../components/admin/whatsapp/FleetFilterBar';
 import { FleetEmptyState } from '../components/admin/whatsapp/FleetEmptyState';
 import { FleetModalsContainer } from '../components/admin/whatsapp/FleetModalsContainer';
-import { IconPlus, IconRefresh } from '../components/icons';
+import { IconPlus, IconRefresh, IconTrash } from '../components/icons';
 import type { WhatsAppFleetInstance } from '../types/whatsappFleet';
 
 interface FleetHeaderProps {
@@ -96,6 +98,8 @@ export function AdminWhatsAppFleetView() {
   const deleteMutation = useDeleteFleetInstance();
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [disconnectTarget, setDisconnectTarget] = useState<WhatsAppFleetInstance | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WhatsAppFleetInstance | null>(null);
 
   const handleRefresh = async () => {
     await Promise.all([refetchFleet(), refetchSummary()]);
@@ -110,21 +114,39 @@ export function AdminWhatsAppFleetView() {
     }
   };
 
-  const handleDisconnect = async (inst: WhatsAppFleetInstance) => {
-    if (window.confirm(`Deseja realmente desconectar o chip "${inst.name}"?`)) {
-      await disconnectMutation.mutateAsync(inst.id);
+  const handleDisconnect = (inst: WhatsAppFleetInstance) => {
+    setDisconnectTarget(inst);
+  };
+
+  const handleDelete = (inst: WhatsAppFleetInstance) => {
+    if (inst.patientCount > 0) {
+      useToastStore
+        .getState()
+        .showError(
+          `O chip "${inst.name}" possui ${inst.patientCount} pacientes vinculados. Migre-os primeiro.`,
+        );
+      return;
+    }
+    setDeleteTarget(inst);
+  };
+
+  const handleConfirmDisconnect = async () => {
+    if (!disconnectTarget) return;
+    try {
+      await disconnectMutation.mutateAsync(disconnectTarget.id);
+      setDisconnectTarget(null);
+    } catch {
+      // Toast handles error in mutation
     }
   };
 
-  const handleDelete = async (inst: WhatsAppFleetInstance) => {
-    if (inst.patientCount > 0) {
-      alert(
-        `O chip "${inst.name}" possui ${inst.patientCount} pacientes vinculados. Migre-os primeiro.`,
-      );
-      return;
-    }
-    if (window.confirm(`Tem certeza que deseja excluir o chip "${inst.name}" permanentemente?`)) {
-      await deleteMutation.mutateAsync(inst.id);
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch {
+      // Toast handles error in mutation
     }
   };
 
@@ -189,6 +211,49 @@ export function AdminWhatsAppFleetView() {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(disconnectTarget)}
+        title="Desconectar Chip WhatsApp"
+        description={
+          disconnectTarget ? (
+            <>
+              Deseja realmente desconectar o chip{' '}
+              <strong style={{ color: 'var(--fg, #0b0c0a)' }}>
+                &quot;{disconnectTarget.name}&quot;
+              </strong>
+              ? O chip precisará ser reconectado via QR Code para voltar a operar.
+            </>
+          ) : null
+        }
+        confirmLabel="Desconectar"
+        variant="warning"
+        isPending={disconnectMutation.isPending}
+        onClose={() => setDisconnectTarget(null)}
+        onConfirm={handleConfirmDisconnect}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="Excluir Chip WhatsApp"
+        description={
+          deleteTarget ? (
+            <>
+              Tem certeza que deseja excluir o chip{' '}
+              <strong style={{ color: 'var(--fg, #0b0c0a)' }}>
+                &quot;{deleteTarget.name}&quot;
+              </strong>{' '}
+              permanentemente? Esta ação não pode ser desfeita.
+            </>
+          ) : null
+        }
+        confirmLabel="Excluir Permanentemente"
+        confirmIcon={<IconTrash size={13} />}
+        variant="danger"
+        isPending={deleteMutation.isPending}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+      />
 
       <FleetModalsContainer />
     </div>
