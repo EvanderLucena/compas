@@ -185,4 +185,30 @@ describe('PrescriptionsTab', () => {
     fireEvent.click(screen.getByText('+ Selecionar do Catálogo'));
     expect(screen.getByText('Catálogo Clínico de Suplementos & Fórmulas')).toBeDefined();
   });
+
+  it('opens ConfirmModal when delete button is clicked and triggers delete on confirm', () => {
+    const mockMutate = vi.fn();
+    vi.mocked(rxStore.useDeletePrescription).mockReturnValue({
+      mutate: mockMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof rxStore.useDeletePrescription>);
+    vi.mocked(rxStore.usePrescriptions).mockReturnValue({
+      data: [mockActivePrescription],
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof rxStore.usePrescriptions>);
+
+    render(<PrescriptionsTab patientId="p1" />);
+
+    const deleteBtn = screen.getByTitle('Excluir prescrição');
+    fireEvent.click(deleteBtn);
+
+    expect(screen.getByRole('heading', { name: 'Excluir Prescrição' })).toBeDefined();
+    expect(screen.getByText(/Tem certeza que deseja excluir a prescrição/)).toBeDefined();
+
+    const confirmBtn = screen.getByTestId('confirm-modal-button');
+    fireEvent.click(confirmBtn);
+
+    expect(mockMutate).toHaveBeenCalledWith('rx-1', expect.any(Object));
+  });
 });
