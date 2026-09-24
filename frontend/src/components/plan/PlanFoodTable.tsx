@@ -10,6 +10,7 @@ interface PlanFoodTableProps {
   onRemoveItem: (item: MealFood) => void;
   onAddFoodClick: () => void;
   onReadOnlyClick: () => void;
+  onSubstituteItem?: (item: MealFood) => void;
 }
 
 const TABLE_HEADERS = [
@@ -33,6 +34,7 @@ export function PlanFoodTable({
   onRemoveItem,
   onAddFoodClick,
   onReadOnlyClick,
+  onSubstituteItem,
 }: PlanFoodTableProps) {
   const handleAddClick = () => {
     if (isReadOnly) {
@@ -48,7 +50,7 @@ export function PlanFoodTable({
         className="plans-food-table"
         style={{
           display: 'grid',
-          gridTemplateColumns: '2.2fr 0.8fr 0.6fr 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 28px',
+          gridTemplateColumns: '2.2fr 0.8fr 0.6fr 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 52px',
           gap: 10,
           padding: '10px 16px',
           borderBottom: '1px solid var(--border)',
@@ -95,6 +97,7 @@ export function PlanFoodTable({
             }
             onRemoveItem(it);
           }}
+          onSubstitute={onSubstituteItem ? () => onSubstituteItem(it) : undefined}
         />
       ))}
       <div

@@ -11,6 +11,7 @@ interface PlanFoodRowProps {
   onReferenceAmountChange: (referenceAmount: number) => void;
   onPrepChange: (prep: string) => void;
   onRemove: () => void;
+  onSubstitute?: () => void;
 }
 
 function MacroReadonly({
@@ -77,13 +78,48 @@ function RemoveButton({ onRemove }: { onRemove: () => void }) {
   );
 }
 
+function SubstituteButton({ onSubstitute }: { onSubstitute: () => void }) {
+  return (
+    <div style={{ display: 'grid', placeItems: 'center' }}>
+      <button
+        type="button"
+        data-testid="plan-food-substitute-btn"
+        onClick={onSubstitute}
+        title="Substituições inteligentes TACO"
+        style={{
+          color: 'var(--fg-subtle)',
+          display: 'grid',
+          placeItems: 'center',
+          width: 22,
+          height: 22,
+          borderRadius: 4,
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: 12,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = 'var(--lime-dark, #047857)';
+          e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = 'var(--fg-subtle)';
+          e.currentTarget.style.background = 'transparent';
+        }}
+      >
+        🔄
+      </button>
+    </div>
+  );
+}
+
 function PlanFoodRowGrid({ children, isLast }: { children: React.ReactNode; isLast: boolean }) {
   return (
     <div
       className="plans-food-row"
       style={{
         display: 'grid',
-        gridTemplateColumns: '2.2fr 0.8fr 0.6fr 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 28px',
+        gridTemplateColumns: '2.2fr 0.8fr 0.6fr 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 52px',
         gap: 10,
         padding: '8px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--border)',
@@ -154,6 +190,7 @@ export function PlanFoodRow({
   onReferenceAmountChange,
   onPrepChange,
   onRemove,
+  onSubstitute,
 }: PlanFoodRowProps) {
   const [macroFlash, setMacroFlash] = useState(false);
   const unitSymbol = FOOD_UNIT_SYMBOLS[item.unit as keyof typeof FOOD_UNIT_SYMBOLS] || 'g';
@@ -186,6 +223,14 @@ export function PlanFoodRow({
     onRemove();
   };
 
+  const handleSubstitute = () => {
+    if (isReadOnly) {
+      onReadOnlyClick?.();
+      return;
+    }
+    onSubstitute?.();
+  };
+
   return (
     <PlanFoodRowGrid isLast={isLast}>
       <FoodNameCell name={item.foodName} />
@@ -207,7 +252,10 @@ export function PlanFoodRow({
         onReadOnlyClick={onReadOnlyClick}
       />
       <MacroCells item={item} opacity={macroFlash ? 0.5 : 1} />
-      <RemoveButton onRemove={handleRemove} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'center' }}>
+        {onSubstitute && <SubstituteButton onSubstitute={handleSubstitute} />}
+        <RemoveButton onRemove={handleRemove} />
+      </div>
     </PlanFoodRowGrid>
   );
 }

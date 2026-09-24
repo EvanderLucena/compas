@@ -23,6 +23,7 @@ interface PlanActiveMealContentProps {
   onRemoveItem: (item: MealFood) => void;
   onAddFoodClick: () => void;
   onReadOnlyClick: () => void;
+  onSubstituteClick?: (item: MealFood) => void;
 }
 
 function ActiveMealTitle({ label, time, count }: { label: string; time: string; count: number }) {
@@ -64,6 +65,7 @@ export function PlanActiveMealContent({
   onRemoveItem,
   onAddFoodClick,
   onReadOnlyClick,
+  onSubstituteClick,
 }: PlanActiveMealContentProps) {
   const optTotals = useMemo(() => {
     return activeOpt.items.reduce(
@@ -144,6 +146,7 @@ export function PlanActiveMealContent({
         onRemoveItem={onRemoveItem}
         onAddFoodClick={onAddFoodClick}
         onReadOnlyClick={onReadOnlyClick}
+        onSubstituteItem={onSubstituteClick}
       />
 
       <PlanOptionTotals

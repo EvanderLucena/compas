@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +27,21 @@ public interface FoodRepository extends JpaRepository<Food, UUID> {
      */
     @Query("SELECT f FROM Food f WHERE (f.nutritionistId = :nutritionistId OR f.nutritionistId IS NULL) ORDER BY f.name ASC")
     Page<Food> findAvailableByNutritionistId(@Param("nutritionistId") UUID nutritionistId, Pageable pageable);
+
+    /**
+     * Non-paginated list of all available foods (custom foods + standard system foods).
+     */
+    @Query("SELECT f FROM Food f WHERE (f.nutritionistId = :nutritionistId OR f.nutritionistId IS NULL) ORDER BY f.name ASC")
+    List<Food> findAllAvailableByNutritionistId(@Param("nutritionistId") UUID nutritionistId);
+
+    /**
+     * Non-paginated list of available foods by category.
+     */
+    @Query("SELECT f FROM Food f WHERE (f.nutritionistId = :nutritionistId OR f.nutritionistId IS NULL) AND f.category = :category ORDER BY f.name ASC")
+    List<Food> findAvailableByNutritionistIdAndCategory(
+            @Param("nutritionistId") UUID nutritionistId,
+            @Param("category") String category
+    );
 
     /**
      * Data isolation: scope by nutritionistId for owner-specific operations (update/delete).

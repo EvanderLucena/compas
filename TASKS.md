@@ -425,4 +425,7 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 10. ~~Verificação de E-mail via Resend~~ ✅ (ResendEmailService + endpoints + banner dashboard + tela pública de validação)
 11. ~~Portal Admin da Frota WhatsApp~~ ✅ (PR #165 + PR #167)
 12. ~~Gestão de Planos, Modo Leitura (Read-Only) & Fallback Amigável da IA~~ ✅ (PR #168 backend + PR #170 frontend)
-13. **Pagamentos Stripe, Deploys e VPS** (Checkout, Customer Portal, Webhooks, Docker em VPS)
+13. ~~Comparativo Evolutivo Biométrico Avançado~~ ✅ (PR #192)
+14. ~~Central de Prescrições & Suplementação com PDF Oficial~~ ✅ (PR #193 backend + PR #194 frontend)
+15. ~~Substituições Inteligentes TACO baseadas em Hábitos Reais~~ ✅ (Cálculo isocalórico/isoproteico, hábitos alimentares WhatsApp, modal interativo e cópia rápida)
+16. **Pagamentos Stripe, Deploys e VPS** (Checkout, Customer Portal, Webhooks, Docker em VPS)
