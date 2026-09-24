@@ -22,3 +22,5 @@ export { PlanExtrasTab } from './PlanExtrasTab';
 export { PlanModals } from './PlanModals';
 export { usePlanPdfDownloads } from './usePlanPdfDownloads';
 export { usePlanMealActions } from './usePlanMealActions';
+export { ApplyTemplateModal } from './ApplyTemplateModal';
+export { SaveAsTemplateModal } from './SaveAsTemplateModal';

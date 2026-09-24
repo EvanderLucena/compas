@@ -28,6 +28,8 @@ interface PlanHeaderProps {
   downloadingGrocery: boolean;
   isReadOnly: boolean;
   onReadOnlyClick: () => void;
+  onOpenApplyTemplate?: () => void;
+  onOpenSaveTemplate?: () => void;
 }
 
 const SECTION_TABS = [
@@ -55,6 +57,8 @@ export function PlanHeader({
   downloadingGrocery,
   isReadOnly,
   onReadOnlyClick,
+  onOpenApplyTemplate,
+  onOpenSaveTemplate,
 }: PlanHeaderProps) {
   return (
     <div style={{ padding: '20px 28px 16px', borderBottom: '1px solid var(--border)' }}>
@@ -81,6 +85,8 @@ export function PlanHeader({
           downloadingPlan={downloadingPlan}
           downloadingGrocery={downloadingGrocery}
           saveStatus={saveStatus}
+          onOpenApplyTemplate={onOpenApplyTemplate}
+          onOpenSaveTemplate={onOpenSaveTemplate}
         />
       </div>
 
