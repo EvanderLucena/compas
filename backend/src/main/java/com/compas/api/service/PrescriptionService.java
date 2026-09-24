@@ -385,6 +385,8 @@ public class PrescriptionService {
         for (PrescriptionItemRequest req : itemRequests) {
             PrescriptionCategory cat = req.category() != null ? req.category() : PrescriptionCategory.SUPPLEMENT;
             boolean isContinuous = req.isContinuous() != null ? req.isContinuous() : true;
+            int itemOrder = req.displayOrder() != null ? req.displayOrder() : order;
+            order = Math.max(order, itemOrder) + 1;
             PrescriptionItem item = PrescriptionItem.builder()
                     .prescriptionId(prescriptionId)
                     .nutritionistId(nutritionistId)
@@ -396,7 +398,7 @@ public class PrescriptionService {
                     .duration(req.duration() != null ? req.duration() : "Uso contínuo")
                     .isContinuous(isContinuous)
                     .instructions(req.instructions())
-                    .displayOrder(req.displayOrder() != null ? req.displayOrder() : order++)
+                    .displayOrder(itemOrder)
                     .build();
             items.add(prescriptionItemRepository.save(item));
         }
