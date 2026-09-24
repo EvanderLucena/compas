@@ -94,24 +94,33 @@ export interface PatientListApiResponse {
   totalPages: number;
 }
 
+const toFiniteNumber = (val: unknown, fallback = 0): number =>
+  typeof val === 'number' && Number.isFinite(val) ? val : fallback;
+
+const resolveInitials = (p: PatientApiResponse): string =>
+  p.initials || (p.name ? p.name.substring(0, 2).toUpperCase() : '--');
+
+const resolveObjective = (objective?: string | null): string =>
+  !objective ? 'Sem objetivo' : (OBJECTIVE_LABELS[objective] ?? objective);
+
 export function mapPatientFromApi(p: PatientApiResponse): Patient {
   return {
     id: p.id,
-    name: p.name,
-    initials: p.initials,
-    age: typeof p.age === 'number' ? p.age : 0,
-    birthDate: p.birthDate,
+    name: p.name || 'Paciente sem nome',
+    initials: resolveInitials(p),
+    age: toFiniteNumber(p.age),
+    birthDate: p.birthDate ?? null,
     sex: p.sex ?? '',
-    heightCm: p.heightCm,
-    whatsapp: p.whatsapp,
-    objective: OBJECTIVE_LABELS[p.objective] || p.objective,
-    status: p.status.toLowerCase() as PatientStatus,
-    adherence: p.adherence,
-    weight: p.weight,
-    weightDelta: p.weightDelta,
-    tag: p.tag,
-    active: p.active,
-    aiAdherenceInsight: p.aiAdherenceInsight,
+    heightCm: p.heightCm ?? null,
+    whatsapp: p.whatsapp ?? null,
+    objective: resolveObjective(p.objective),
+    status: (p.status ? p.status.toLowerCase() : 'warning') as PatientStatus,
+    adherence: toFiniteNumber(p.adherence),
+    weight: toFiniteNumber(p.weight),
+    weightDelta: toFiniteNumber(p.weightDelta),
+    tag: p.tag || '',
+    active: typeof p.active === 'boolean' ? p.active : true,
+    aiAdherenceInsight: p.aiAdherenceInsight ?? null,
   };
 }
 

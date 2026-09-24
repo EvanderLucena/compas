@@ -65,34 +65,38 @@ function buildDetailedPatient(
   };
 }
 
+function getValidNumber(val: unknown, fallback: number): number {
+  return typeof val === 'number' && Number.isFinite(val) ? val : fallback;
+}
+
 function computeBiometryStats(
   assessments:
     { weight: number; bodyFatPercent?: number | null; assessmentDate: string }[] | undefined,
   fallbackWeight: number,
   fallbackDelta: number,
 ) {
-  if (!assessments || assessments.length === 0) {
+  const safeWeight = getValidNumber(fallbackWeight, 0);
+  const safeDelta = getValidNumber(fallbackDelta, 0);
+  if (!assessments?.length) {
     return {
-      latestWeight: fallbackWeight,
+      latestWeight: safeWeight,
       latestBodyFat: null,
       latestDate: null,
-      weightDelta: Number.isFinite(fallbackDelta) ? fallbackDelta : 0,
+      weightDelta: safeDelta,
     };
   }
   const latest = assessments[assessments.length - 1];
-  const previous = assessments.length > 1 ? assessments[assessments.length - 2] : null;
-  const latestWeight = latest.weight ?? fallbackWeight;
-  const weightDelta =
-    previous != null
-      ? latestWeight - previous.weight
-      : Number.isFinite(fallbackDelta)
-        ? fallbackDelta
-        : 0;
+  const prev = assessments[assessments.length - 2];
+  const latestWeight = getValidNumber(latest?.weight, safeWeight);
+  const hasPrev = prev && typeof prev.weight === 'number' && Number.isFinite(prev.weight);
+  const delta = hasPrev ? latestWeight - prev.weight : safeDelta;
+  const bf = latest?.bodyFatPercent;
+  const latestBodyFat = typeof bf === 'number' && Number.isFinite(bf) ? bf : null;
   return {
     latestWeight,
-    latestBodyFat: latest.bodyFatPercent ?? null,
-    latestDate: latest.assessmentDate ?? null,
-    weightDelta,
+    latestBodyFat,
+    latestDate: latest?.assessmentDate ?? null,
+    weightDelta: getValidNumber(delta, 0),
   };
 }
 

@@ -76,17 +76,23 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <button
                 type="button"
                 onClick={this.reset}
-                className="btn btn-secondary text-sm px-4 py-2 cursor-pointer"
+                className="btn btn-primary text-sm px-4 py-2 cursor-pointer"
               >
                 Tentar novamente
               </button>
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="btn btn-primary text-sm px-4 py-2 cursor-pointer"
+              <a
+                href={
+                  typeof window !== 'undefined' && window.location.pathname.startsWith('/patient')
+                    ? '/patients'
+                    : '/home'
+                }
+                onClick={this.reset}
+                className="btn btn-secondary text-sm px-4 py-2 cursor-pointer"
               >
-                Recarregar página
-              </button>
+                {typeof window !== 'undefined' && window.location.pathname.startsWith('/patient')
+                  ? 'Voltar para pacientes'
+                  : 'Voltar ao início'}
+              </a>
             </div>
             {import.meta.env.DEV && this.state.error && (
               <details className="mt-4 text-left text-xs text-fg-subtle bg-paper-2 p-3 rounded overflow-auto max-h-40">

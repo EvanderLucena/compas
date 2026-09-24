@@ -39,7 +39,7 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('Algo deu errado')).toBeInTheDocument();
     expect(screen.getByText('Tentar novamente')).toBeInTheDocument();
-    expect(screen.getByText('Recarregar página')).toBeInTheDocument();
+    expect(screen.getByText(/Voltar/)).toBeInTheDocument();
   });
 
   it('allows resetting error state with Tentar novamente button', () => {
