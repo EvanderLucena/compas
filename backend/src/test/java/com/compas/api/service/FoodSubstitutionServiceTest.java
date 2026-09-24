@@ -415,6 +415,98 @@ class FoodSubstitutionServiceTest {
     }
 
     @Test
+    void calculateSubstitutions_scrambledEggsWithUnUnit_preservesTwoUnitsAndScoresHigh() {
+        Food ovoCozido = Food.builder()
+                .id(UUID.randomUUID())
+                .name("Ovo cozido")
+                .category("PROTEINA")
+                .unit("un")
+                .referenceAmount(BigDecimal.valueOf(2.0))
+                .portionLabel("2 un")
+                .kcal(BigDecimal.valueOf(156.0))
+                .prot(BigDecimal.valueOf(12.6))
+                .carb(BigDecimal.valueOf(1.2))
+                .fat(BigDecimal.valueOf(10.6))
+                .fiber(BigDecimal.ZERO)
+                .build();
+
+        Food queijoRicota = Food.builder()
+                .id(UUID.randomUUID())
+                .name("Queijo ricota")
+                .category("PROTEINA")
+                .unit("GRAMAS")
+                .referenceAmount(BigDecimal.valueOf(100))
+                .portionLabel("2 fatias médias · 50g")
+                .kcal(BigDecimal.valueOf(139.7))
+                .prot(BigDecimal.valueOf(12.6))
+                .carb(BigDecimal.valueOf(3.8))
+                .fat(BigDecimal.valueOf(8.1))
+                .fiber(BigDecimal.ZERO)
+                .build();
+
+        Food charqueCru = Food.builder()
+                .id(UUID.randomUUID())
+                .name("Carne bovina charque cru")
+                .category("PROTEINA")
+                .unit("GRAMAS")
+                .referenceAmount(BigDecimal.valueOf(100))
+                .kcal(BigDecimal.valueOf(248.8))
+                .prot(BigDecimal.valueOf(22.7))
+                .carb(BigDecimal.ZERO)
+                .fat(BigDecimal.valueOf(16.8))
+                .fiber(BigDecimal.ZERO)
+                .build();
+
+        when(foodRepository.findAvailableByNutritionistIdAndCategory(nutritionistId, "PROTEINA"))
+                .thenReturn(List.of(charqueCru, queijoRicota, ovoCozido));
+
+        FoodSubstitutionRequest req = new FoodSubstitutionRequest(
+                null,
+                "Ovos mexidos",
+                BigDecimal.valueOf(100),
+                "g",
+                BigDecimal.valueOf(150),
+                BigDecimal.valueOf(13),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(10),
+                null,
+                5
+        );
+
+        FoodSubstitutionResponse response = foodSubstitutionService.calculateGeneralSubstitutions(
+                nutritionistId, req);
+
+        assertNotNull(response);
+        assertEquals("PROTEINA", response.dominantMacro());
+        assertFalse(response.substitutions().isEmpty());
+
+        // 1. Ovo cozido must be #1 with high score (>= 90) and exactly 2.0 un
+        FoodSubstitutionItemResponse topItem = response.substitutions().get(0);
+        assertEquals("Ovo cozido", topItem.name());
+        assertEquals(BigDecimal.valueOf(2.0), topItem.suggestedAmount());
+        assertEquals("2 unidades", topItem.householdPortion());
+        assertTrue(topItem.matchScore() >= 90, "Ovo cozido should have matchScore >= 90, was " + topItem.matchScore());
+
+        // 2. Queijo ricota should come before raw charque
+        int ovoIndex = -1;
+        int ricotaIndex = -1;
+        int charqueIndex = -1;
+        for (int i = 0; i < response.substitutions().size(); i++) {
+            String name = response.substitutions().get(i).name();
+            if (name.equals("Ovo cozido")) ovoIndex = i;
+            if (name.equals("Queijo ricota")) ricotaIndex = i;
+            if (name.equals("Carne bovina charque cru")) charqueIndex = i;
+        }
+
+        assertTrue(ovoIndex < ricotaIndex, "Ovo cozido should rank above Queijo ricota");
+        if (charqueIndex != -1) {
+            assertTrue(ricotaIndex < charqueIndex, "Queijo ricota should rank above raw charque");
+            FoodSubstitutionItemResponse charque = response.substitutions().get(charqueIndex);
+            assertTrue(charque.matchScore() < topItem.matchScore(), "Raw meat should score lower than eggs");
+        }
+    }
+
+    @Test
     void calculateSubstitutions_patientNotFound_throwsResourceNotFoundException() {
         UUID nonExistentPatientId = UUID.randomUUID();
         when(patientRepository.findByIdAndNutritionistId(nonExistentPatientId, nutritionistId))
