@@ -208,10 +208,16 @@ export function PrescriptionCard({
     if (prescription.whatsappMessage) {
       navigator.clipboard.writeText(prescription.whatsappMessage);
       useToastStore.getState().showSuccess('Mensagem copiada para a área de transferência!');
+    } else {
+      useToastStore.getState().showError('Mensagem da prescrição não disponível.');
     }
   };
 
   const handleSendWhatsApp = () => {
+    if (!prescription.whatsappMessage) {
+      useToastStore.getState().showError('Mensagem da prescrição não disponível.');
+      return;
+    }
     const text = encodeURIComponent(prescription.whatsappMessage);
     const cleanPhone = patientPhone ? patientPhone.replace(/\D/g, '') : '';
     const url = cleanPhone
