@@ -22,3 +22,4 @@ export { BiometryLatestCard } from './BiometryLatestCard';
 export { BiometryEvolutionChartCard } from './BiometryEvolutionChartCard';
 export { BiometryMeasuresGrid } from './BiometryMeasuresGrid';
 export { BiometryHistoryTable } from './BiometryHistoryTable';
+export { PrescriptionsTab } from './PrescriptionsTab';

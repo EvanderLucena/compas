@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { DetailedPatient, MacroTarget } from '../../types/patient';
 import type { MealPlan } from '../../types/plan';
 import { WeekBars } from '../viz';
@@ -12,7 +12,7 @@ import { TodayPlanCard } from './TodayPlanCard';
 import { TodayReportedCard } from './TodayReportedCard';
 import { TodayTimelineCard } from './TodayTimelineCard';
 
-type Tab = 'today' | 'plan' | 'biometry' | 'insights' | 'history';
+import type { Tab } from './PatientHeader';
 
 interface TodayTabProps {
   patient: DetailedPatient;
