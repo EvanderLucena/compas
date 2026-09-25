@@ -136,7 +136,62 @@ function getTasksData() {
   };
 }
 
-function getAiMetrics() {
+let cachedOllamaCloud = null;
+let lastOllamaFetch = 0;
+
+function getOllamaApiKey() {
+  if (process.env.OLLAMA_API_KEY) return process.env.OLLAMA_API_KEY;
+  const cfgPath = path.join(os.homedir(), '.config', 'opencode', 'opencode.jsonc');
+  if (fs.existsSync(cfgPath)) {
+    try {
+      const content = fs.readFileSync(cfgPath, 'utf8');
+      const m = content.match(/"apiKey"\s*:\s*"([^"]+)"/);
+      if (m) return m[1];
+    } catch {}
+  }
+  return null;
+}
+
+async function fetchOllamaCloudApi() {
+  const now = Date.now();
+  if (cachedOllamaCloud && (now - lastOllamaFetch) < 15000) {
+    return cachedOllamaCloud;
+  }
+
+  const apiKey = getOllamaApiKey();
+  if (!apiKey) return cachedOllamaCloud;
+
+  try {
+    const res = await fetch('https://ollama.com/api/usage', {
+      headers: { Authorization: 'Bearer ' + apiKey },
+      signal: AbortSignal.timeout(3000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      lastOllamaFetch = now;
+      const sModels = data.limits?.session?.models || [];
+      const wModels = data.limits?.weekly?.models || [];
+      const totalWeeklyReqs = wModels.reduce((acc, m) => acc + (m.request_count || 0), 0);
+      const topWeeklyModel = wModels[0] || null;
+
+      cachedOllamaCloud = {
+        available: true,
+        sessionUsagePct: (data.limits?.session?.usage != null ? (data.limits.session.usage * 100) : 0),
+        weeklyUsagePct: (data.limits?.weekly?.usage != null ? (data.limits.weekly.usage * 100) : 0),
+        sessionModels: sModels,
+        weeklyModels: wModels,
+        topWeeklyModel,
+        totalWeeklyRequests: totalWeeklyReqs
+      };
+      return cachedOllamaCloud;
+    }
+  } catch {}
+  return cachedOllamaCloud;
+}
+
+async function getAiMetrics() {
+  const ollamaCloud = await fetchOllamaCloudApi();
+
   // OpenCode
   const opencodeDb = path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
   const opencodeConfig = path.join(os.homedir(), '.config', 'opencode', 'opencode.jsonc');
@@ -158,8 +213,8 @@ function getAiMetrics() {
     lastSession: null,
     weekTokens: 0,
     weekCost: 0,
-    weekBudget: 15.00, // $60/mês => ~$15/semana de créditos inclusos
-    weekTokensTarget: 10000000 // 10M tokens target
+    weekBudget: 15.00,
+    weekTokensTarget: 10000000
   };
 
   if (DatabaseSync && fs.existsSync(opencodeDb)) {
@@ -252,7 +307,7 @@ function getAiMetrics() {
     } catch {}
   }
 
-  return { opencode, antigravity };
+  return { opencode, antigravity, ollamaCloud };
 }
 
 // ==============================================================================
@@ -350,24 +405,43 @@ async function renderDashboard(statusMessage = '') {
   lines.push(`${C.brightCyan}╠═${'═'.repeat(width - 4)}═╣${C.reset}`);
 
   // 2. AI Harness & Quotas with Gauges
-  lines.push(`${C.brightCyan}║ ${C.bold}${C.yellow}🤖 AI HARNESS & CONSUMO DE TOKENS (LIMITES E COTAS)${C.reset}`);
+  lines.push(`${C.brightCyan}║ ${C.bold}${C.yellow}🤖 AI HARNESS & CONSUMO DE TOKENS (LIMITES E COTAS AO VIVO)${C.reset}`);
   
-  // Ollama Cloud Pro
-  const oc = ai.opencode;
-  const costPct = (oc.weekCost / oc.weekBudget) * 100;
-  const costBar = makeBar(Number(oc.weekCost.toFixed(2)), oc.weekBudget, 16, '$');
-  const tokenFmt = (oc.weekTokens / 1000000).toFixed(2);
-  const tokenMaxFmt = (oc.weekTokensTarget / 1000000).toFixed(1);
-  const tokenBar = makeBar(Number(tokenFmt), Number(tokenMaxFmt), 16, 'M');
+  // Ollama Cloud Pro (Live Official API)
+  if (ai.ollamaCloud && ai.ollamaCloud.available) {
+    const oCloud = ai.ollamaCloud;
+    const sessionBar = makeBar(Number(oCloud.sessionUsagePct.toFixed(1)), 100, 16, '%');
+    const weeklyBar = makeBar(Number(oCloud.weeklyUsagePct.toFixed(1)), 100, 16, '%');
+    const sModelsSummary = oCloud.sessionModels.map(m => `${m.name} (${m.request_count})`).join(', ') || '0 reqs';
+    const topModelStr = oCloud.topWeeklyModel ? `${oCloud.topWeeklyModel.name} (${oCloud.topWeeklyModel.request_count} reqs)` : 'desconhecido';
 
-  lines.push(`${C.brightCyan}║ ${C.brightCyan}[Ollama Cloud Pro / OpenCode]${C.reset} Modelo: ${C.white}${oc.activeModel}${C.reset} | Tier: ${C.dim}${oc.tier}${C.reset}`);
-  lines.push(`${C.brightCyan}║   • Cota Semanal Créditos ($15/sem) : ${costBar}`);
-  lines.push(`${C.brightCyan}║   • Volume Tokens Semana (Meta 10M) : ${tokenBar}`);
-  if (oc.lastSession) {
-    const sIn = formatTokens(oc.lastSession.tokensInput);
-    const sOut = formatTokens(oc.lastSession.tokensOutput);
-    const sCache = formatTokens(oc.lastSession.tokensCache);
-    lines.push(`${C.brightCyan}║   • Última Sessão: ${C.dim}"${truncate(oc.lastSession.title, 42)}"${C.reset} (${C.white}${sIn} in${C.reset} | ${C.white}${sOut} out${C.reset} | ${C.dim}${sCache} cache${C.reset})`);
+    lines.push(`${C.brightCyan}║ ${C.brightCyan}[Ollama Cloud Pro — Dados Oficiais ao Vivo]${C.reset} Tier: ${C.white}Pro (3 concorrências)${C.reset}`);
+    lines.push(`${C.brightCyan}║   • Session Usage (Reseta em ~1h)   : ${sessionBar} ${C.dim}[${sModelsSummary}]${C.reset}`);
+    lines.push(`${C.brightCyan}║   • Weekly Usage (Cota Semanal)     : ${weeklyBar} ${C.dim}[${topModelStr} | ${oCloud.totalWeeklyRequests} total]${C.reset}`);
+    if (ai.opencode && ai.opencode.lastSession) {
+      const oc = ai.opencode;
+      const sIn = formatTokens(oc.lastSession.tokensInput);
+      const sOut = formatTokens(oc.lastSession.tokensOutput);
+      const sCache = formatTokens(oc.lastSession.tokensCache);
+      lines.push(`${C.brightCyan}║   • OpenCode Última Sessão: ${C.dim}"${truncate(oc.lastSession.title, 36)}"${C.reset} (${C.white}${sIn} in${C.reset} | ${C.white}${sOut} out${C.reset} | ${C.dim}${sCache} cache${C.reset})`);
+    }
+  } else {
+    // Fallback to local SQLite
+    const oc = ai.opencode;
+    const costBar = makeBar(Number(oc.weekCost.toFixed(2)), oc.weekBudget, 16, '$');
+    const tokenFmt = (oc.weekTokens / 1000000).toFixed(2);
+    const tokenMaxFmt = (oc.weekTokensTarget / 1000000).toFixed(1);
+    const tokenBar = makeBar(Number(tokenFmt), Number(tokenMaxFmt), 16, 'M');
+
+    lines.push(`${C.brightCyan}║ ${C.brightCyan}[Ollama Cloud Pro / OpenCode]${C.reset} Modelo: ${C.white}${oc.activeModel}${C.reset} | Tier: ${C.dim}${oc.tier}${C.reset}`);
+    lines.push(`${C.brightCyan}║   • Cota Semanal Créditos ($15/sem) : ${costBar}`);
+    lines.push(`${C.brightCyan}║   • Volume Tokens Semana (Meta 10M) : ${tokenBar}`);
+    if (oc.lastSession) {
+      const sIn = formatTokens(oc.lastSession.tokensInput);
+      const sOut = formatTokens(oc.lastSession.tokensOutput);
+      const sCache = formatTokens(oc.lastSession.tokensCache);
+      lines.push(`${C.brightCyan}║   • Última Sessão: ${C.dim}"${truncate(oc.lastSession.title, 42)}"${C.reset} (${C.white}${sIn} in${C.reset} | ${C.white}${sOut} out${C.reset} | ${C.dim}${sCache} cache${C.reset})`);
+    }
   }
 
   // Antigravity CLI
@@ -632,27 +706,29 @@ function startWebServer(port = 3333) {
         // AI Metrics
         const oc = data.ai.opencode;
         const agy = data.ai.antigravity;
-        const costPct = Math.min(100, (oc.weekCost / oc.weekBudget) * 100).toFixed(1);
-        const tokPct = Math.min(100, (oc.weekTokens / oc.weekTokensTarget) * 100).toFixed(1);
+        const oCloud = data.ai.ollamaCloud;
+        const sUsage = oCloud ? Number(oCloud.sessionUsagePct.toFixed(1)) : 0;
+        const wUsage = oCloud ? Number(oCloud.weeklyUsagePct.toFixed(1)) : 0;
+        const topModel = (oCloud && oCloud.topWeeklyModel) ? oCloud.topWeeklyModel.name + ' (' + oCloud.topWeeklyModel.request_count + ' reqs)' : 'glm-5.3-flash';
         const stepsPct = Math.min(100, (agy.stepCount / agy.stepSoftLimit) * 100).toFixed(1);
 
         document.getElementById('ai-grid').innerHTML = \`
           <div>
-            <div style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">Ollama Cloud Pro (OpenCode)</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Modelo: \${oc.activeModel} | \${oc.tier}</div>
+            <div style="font-weight: 600; color: var(--accent); margin-bottom: 8px;">Ollama Cloud Pro (Dados Oficiais ao Vivo)</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Top Model: \${topModel} | Tier: Pro</div>
             <div class="bar-wrap">
               <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                <span>Cota Semanal de Créditos (\$15.00)</span>
-                <span style="font-weight: bold;">\${costPct}% (\$\${oc.weekCost.toFixed(2)} / \$\${oc.weekBudget.toFixed(2)})</span>
+                <span>Session Usage (Reseta em ~1h)</span>
+                <span style="font-weight: bold; color: \${sUsage > 80 ? 'var(--red)' : 'var(--green)'};">\${sUsage}% used</span>
               </div>
-              <div class="bar-bg"><div class="bar-fill" style="width: \${costPct}%; background: \${costPct > 80 ? 'var(--red)' : 'var(--green)'};"></div></div>
+              <div class="bar-bg"><div class="bar-fill" style="width: \${sUsage}%; background: \${sUsage > 80 ? 'var(--red)' : 'var(--green)'};"></div></div>
             </div>
             <div class="bar-wrap">
               <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                <span>Tokens Consumidos na Semana (Meta 10M)</span>
-                <span style="font-weight: bold;">\${tokPct}% (\${(oc.weekTokens/1000000).toFixed(2)}M / 10.0M)</span>
+                <span>Weekly Usage</span>
+                <span style="font-weight: bold; color: \${wUsage > 80 ? 'var(--red)' : 'var(--yellow)'};">\${wUsage}% used</span>
               </div>
-              <div class="bar-bg"><div class="bar-fill" style="width: \${tokPct}%; background: var(--accent);"></div></div>
+              <div class="bar-bg"><div class="bar-fill" style="width: \${wUsage}%; background: var(--accent);"></div></div>
             </div>
           </div>
           <div>
@@ -797,7 +873,6 @@ if (args.includes('--web')) {
 } else if (args.includes('--plain')) {
   renderDashboard().then(out => {
     console.log(out);
-    process.exit(0);
   });
 } else {
   startTui();
