@@ -26,8 +26,12 @@ jobs:
       - name: Check VPS configuration
         id: check_secrets
         shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
-          if [ -n "${{ secrets.VPS_SSH_HOST }}" ] && [ -n "${{ secrets.VPS_SSH_USER }}" ] && [ -n "${{ secrets.VPS_SSH_KEY }}" ]; then
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_USER" ] && [ -n "$VPS_KEY" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
             echo "VPS secrets configured. Proceeding with deployment."
           else
@@ -42,31 +46,56 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
+      - name: Configure Known Hosts
+        if: steps.check_secrets.outputs.configured == 'true'
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_PORT: ${{ secrets.VPS_SSH_PORT || 22 }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
       - name: Deploy via SSH to VPS
         if: steps.check_secrets.outputs.configured == 'true'
         shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_PORT: ${{ secrets.VPS_SSH_PORT || 22 }}
         run: |
-          ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_SSH_PORT || 22 }} ${{ secrets.VPS_SSH_USER }}@${{ secrets.VPS_SSH_HOST }} << 'EOF'
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" << 'EOF'
             set -e
             echo "=== Iniciando Deploy do Compas na VPS ==="
             cd /opt/compas || mkdir -p /opt/compas && cd /opt/compas
             
-            # Atualiza código da branch main
+            # Captura commit atual antes do update para restaurar em caso de rollback
+            PREV_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+            # Atualiza codigo da branch main
             if [ -d ".git" ]; then
               git fetch origin main
               git reset --hard origin/main
             fi
 
-            # Backup da imagem/tag atual para rollback rápido
-            docker tag compas-api:latest compas-api:previous 2>/dev/null || true
-            docker tag compas-frontend:latest compas-frontend:previous 2>/dev/null || true
-
-            # Build e inicialização dos containers
-            if [ -f "docker/docker-compose.prod.yml" ]; then
-              docker compose -f docker/docker-compose.prod.yml up -d --build
-            elif [ -f "docker-compose.yml" ]; then
-              docker compose up -d --build
+            # Backup das imagens atuais se existirem
+            if docker image inspect compas-api:latest >/dev/null 2>&1; then
+              docker tag compas-api:latest compas-api:previous
             fi
+            if docker image inspect compas-frontend:latest >/dev/null 2>&1; then
+              docker tag compas-frontend:latest compas-frontend:previous
+            fi
+
+            # Define arquivo de compose
+            COMPOSE_FILE="docker-compose.yml"
+            if [ -f "docker/docker-compose.prod.yml" ]; then
+              COMPOSE_FILE="docker/docker-compose.prod.yml"
+            fi
+
+            # Build e inicializacao dos containers
+            docker compose -f "$COMPOSE_FILE" up -d --build
 
             echo "=== Aguardando inicialização do serviço (Healthcheck) ==="
             RETRIES=10
@@ -82,17 +111,20 @@ jobs:
             done
 
             if [ "$SUCCESS" -ne 1 ]; then
-              echo "ERRO: Healthcheck falhou após $RETRIES tentativas. Iniciando ROLLBACK..."
-              docker tag compas-api:previous compas-api:latest 2>/dev/null || true
-              docker tag compas-frontend:previous compas-frontend:latest 2>/dev/null || true
-              if [ -f "docker/docker-compose.prod.yml" ]; then
-                docker compose -f docker/docker-compose.prod.yml up -d
-              elif [ -f "docker-compose.yml" ]; then
-                docker compose up -d
+              echo "ERRO: Healthcheck falhou apos $RETRIES tentativas. Iniciando ROLLBACK..."
+              if [ -n "$PREV_COMMIT" ] && [ -d ".git" ]; then
+                git checkout "$PREV_COMMIT"
               fi
-              echo "Rollback concluído para a versão estável anterior."
+              if docker image inspect compas-api:previous >/dev/null 2>&1; then
+                docker tag compas-api:previous compas-api:latest
+              fi
+              if docker image inspect compas-frontend:previous >/dev/null 2>&1; then
+                docker tag compas-frontend:previous compas-frontend:latest
+              fi
+              docker compose -f "$COMPOSE_FILE" up -d
+              echo "Rollback concluido para a versao estavel anterior."
               exit 1
             fi
 
-            echo "=== Deploy concluído com 100% de sucesso! ==="
+            echo "=== Deploy concluido com 100% de sucesso! ==="
           EOF
