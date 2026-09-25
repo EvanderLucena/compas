@@ -703,8 +703,15 @@ function startWebServer(port = 3333) {
 // ==============================================================================
 
 async function startTui() {
-  if (!IS_TTY) {
-    // Non-interactive fallback: just print once
+  let isRawSupported = false;
+  try {
+    if (process.stdin.setRawMode) {
+      process.stdin.setRawMode(true);
+      isRawSupported = true;
+    }
+  } catch {}
+
+  if (args.includes('--plain') || (!isRawSupported && !process.stdout.isTTY)) {
     const output = await renderDashboard();
     console.log(output);
     process.exit(0);
@@ -727,13 +734,16 @@ async function startTui() {
   }
 
   async function draw() {
-    const screen = await renderDashboard(statusMsg);
-    // Cursor to top-left and redraw
-    process.stdout.write('\x1b[H' + screen);
+    try {
+      const screen = await renderDashboard(statusMsg);
+      process.stdout.write('\x1b[H' + screen);
+    } catch {}
   }
 
   function cleanup() {
-    process.stdout.write('\x1b[?1049l\x1b[?25h');
+    try {
+      process.stdout.write('\x1b[?1049l\x1b[?25h');
+    } catch {}
     process.exit(0);
   }
 
@@ -741,44 +751,43 @@ async function startTui() {
   process.on('SIGTERM', cleanup);
 
   // Setup raw mode for key input
-  try {
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.setEncoding('utf8');
+  if (isRawSupported) {
+    try {
+      process.stdin.resume();
+      process.stdin.setEncoding('utf8');
 
-    process.stdin.on('data', async key => {
-      if (key === 'q' || key === '\u0003' || key === '\u001b') {
-        cleanup();
-      } else if (key === 'r') {
-        setStatus('Atualizando dados...');
-      } else if (key === 'u') {
-        setStatus('Executando Docker Compose Up...');
-        const res = dockerUp();
-        setStatus(res);
-      } else if (key === 'd') {
-        setStatus('Executando Docker Compose Down...');
-        const res = dockerDown();
-        setStatus(res);
-      } else if (key === 'k') {
-        setStatus('Liberando portas 8080 e 5173...');
-        const res = killPorts();
-        setStatus(res);
-      } else if (key === 'w') {
-        setStatus('Iniciando Web Dashboard em http://localhost:3333...');
-        startWebServer(3333);
-      }
-    });
-  } catch {}
+      process.stdin.on('data', async key => {
+        if (key === 'q' || key === '\u0003' || key === '\u001b') {
+          cleanup();
+        } else if (key === 'r') {
+          setStatus('Atualizando dados...');
+        } else if (key === 'u') {
+          setStatus('Executando Docker Compose Up...');
+          const res = dockerUp();
+          setStatus(res);
+        } else if (key === 'd') {
+          setStatus('Executando Docker Compose Down...');
+          const res = dockerDown();
+          setStatus(res);
+        } else if (key === 'k') {
+          setStatus('Liberando portas 8080 e 5173...');
+          const res = killPorts();
+          setStatus(res);
+        } else if (key === 'w') {
+          setStatus('Iniciando Web Dashboard em http://localhost:3333...');
+          startWebServer(3333);
+        }
+      });
+    } catch {}
+  }
 
   // Initial draw
   await draw();
 
-  // 1.5s refresh loop
+  // 1.5s refresh loop — KEPT ACTIVE!
   const interval = setInterval(async () => {
     await draw();
   }, 1500);
-
-  interval.unref();
 }
 
 // Check args
