@@ -80,12 +80,18 @@ jobs:
             # Captura commit atual antes do update para restaurar em caso de rollback
             PREV_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
 
-            # Define arquivo de compose
-            COMPOSE_FILE="docker/docker-compose.yml"
-            if [ -f "docker/docker-compose.prod.yml" ]; then
-              COMPOSE_FILE="docker/docker-compose.prod.yml"
-            elif [ -f "docker-compose.yml" ]; then
-              COMPOSE_FILE="docker-compose.yml"
+            # Atualiza o repositório e posiciona no commit exato testado pelo CI
+            git fetch origin main
+            git checkout "$TARGET_SHA"
+
+            # Define arquivo de compose e argumentos de env
+            COMPOSE_FILE="docker/docker-compose.prod.yml"
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              COMPOSE_FILE="docker/docker-compose.yml"
+            fi
+            ENV_ARGS=""
+            if [ -f ".env" ]; then
+              ENV_ARGS="--env-file .env"
             fi
 
             # Funcao de rollback para falha de build ou falha de healthcheck
@@ -100,14 +106,10 @@ jobs:
               if docker image inspect compas-frontend:previous >/dev/null 2>&1; then
                 docker tag compas-frontend:previous compas-frontend:latest || true
               fi
-              docker compose -f "$COMPOSE_FILE" up -d || true
+              docker compose $ENV_ARGS -f "$COMPOSE_FILE" up -d || true
               echo "Rollback concluido para o commit anterior: $PREV_COMMIT."
               exit 1
             }
-
-            # Atualiza o repositório e posiciona no commit exato testado pelo CI
-            git fetch origin main
-            git checkout "$TARGET_SHA"
 
             # Backup das imagens atuais se existirem
             if docker image inspect compas-backend:latest >/dev/null 2>&1; then
@@ -118,7 +120,7 @@ jobs:
             fi
 
             # Build e inicializacao dos containers protegidos por rollback imediato em caso de erro
-            docker compose -f "$COMPOSE_FILE" up -d --build || rollback
+            docker compose $ENV_ARGS -f "$COMPOSE_FILE" up -d --build || rollback
 
             echo "=== Aguardando inicialização dos serviços (Healthcheck) ==="
             RETRIES=10
@@ -134,7 +136,7 @@ jobs:
               fi
 
               # Checa se container frontend esta rodando no docker
-              if docker compose -f "$COMPOSE_FILE" ps --status running | grep -q "frontend"; then
+              if docker compose $ENV_ARGS -f "$COMPOSE_FILE" ps --status running | grep -q "frontend"; then
                 FRONTEND_OK=1
               fi
 
