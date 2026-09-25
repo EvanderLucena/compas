@@ -45,6 +45,21 @@
 - Patient data must be scoped by nutritionist — no global queries
 - All endpoints that create patients must accept consent terms
 
+## AI Engineering & Quality Rules (Inspired by AI Lair)
+
+### Evidence Over Narrative
+- Do NOT accept PR descriptions or commit summaries at face value: evaluate strictly whether the code changes and test assertions verify the claimed behavior.
+- Every new endpoint, formula, or business logic calculation MUST be accompanied by corresponding automated tests (unit or integration). Flag as `HIGH` if critical logic changes lack test coverage.
+
+### "Slop é Defeito" (Anti-Slop Rule)
+- Flag unassociated `// TODO:` or `// FIXME:` comments introduced in the diff as `MEDIUM`. Code must be complete.
+- Flag speculative abstractions ("future-proofing" helpers or dead code) that are not exercised anywhere.
+- Flag test weakening: removing assertions, disabling checks, or inflating timeouts arbitrarily to pass CI.
+
+### Database Migrations: Expand-Contract Pattern
+- Flyway migrations (`V*.sql`) must be non-destructive to allow seamless rollback.
+- Never drop or rename columns in the same migration step as application code updates. Always expand first (add nullable/default column), deploy code that writes/reads, and contract (drop old column) in a subsequent release.
+
 ## Do NOT Flag
 - Mock data patterns (in-memory data, hardcoded arrays in prototype code)
 - Missing i18n (project is intentionally pt-BR only)

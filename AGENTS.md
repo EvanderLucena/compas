@@ -11,8 +11,10 @@
 | E2E tests | `frontend/e2e/` | `npm run test:e2e` (requires backend + frontend running) |
 | Docker dev | `docker/` | `docker compose -f docker/docker-compose.dev.yml up -d postgres` |
 | AI reviewer rules | `.github/review-rules.md` | Edit to change what the AI reviewer flags on PRs |
-| CI pipelines | `.github/workflows/` | `frontend-ci.yml`, `backend-ci.yml`, `e2e.yml`, `ai-review.yml` |
+| CI/CD pipelines | `.github/workflows/` | `frontend-ci.yml`, `backend-ci.yml`, `ai-review.yml`, `deploy.yml` |
 | Project tasks | `TASKS.md` | Tracks bugs, features, and quality next-steps |
+| Skills | `.skills/` | Modular skills: `pr-audit`, `github-resolution`, `expand-contract-migration`, `release` |
+| Memory hub | `.memory/` | `DECISIONS.md` (ADRs), `HANDOFFS.md` |
 
 ## Development Workflow
 

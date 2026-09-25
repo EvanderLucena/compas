@@ -1,0 +1,98 @@
+name: Deploy to VPS (CD)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to VPS Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check VPS configuration
+        id: check_secrets
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.VPS_SSH_HOST }}" ] && [ -n "${{ secrets.VPS_SSH_USER }}" ] && [ -n "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "VPS secrets configured. Proceeding with deployment."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "VPS secrets (VPS_SSH_HOST, VPS_SSH_USER, VPS_SSH_KEY) are not set. Skipping live deployment."
+            echo "To enable automatic deployment, add these secrets to your GitHub repository settings."
+          fi
+
+      - name: Setup SSH Keys
+        if: steps.check_secrets.outputs.configured == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Deploy via SSH to VPS
+        if: steps.check_secrets.outputs.configured == 'true'
+        shell: bash
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ secrets.VPS_SSH_PORT || 22 }} ${{ secrets.VPS_SSH_USER }}@${{ secrets.VPS_SSH_HOST }} << 'EOF'
+            set -e
+            echo "=== Iniciando Deploy do Compas na VPS ==="
+            cd /opt/compas || mkdir -p /opt/compas && cd /opt/compas
+            
+            # Atualiza código da branch main
+            if [ -d ".git" ]; then
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            # Backup da imagem/tag atual para rollback rápido
+            docker tag compas-api:latest compas-api:previous 2>/dev/null || true
+            docker tag compas-frontend:latest compas-frontend:previous 2>/dev/null || true
+
+            # Build e inicialização dos containers
+            if [ -f "docker/docker-compose.prod.yml" ]; then
+              docker compose -f docker/docker-compose.prod.yml up -d --build
+            elif [ -f "docker-compose.yml" ]; then
+              docker compose up -d --build
+            fi
+
+            echo "=== Aguardando inicialização do serviço (Healthcheck) ==="
+            RETRIES=10
+            SUCCESS=0
+            for i in $(seq 1 $RETRIES); do
+              echo "Healthcheck tentativa $i de $RETRIES..."
+              if curl -s -f http://127.0.0.1:8080/health | grep -q "status"; then
+                echo "Healthcheck OK! Serviço respondendo perfeitamente."
+                SUCCESS=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$SUCCESS" -ne 1 ]; then
+              echo "ERRO: Healthcheck falhou após $RETRIES tentativas. Iniciando ROLLBACK..."
+              docker tag compas-api:previous compas-api:latest 2>/dev/null || true
+              docker tag compas-frontend:previous compas-frontend:latest 2>/dev/null || true
+              if [ -f "docker/docker-compose.prod.yml" ]; then
+                docker compose -f docker/docker-compose.prod.yml up -d
+              elif [ -f "docker-compose.yml" ]; then
+                docker compose up -d
+              fi
+              echo "Rollback concluído para a versão estável anterior."
+              exit 1
+            fi
+
+            echo "=== Deploy concluído com 100% de sucesso! ==="
+          EOF
