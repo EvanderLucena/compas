@@ -37,6 +37,15 @@ Fluxo padrão:
    - **Internal PRs**: AI approval is enough; owner is admin and can bypass if needed.
    - **External PRs**: AI approval + manual approval from owner (convention, not technically enforced).
 
+### AI Memory & Session Continuation Protocol
+
+Whenever the user instructs to **"continue"**, **"retomar"**, or mentions **"ai-memory"** / **"continue a tarefa em andamento"**:
+1. **Inspect Memory & Tasks**: Read `.memory/HANDOFFS.md` and `TASKS.md` to identify the active task and the latest session checkpoint.
+2. **Inspect Working Tree**: Run `git status` and `git diff` to understand in-flight modifications.
+3. **Verify Baseline Health**: Run `./gradlew test` (backend) or `npm test` (frontend) to understand current health.
+4. **Resume Seamlessly**: Report a 1-2 line confirmation and continue the task without repeating completed work.
+5. **Update Handoff on Pause**: Before pausing, update `.memory/HANDOFFS.md` with current progress and the next immediate step.
+
 ### PR sizing convention (soft limit ~2.000 linhas de diff)
 
 PRs gigantes (8k+ linhas, fase inteira) **amplificam falsos positivos do reviewer LLM**:
