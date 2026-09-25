@@ -13,7 +13,28 @@ Ao encerrar uma sessão de trabalho ou alternar de IA:
 
 ## Log de Sessões
 
-### [2026-09-25] — Auditoria Completa do Backlog & Sincronização do Live Kanban
+### [2026-09-25] — Deploy de Produção na VPS (Magalu Cloud) em Modo Closed Beta & Pipeline CD
+- **Agente:** Antigravity CLI
+- **Concluído:**
+  - **VPS Provisionada e Blindada (`201.23.76.153`):** Ubuntu 24.04 LTS, Swapfile 2GB, Docker 29.8 + Compose v5. Firewall UFW ativo com política `DEFAULT DENY INCOMING` (apenas portas 22 e 80 liberadas externamente).
+  - **Segurança de Rede dos Containers:** PostgreSQL (5432), Redis (6379), Backend Spring Boot (8080) e Evolution API (8081) isolados na rede interna Docker e vinculados exclusivamente a `127.0.0.1`. Apenas Nginx (80) exposto.
+  - **Segurança Criptográfica & `.env` na VPS:** Segredos de 256 bits gerados diretamente no servidor via `openssl rand` com permissões `chmod 600 /opt/compas/.env`. Nenhum segredo em git.
+  - **Modo Closed Beta (Fail-Closed):**
+    - Rota `/` e `/signup` redirecionam imediatamente para `/login`.
+    - `LoginView` exibe aviso de beta privado e oculta links públicos e login social.
+    - Backend intercepta `POST /api/v1/auth/signup` retornando `403 Forbidden` com `PUBLIC_SIGNUP_ENABLED=false`.
+    - Defaults de frontend e backend 100% sincronizados para fail-closed.
+  - **Seeder de Produção (`ProdAccountSeeder`):** Cria conta inicial de nutricionista com `onboardingCompleted(false)` (sem dados clínicos falsos, forçando fluxo autêntico de onboarding e termos) sob opt-in explícito `COMPAS_SEED_ADMIN_ENABLED=true`.
+  - **Pipeline CD (`deploy.yml`):**
+    - Corrigido healthcheck para `/api/v1/health`.
+    - Injeção automática de `--env-file .env` e detecção pós-checkout de `docker-compose.prod.yml`.
+    - Pipeline executou com sucesso (PR #214 e PR #216 aprovados pelo AI Reviewer e mergeados na `main`).
+  - **Validação Live:** Healthcheck `UP` e DB `connected` em `http://201.23.76.153/api/v1/health`, Nginx servindo frontend em `http://201.23.76.153/`, e login validado com sucesso.
+- **Credenciais Iniciais do Nutricionista:**
+  - E-mail: `admin@compas.app`
+  - Senha: Gerada com alta entropia no `.env` da VPS (informada de forma segura na resposta).
+- **Próximo Passo:**
+  - Usuário acessar `http://201.23.76.153` no navegador, realizar login e testar o onboarding e painel ao vivo em produção.
 - **Agente:** Antigravity CLI
 - **Concluído:**
   - Auditoria forense e alinhamento de 100% das tarefas pendentes (`TASKS.md`) contra a codebase real:
