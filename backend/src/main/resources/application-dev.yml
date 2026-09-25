@@ -24,6 +24,8 @@ logging:
     com.nutriai: DEBUG
 
 compas:
+  auth:
+    public-signup-enabled: true
   jwt:
     secret: ${COMPAS_JWT_SECRET:${NUTRIAI_JWT_SECRET:local-dev-secret-do-not-use-in-production}}
     cookie:

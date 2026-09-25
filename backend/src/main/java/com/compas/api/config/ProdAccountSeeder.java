@@ -26,6 +26,9 @@ public class ProdAccountSeeder implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final TransactionTemplate transactionTemplate;
 
+    @Value("${compas.seed.admin.enabled:${COMPAS_SEED_ADMIN_ENABLED:false}}")
+    private boolean seedEnabled;
+
     @Value("${compas.seed.admin.email:${nutriai.seed.admin.email:admin@compas.app}}")
     private String adminEmail;
 
@@ -47,8 +50,12 @@ public class ProdAccountSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (!seedEnabled) {
+            return;
+        }
+
         if (adminPassword == null || adminPassword.isBlank()) {
-            logger.info("COMPAS_SEED_ADMIN_PASSWORD is empty. Skipping initial account seeding.");
+            logger.warn("COMPAS_SEED_ADMIN_ENABLED is true but password is empty. Skipping initial account seeding.");
             return;
         }
 
@@ -67,15 +74,13 @@ public class ProdAccountSeeder implements CommandLineRunner {
                     .professionalName(adminName)
                     .email(adminEmail)
                     .passwordHash(passwordEncoder.encode(adminPassword))
-                    .crn("00000")
-                    .crnRegional("CRN-3")
                     .role(UserRole.NUTRITIONIST)
                     .emailVerified(true)
-                    .onboardingCompleted(true)
+                    .onboardingCompleted(false)
                     .subscriptionTier("UNLIMITED")
                     .patientLimit(9999)
                     .build());
-            logger.info("Initial nutritionist account {} seeded.", adminEmail);
+            logger.info("Initial nutritionist account {} seeded for first-time onboarding.", adminEmail);
         }
     }
 }

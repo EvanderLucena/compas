@@ -39,9 +39,10 @@ server:
 compas:
   version: 0.5.0
   auth:
-    public-signup-enabled: ${PUBLIC_SIGNUP_ENABLED:true}
+    public-signup-enabled: ${PUBLIC_SIGNUP_ENABLED:false}
   seed:
     admin:
+      enabled: ${COMPAS_SEED_ADMIN_ENABLED:false}
       email: ${COMPAS_SEED_ADMIN_EMAIL:${NUTRIAI_SEED_ADMIN_EMAIL:admin@compas.app}}
       password: ${COMPAS_SEED_ADMIN_PASSWORD:${NUTRIAI_SEED_ADMIN_PASSWORD:}}
       name: ${COMPAS_SEED_ADMIN_NAME:${NUTRIAI_SEED_ADMIN_NAME:Admin Compas}}
@@ -106,6 +107,7 @@ nutriai:
     public-signup-enabled: ${compas.auth.public-signup-enabled}
   seed:
     admin:
+      enabled: ${compas.seed.admin.enabled}
       email: ${compas.seed.admin.email}
       password: ${compas.seed.admin.password}
       name: ${compas.seed.admin.name}
