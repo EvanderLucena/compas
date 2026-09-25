@@ -1,0 +1,155 @@
+name: Deploy to VPS (CD)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to VPS Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check VPS configuration
+        id: check_secrets
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_USER" ] && [ -n "$VPS_KEY" ] && [ -n "$VPS_KNOWN_HOSTS" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "VPS secrets configured with pinned known_hosts. Proceeding with deployment."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "VPS secrets (VPS_SSH_HOST, VPS_SSH_USER, VPS_SSH_KEY, VPS_SSH_KNOWN_HOSTS) are not fully configured. Skipping live deployment."
+            echo "To enable automatic deployment, add these secrets to your GitHub repository settings."
+          fi
+
+      - name: Setup SSH Keys
+        if: steps.check_secrets.outputs.configured == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Configure Known Hosts
+        if: steps.check_secrets.outputs.configured == 'true'
+        shell: bash
+        env:
+          KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy via SSH to VPS
+        if: steps.check_secrets.outputs.configured == 'true'
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_SSH_HOST }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_PORT: ${{ secrets.VPS_SSH_PORT || 22 }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "TARGET_SHA='$TARGET_SHA' bash -s" << 'EOF'
+            set -e
+            echo "=== Iniciando Deploy do Compas na VPS (Commit: $TARGET_SHA) ==="
+            cd /opt/compas || { echo "ERRO: Diretório /opt/compas não encontrado"; exit 1; }
+            
+            if [ ! -d ".git" ]; then
+              echo "ERRO: Repositório Git não encontrado em /opt/compas."
+              exit 1
+            fi
+
+            # Captura commit atual antes do update para restaurar em caso de rollback
+            PREV_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+
+            # Define arquivo de compose
+            COMPOSE_FILE="docker/docker-compose.yml"
+            if [ -f "docker/docker-compose.prod.yml" ]; then
+              COMPOSE_FILE="docker/docker-compose.prod.yml"
+            elif [ -f "docker-compose.yml" ]; then
+              COMPOSE_FILE="docker-compose.yml"
+            fi
+
+            # Funcao de rollback para falha de build ou falha de healthcheck
+            rollback() {
+              echo "ERRO: Falha detectada durante o deploy. Iniciando ROLLBACK..."
+              if [ -n "$PREV_COMMIT" ]; then
+                git checkout "$PREV_COMMIT" || true
+              fi
+              if docker image inspect compas-backend:previous >/dev/null 2>&1; then
+                docker tag compas-backend:previous compas-backend:latest || true
+              fi
+              if docker image inspect compas-frontend:previous >/dev/null 2>&1; then
+                docker tag compas-frontend:previous compas-frontend:latest || true
+              fi
+              docker compose -f "$COMPOSE_FILE" up -d || true
+              echo "Rollback concluido para o commit anterior: $PREV_COMMIT."
+              exit 1
+            }
+
+            # Atualiza o repositório e posiciona no commit exato testado pelo CI
+            git fetch origin main
+            git checkout "$TARGET_SHA"
+
+            # Backup das imagens atuais se existirem
+            if docker image inspect compas-backend:latest >/dev/null 2>&1; then
+              docker tag compas-backend:latest compas-backend:previous || true
+            fi
+            if docker image inspect compas-frontend:latest >/dev/null 2>&1; then
+              docker tag compas-frontend:latest compas-frontend:previous || true
+            fi
+
+            # Build e inicializacao dos containers protegidos por rollback imediato em caso de erro
+            docker compose -f "$COMPOSE_FILE" up -d --build || rollback
+
+            echo "=== Aguardando inicialização dos serviços (Healthcheck) ==="
+            RETRIES=10
+            SUCCESS=0
+            for i in $(seq 1 $RETRIES); do
+              echo "Healthcheck tentativa $i de $RETRIES..."
+              # Verifica se tanto backend quanto frontend estao respondendo ou saudaveis
+              BACKEND_OK=0
+              FRONTEND_OK=0
+
+              if curl -s -f http://127.0.0.1:8080/health | grep -q "status"; then
+                BACKEND_OK=1
+              fi
+
+              # Checa se container frontend esta rodando no docker
+              if docker compose -f "$COMPOSE_FILE" ps --status running | grep -q "frontend"; then
+                FRONTEND_OK=1
+              fi
+
+              if [ "$BACKEND_OK" -eq 1 ] && [ "$FRONTEND_OK" -eq 1 ]; then
+                echo "Healthcheck OK! Backend e Frontend respondendo perfeitamente."
+                SUCCESS=1
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$SUCCESS" -ne 1 ]; then
+              echo "ERRO: Healthcheck falhou apos $RETRIES tentativas."
+              rollback
+            fi
+
+            echo "=== Deploy concluido com 100% de sucesso! ==="
+          EOF
