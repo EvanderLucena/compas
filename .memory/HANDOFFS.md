@@ -25,7 +25,7 @@ Ao encerrar uma sessão de trabalho ou alternar de IA:
     - **Limpeza de Out of Scope:** Tarefas não-acionáveis (importação avulsa de arquivo TACO e exportação de PDF em Inteligência) devidamente arquivadas para não poluir o Kanban.
   - Sincronização do parser do TUI (`scripts/compas-dashboard.cjs`) e do CLI (`scripts/compas-tools.ps1`) para manter o Kanban limpo e 100% verdadeiro.
 - **Próximo Passo:**
-  - Integração Stripe & Infraestrutura Final (/billing)
+  - Stripe Checkout — Planos e Assinaturas (/billing)
 
 - **Agente:** Antigravity CLI
 - **Concluído:**

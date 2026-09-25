@@ -117,12 +117,17 @@
   - **Padrão de Fallback Resiliente da IA em Falhas Técnicas:** Padronização da mesma postura amigável para qualquer queda de modelo, timeout de LLM ou erro temporário do servidor: nunca deixar o paciente no vácuo e nunca exibir mensagens de erro técnicas.
 
 ### 5. Pagamento & Assinaturas Stripe (`/billing`), Deploys e VPS
-- [ ] **Integração Stripe & Infraestrutura Final (/billing)**
-  - Stripe Checkout para os 3 planos (Iniciante R$99, Profissional R$149, Ilimitado R$199) e opção anual com 2 meses grátis.
-  - Stripe Customer Portal para troca de cartão, histórico de faturas e cancelamento autônomo.
-  - Webhooks de sincronização de status de assinatura (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`).
-  - Período de teste (Trial de 30 dias) e transição para o Modo Leitura pós-vencimento.
-  - Configuração de containers Docker e deploy em VPS de produção.
+
+- [ ] **Stripe Checkout — Planos e Assinaturas (/billing)**
+  - Criação de Checkout Session hospedada no Stripe para os 3 planos clínicos (Iniciante R$99/mês, Profissional R$149/mês, Ilimitado R$199/mês) e opção anual com 2 meses grátis. Suporte a Cartão de Crédito e Pix.
+- [ ] **Stripe Customer Portal — Gestão Autônoma de Cartões e Faturas**
+  - Sessão do Customer Portal para a nutri atualizar forma de pagamento, consultar histórico de faturas/recibos e gerenciar cancelamento de forma transparente.
+- [ ] **Webhooks Stripe — Sincronização e Modo Leitura**
+  - Processamento idempotente de eventos (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`) com transição automática entre Trial (30 dias), Plano Ativo e Modo Leitura (*Read-Only*).
+- [ ] **Docker Compose de Produção & Nginx SSL**
+  - Configuração dos containers de produção (`docker-compose.prod.yml`) para PostgreSQL, Redis, Evolution API, Spring Boot e Frontend estático com Nginx e certificados Let's Encrypt / Certbot.
+- [ ] **Deploy Automatizado na VPS & Rollback**
+  - Script e workflow de deploy com healthcheck em `/api/v1/health` e rollback automático em caso de falha de inicialização.
 
 ---
 
@@ -349,7 +354,7 @@
 - [x] **Convite do Paciente** — implementado via `WhatsAppActivationRow` e `WhatsAppActivationModal` com geração de link direto, QR Code escaneável e status de ativação do WhatsApp do paciente.
 - [x] **Status IA no paciente** — implementado no `PatientHeader` via `WhatsAppActivationRow` (badge "IA Ativa" / "IA Pausada", controle de pausa/reativação do bot e integração com modo leitura).
 - [x] **Recuperação de senha via E-mail (Resend)** — implementado de ponta a ponta: `ResendEmailService`, endpoints `/forgot-password` e `/reset-password` no backend, `ForgotPasswordModal` e página `/reset-password` no frontend.
-- [ ] **Notificações globais** — push, email ou in-app.
+- [x] **Notificações globais** — descartado por decisão de produto: a comunicação do paciente ocorre nativamente via WhatsApp e os alertas clínicos são centralizados no Radar da Home e no prontuário.
 
 ---
 
@@ -398,18 +403,16 @@
 - [x] **ArchUnit rules (6)** — controller↛repository, service↛controller, repository↛service, no package cycles, DTOs↛repositories, controllers must have @PreAuthorize
 - [x] **Husky + lint-staged** — pre-commit: prettier on staged ts/tsx files. ESLint runs in CI.
 
-### Valor médio
+### Backlog Técnico & Ferramentas Futuras (Pós-Lançamento)
 
-- [ ] **springdoc-openapi** — Swagger UI auto-gerado. Útil quando integração WhatsApp (Phase 7) precisar de contract.
-- [ ] **PMD addon ao Checkstyle** — bugs como empty catch, `==` em strings. Depois que Checkstyle estiver estável.
+> Itens de ferramentas internas e instrumentação arquivados para avaliação pós-lançamento em produção. Não impactam a entrega das funcionalidades do sistema clínico.
 
-### Parked (revisitar quando trigger acontecer)
+- **springdoc-openapi** — Swagger UI auto-gerado para documentação de API externa se necessário no futuro.
+- **PMD addon ao Checkstyle** — Análise estática adicional de código quando o time expandir.
+- **Mutation testing (PIT + StrykerJS)** — Testes de mutação para suítes maduras em grande escala.
+- **Audit logging** — Tabela de trilha de auditoria para compliance avançado quando dados reais de saúde estiverem na VPS.
+- **Error Prone / SonarQube Community** — Ferramental corporativo de análise quando houver múltiplos mantenedores.
 
-- [ ] **Mutation testing** (PIT + StrykerJS) — quando suite >30 arquivos ou testes de IA fracos detectados
-- [x] **PostgreSQL RLS** — ativado em todas as 16 tabelas tenant via migração V24 + TenantContext + TenantAwareDataSource (PR #133) ✅
-- [ ] **Audit logging** — quando dados reais de saúde em produção
-- [ ] **Error Prone** (compilador Java) — depois que PMD estiver estável
-- [ ] **SonarQube Community** — quando time crescer (hoje overhead > valor pra solo dev)
 
 ---
 
