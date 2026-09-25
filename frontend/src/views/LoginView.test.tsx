@@ -7,7 +7,9 @@ const mockClearError = vi.fn();
 
 vi.mock('react-router', () => ({
   useNavigate: () => vi.fn(),
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 
 vi.mock('../stores/authStore', () => ({
@@ -108,6 +110,15 @@ describe('LoginView', () => {
       render(<LoginView />);
       const signupLink = screen.getByRole('link', { name: /criar conta/i });
       expect(signupLink).toHaveAttribute('href', '/signup');
+    });
+  });
+
+  describe('Closed Beta mode', () => {
+    it('shows closed beta notice and hides signup when closedBeta is true', () => {
+      render(<LoginView closedBeta={true} />);
+      expect(screen.getByTestId('closed-beta-notice')).toBeInTheDocument();
+      expect(screen.getByText(/versão beta privada/i)).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /criar conta/i })).not.toBeInTheDocument();
     });
   });
 });

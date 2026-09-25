@@ -44,6 +44,9 @@ class AuthControllerTest {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthController authController;
+
     @BeforeEach
     void setUp() {
         refreshTokenRepository.deleteAll();
@@ -73,6 +76,31 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.user.role").value("NUTRITIONIST"))
                 .andExpect(jsonPath("$.user.onboardingCompleted").value(false))
                 .andExpect(header().exists("Set-Cookie"));
+    }
+
+    @Test
+    void signup_whenPublicSignupDisabled_returns403() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(authController, "publicSignupEnabled", false);
+        try {
+            SignupRequest request = new SignupRequest(
+                    "Dr. Test",
+                    "closedbeta@nutriai.com",
+                    "senha12345",
+                    "12345",
+                    "SP",
+                    null,
+                    null,
+                    true
+            );
+
+            mockMvc.perform(post("/api/v1/auth/signup")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.message").value("O cadastro público está temporariamente desativado."));
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(authController, "publicSignupEnabled", true);
+        }
     }
 
     @Test

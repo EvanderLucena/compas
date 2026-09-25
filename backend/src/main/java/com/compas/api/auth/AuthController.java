@@ -35,6 +35,9 @@ public class AuthController {
     @Value("${compas.jwt.cookie.same-site:${nutriai.jwt.cookie.same-site:Lax}}")
     private String cookieSameSite;
 
+    @Value("${compas.auth.public-signup-enabled:${nutriai.auth.public-signup-enabled:true}}")
+    private boolean publicSignupEnabled;
+
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
@@ -44,6 +47,11 @@ public class AuthController {
             @RequestBody @Valid SignupRequest request,
             HttpServletResponse response
     ) {
+        if (!publicSignupEnabled) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("success", false, "message", "O cadastro público está temporariamente desativado."));
+        }
+
         AuthService.SignupResult result = authService.signup(request);
 
         setRefreshTokenCookie(response, result.refreshToken(), cookieMaxAge);

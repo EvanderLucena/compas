@@ -141,7 +141,9 @@ function GoogleAuthButton({ onGoogleClick }: { onGoogleClick: () => void }) {
   );
 }
 
-export function LoginView() {
+const isClosedBeta = import.meta.env.VITE_CLOSED_BETA === 'true';
+
+export function LoginView({ closedBeta = isClosedBeta }: { closedBeta?: boolean } = {}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -242,18 +244,42 @@ export function LoginView() {
             </button>
           </form>
 
-          <div className="auth-divider">
-            <span>ou</span>
-          </div>
+          {closedBeta ? (
+            <div
+              data-testid="closed-beta-notice"
+              style={{
+                marginTop: '1.5rem',
+                padding: '0.85rem 1rem',
+                borderRadius: '8px',
+                background: 'var(--paper-2)',
+                border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+                color: 'var(--fg-muted)',
+                fontSize: '0.85rem',
+                textAlign: 'center',
+                lineHeight: '1.4',
+              }}
+            >
+              🔒 <strong>Versão Beta Privada</strong>
+              <div style={{ fontSize: '0.78rem', marginTop: '0.25rem', color: 'var(--fg-subtle)' }}>
+                Acesso restrito a nutricionistas convidados.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="auth-divider">
+                <span>ou</span>
+              </div>
 
-          <GoogleAuthButton onGoogleClick={handleGoogleAuth} />
+              <GoogleAuthButton onGoogleClick={handleGoogleAuth} />
 
-          <p className="auth-switch">
-            Não tem conta?{' '}
-            <Link to="/signup" className="auth-link-btn">
-              Criar conta grátis
-            </Link>
-          </p>
+              <p className="auth-switch">
+                Não tem conta?{' '}
+                <Link to="/signup" className="auth-link-btn">
+                  Criar conta grátis
+                </Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
 
