@@ -45,7 +45,7 @@ function SidebarHeader({ user }: { user: { name?: string } | null }) {
           <IconCompas size={16} />
         </div>
         <div className="brand-name">compas</div>
-        <div className="brand-tag mono">v2.4</div>
+        <div className="brand-tag mono">beta</div>
       </div>
       <div className="sidebar-user-name">{user?.name || 'Nutricionista'}</div>
     </div>
