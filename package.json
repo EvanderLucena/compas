@@ -4,7 +4,9 @@
     "lint-staged": "^16.4.0"
   },
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "compas": "node scripts/compas-dashboard.cjs",
+    "compas:web": "node scripts/compas-dashboard.cjs --web"
   },
   "lint-staged": {
     "frontend/**/*.{ts,tsx}": [
