@@ -43,7 +43,7 @@ compas:
   seed:
     admin:
       email: ${COMPAS_SEED_ADMIN_EMAIL:${NUTRIAI_SEED_ADMIN_EMAIL:admin@compas.app}}
-      password: ${COMPAS_SEED_ADMIN_PASSWORD:${NUTRIAI_SEED_ADMIN_PASSWORD:Admin123!}}
+      password: ${COMPAS_SEED_ADMIN_PASSWORD:${NUTRIAI_SEED_ADMIN_PASSWORD:}}
       name: ${COMPAS_SEED_ADMIN_NAME:${NUTRIAI_SEED_ADMIN_NAME:Admin Compas}}
   jwt:
     secret: ${COMPAS_JWT_SECRET:${NUTRIAI_JWT_SECRET}}

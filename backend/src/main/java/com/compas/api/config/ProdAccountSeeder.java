@@ -29,7 +29,7 @@ public class ProdAccountSeeder implements CommandLineRunner {
     @Value("${compas.seed.admin.email:${nutriai.seed.admin.email:admin@compas.app}}")
     private String adminEmail;
 
-    @Value("${compas.seed.admin.password:${nutriai.seed.admin.password:Admin123!}}")
+    @Value("${compas.seed.admin.password:${nutriai.seed.admin.password:}}")
     private String adminPassword;
 
     @Value("${compas.seed.admin.name:${nutriai.seed.admin.name:Nutricionista Compas}}")
@@ -47,29 +47,16 @@ public class ProdAccountSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (adminPassword == null || adminPassword.isBlank()) {
+            logger.info("COMPAS_SEED_ADMIN_PASSWORD is empty. Skipping initial account seeding.");
+            return;
+        }
+
         TenantContext.executeWithBypass(() -> {
             transactionTemplate.executeWithoutResult(status -> {
-                ensureAdminUser();
                 ensureInitialNutritionist();
             });
         });
-    }
-
-    private void ensureAdminUser() {
-        if (nutritionistRepository.findByEmail("ops@compas.app").isEmpty()) {
-            nutritionistRepository.save(Nutritionist.builder()
-                    .name("Operador Compas")
-                    .professionalName("Compas Ops")
-                    .email("ops@compas.app")
-                    .passwordHash(passwordEncoder.encode(adminPassword))
-                    .role(UserRole.ADMIN)
-                    .emailVerified(true)
-                    .onboardingCompleted(true)
-                    .subscriptionTier("UNLIMITED")
-                    .patientLimit(9999)
-                    .build());
-            logger.info("Admin account ops@compas.app seeded.");
-        }
     }
 
     private void ensureInitialNutritionist() {
