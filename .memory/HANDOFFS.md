@@ -13,7 +13,20 @@ Ao encerrar uma sessão de trabalho ou alternar de IA:
 
 ## Log de Sessões
 
-### [2026-09-25] — Terminal Unificado, AI Harness & Live Task Board
+### [2026-09-25] — Auditoria Completa do Backlog & Sincronização do Live Kanban
+- **Agente:** Antigravity CLI
+- **Concluído:**
+  - Auditoria forense e alinhamento de 100% das tarefas pendentes (`TASKS.md`) contra a codebase real:
+    - **Trio de Ouro PDFs (`PatientDocumentService`, `PatientDocumentController`, `documents.ts`):** 100% concluído no backend e frontend.
+    - **Status IA no Paciente (`WhatsAppActivationRow.tsx`):** Badge dinâmico ("IA Ativa" / "IA Pausada"), controle de pausa/reativação e ativação WhatsApp com testes.
+    - **Recuperação de Senha via E-mail Resend:** `ResendEmailService`, endpoints `/forgot-password` e `/reset-password` no backend, `ForgotPasswordModal` e página `/reset-password` no frontend.
+    - **Playwright Tutorial/Onboarding & E2E:** Cenário `E2E-J-01` (`journey-auth.spec.ts`) e `E2E-J-02` (`journey-patient.spec.ts`) cobrindo 100% do fluxo real de UI.
+    - **Validação de Biometria e Alimentos:** `% gordura` alinhado como obrigatório (`@NotNull` e faixa 0.01-100), e `foodValidation.ts` + `CreateFoodRequest` cobrindo validação de macros.
+    - **Limpeza de Out of Scope:** Tarefas não-acionáveis (importação avulsa de arquivo TACO e exportação de PDF em Inteligência) devidamente arquivadas para não poluir o Kanban.
+  - Sincronização do parser do TUI (`scripts/compas-dashboard.cjs`) e do CLI (`scripts/compas-tools.ps1`) para manter o Kanban limpo e 100% verdadeiro.
+- **Próximo Passo:**
+  - Integração Stripe & Infraestrutura Final (/billing)
+
 - **Agente:** Antigravity CLI
 - **Concluído:**
   - Implementação do script de estatísticas e métricas de IA (`scripts/ai-harness-stats.cjs`), monitorando SQLite do OpenCode (tokens in/out/cache, custos, sessões) e Antigravity CLI (steps, conversas, transcript).

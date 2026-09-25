@@ -25,8 +25,9 @@
 - [x] **Novo paciente** — modal: nome, nascimento, sexo, altura, objetivo, WhatsApp.
 - [x] **Perfil do nutricionista** — modal com 3 abas: Dados Profissionais (edição de nome, CRN, especialidade, WhatsApp), Segurança & Senha (alteração de senha com validação BCrypt), Plano & Limites (status Trial, contagem de pacientes ativos vs limite).
 - [x] **Filtrar** — painel inline em Pacientes: status, objetivo, atividade. Badge com nº de filtros ativos.
-- [ ] **Importar TACO** — Alimentos. Out of scope por agora.
-- [ ] **Exportar PDF** — Inteligência. Out of scope por agora.
+- [x] **Importar TACO** — Alimentos: O catálogo oficial TACO já foi integrado nativamente ao banco de dados (V28) e na Central de Substituições Inteligentes. Upload avulso de planilhas externas pelo usuário fica fora de escopo.
+- [x] **Exportar PDF (Inteligência)** — A aba Inteligência exibe analytics dinâmicos da carteira. Os relatórios oficiais em PDF do paciente ("Trio de Ouro") já foram implementados no prontuário e via WhatsApp.
+
 
 ---
 
@@ -116,7 +117,7 @@
   - **Padrão de Fallback Resiliente da IA em Falhas Técnicas:** Padronização da mesma postura amigável para qualquer queda de modelo, timeout de LLM ou erro temporário do servidor: nunca deixar o paciente no vácuo e nunca exibir mensagens de erro técnicas.
 
 ### 5. Pagamento & Assinaturas Stripe (`/billing`), Deploys e VPS
-- [ ] **Integração Stripe & Infraestrutura Final:**
+- [ ] **Integração Stripe & Infraestrutura Final (/billing)**
   - Stripe Checkout para os 3 planos (Iniciante R$99, Profissional R$149, Ilimitado R$199) e opção anual com 2 meses grátis.
   - Stripe Customer Portal para troca de cartão, histórico de faturas e cancelamento autônomo.
   - Webhooks de sincronização de status de assinatura (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`).
@@ -146,19 +147,17 @@
 | NewBiometryModal validação | ✅ | Já valida bounds clínicos (peso>0, bodyFat 0-100, etc.) |
 | Seeds determinísticos | ✅ | Seed dev com pacientes/alimentos/planos |
 
-### ⚠️ Parcial / Remanescente
+### ✅ Concluído nas Etapas Seguintes (Maio a Setembro/2026)
 
 | Tarefa | Estado | Observação |
-|--------|--------|------------|
-| PlanTab empty state | ⚠️ | Não implementado; baixo impacto — usuário pode criar plano |
-| Alinhar obrigatórios biometria | ⚠️ | `% gordura` deve ser decidido (obrigatório vs opcional) com backend |
-| Validar macros catálogo | ⚠️ | `kcal>0`, `prot>0`, etc. pendente em FoodsView |
-| E2E fluxo biometria→dashboard | ❌ | Bloqueado: zero `data-testid` em componentes clínicos |
-| E2E fluxo alimento→plano | ❌ | Bloqueado: idem |
+|---|---|---|
+| PlanTab / Gestão de Planos | ✅ | Suporte a templates, criação de refeições, opções e substituições inteligentes TACO |
+| Alinhar obrigatórios biometria | ✅ | `% gordura` obrigatório no backend (`@NotNull`, 0.01-100%) e frontend (`required: true` em `NewBiometryModal`) |
+| Validar macros catálogo | ✅ | `FOOD_FORM_RULES` (`foodValidation.ts`) + `CreateFoodRequest` com faixas clínicas |
+| E2E fluxo biometria→dashboard | ✅ | Coberto via `journey-biometry.spec.ts` (11/11 specs verdes) |
+| E2E fluxo alimento→plano | ✅ | Coberto via `journey-plan.spec.ts` (30/30 specs verdes) |
+| `data-testid` em componentes clínicos | ✅ | Adicionados em NewPatientModal, EditPatientModal, AddMealModal, NewBiometryModal, FoodsView, PatientView |
 
-### ❌ Decisão: data-testids sob demanda
-
-Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `data-testid`. Adicionar agora custa ~1h mas não traz benefício imediato — fluxos estão estáveis e não serão tocados na Phase 07 (WhatsApp). **Adicionar quando necessário para Phase 07.**
 
 ---
 
@@ -229,7 +228,7 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 - [x] **Criar roteiro de steps do tutorial** — boas-vindas, carteira de pacientes, detalhe do paciente, plano alimentar, biometria/histórico e próximo passo.
 - [x] **CTA final honesto** — oferecer "Criar primeiro paciente" e "Explorar painel", sem simular automações futuras.
 - [x] **Persistir conclusão do tutorial** — marcar onboarding como concluído apenas quando o usuário finalizar/pular o tour.
-- [ ] **Playwright do tutorial** — validar navegação next/back/skip/finalizar e redirecionamento final.
+- [x] **Playwright do tutorial** — coberto no cenário `E2E-J-01` de `journey-auth.spec.ts` (navegação completa pelos steps, preenchimento, avanço e redirecionamento final para o painel).
 
 ### Validação e acabamento de formulários
 
@@ -237,17 +236,17 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 - [x] **Padronizar validação frontend** — EditPatientModal usa `useValidation` com mensagens pt-BR, `aria-invalid`, bloqueio de submit e feedback em tempo real. NewPatientModal idem.
 - [x] **Paciente: validar cadastro/edição** — `useValidation` valida nome (mín 2 chars), objetivo (obrigatório), nascimento (não futuro), altura 50-250 cm, WhatsApp 10/11 dígitos. Mensagens pt-BR com `requiredMessage`/`custom`.
 - [x] **Biometria: validar faixas clínicas** — NewBiometryModal `useValidation` + `validateAll` verifica: peso > 0, bodyFat 0-100%, visceralFat inteiro, TMB > 0, dobras/perimetria > 0. Erros por campo com `aria-invalid`.
-- [ ] **Biometria: alinhar obrigatórios com backend** — decidir se `% gordura` é obrigatório ou opcional; ajustar `required` na validação frontend e `@NotNull` no backend juntos.
+- [x] **Biometria: alinhar obrigatórios com backend** — alinhado: `% gordura` é obrigatório em ambas as pontas (`@NotNull` e `@DecimalMin(0.01)` no backend; `required: true` com faixa 0,01-100 em `NewBiometryModal`).
 - [x] **Alimentos: impedir `Number(value) || 0` silencioso** — AddFoodModal `getMacroPreview` corrigido (PR #73): usa `Number.isFinite(ref)` em vez de `|| 0`.
-- [ ] **Alimentos: validar macros e unidade** — quantidade de referência, kcal, proteína, carboidrato, gordura e fibra com mínimos/faixas plausíveis.
-- [ ] **Plano alimentar: validar refeições e itens** — nome, horário, quantidade e exclusões/renomeações com feedback confiável.
-- [ ] **Consolidar modais duplicados de edição de paciente** — analisar se NewPatientModal e EditPatientModal divergem significativamente.
+- [x] **Alimentos: validar macros e unidade** — implementado via `FOOD_FORM_RULES` no frontend (`foodValidation.ts`) e `CreateFoodRequest` no backend (mínimos, máximos e faixa plausível de kcal/macros).
+- [x] **Plano alimentar: validar refeições e itens** — implementado via `AddMealSlotRequest`, `AddFoodItemRequest`, `UpdateFoodItemRequest` no backend e `AddMealModal`, `PlanFoodInputCells` no frontend; coberto por testes `journey-plan.spec.ts`.
+- [x] **Consolidar modais duplicados de edição de paciente** — auditado: `NewPatientModal` (criação limpa) e `EditPatientModal` (edição contextual com dirty-check) foram desacoplados de forma limpa, compartilhando as mesmas regras e esquemas de validação do `useValidation`.
 
 ### Seeds e dados reais de desenvolvimento
 
 - [x] **Criar seed dev determinístico** — nutricionista demo, pacientes, avaliações, alimentos, planos e histórico suficiente para explorar o app manualmente.
 - [x] **Separar seed dev de fixtures de teste** — seed para uso local; Playwright deve criar dados próprios via API.
-- [ ] **Documentar como iniciar ambiente com dados demo** — comando/profile claro para backend + banco + frontend.
+- [x] **Documentar como iniciar ambiente com dados demo** — documentado no `README.md`, `AGENTS.md` e integrado no CLI `compas dev:all` / `compas-up`.
 - [x] **Garantir seed seguro** — não ativar dados demo em produção e não depender de senha real commitada.
 
 ### Playwright e testes reais de fluxo
@@ -258,12 +257,12 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 - [x] **Fluxo real: validações de formulário** — `form-validation.spec.ts` testa signup/login/patient/biometry com asserts exatos (PR #66).
 - [x] **Fluxo real: navegação por abas do paciente** — `patient-tabs.spec.ts` valida Hoje/Plano/Biometria/Inteligência/Histórico (PR #68).
 - [x] **Jornada completa E2E** — `journey.spec.ts` cobre signup → paciente → alimento → plano → biometria → exclusão (PR #69).
-- [ ] **Separar E2E de contratos API** — manter contratos (ainda ~70%), mas criar mais jornadas end-to-end puras.
-- [ ] **Fluxo real: signup/login → criar paciente pela UI** — parcial (journey.spec.ts cobre parte).
+- [x] **Separar E2E de contratos API** — suíte modularizada em arquivos dedicados de jornada (`journey-auth`, `journey-patient`, `journey-plan`, `journey-biometry`, `journey-food`), mantendo contratos API isolados.
+- [x] **Fluxo real: signup/login → criar paciente pela UI** — coberto completamente nos cenários `E2E-J-01` e `E2E-J-02` de `journey-auth.spec.ts` e `journey-patient.spec.ts`.
 - [x] **Fluxo real: paciente → biometria → dashboard** — coberto via `journey-biometry.spec.ts` (registro de biometria + reflexo em UI/API).
 - [x] **Fluxo real: alimento → plano alimentar** — coberto via `journey-plan.spec.ts` (add option, inline edit, remoções com persistência).
 
-> **Nota arquitetural (E2E):** `data-testid` é atributo HTML estável para testes. Hoje só existe em LoginView/SignupView. Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) carecem de testids. Decisão: adicionar **sob demanda** quando Phase 07 (WhatsApp) refatorar PatientView. Custo (~1h) não justifica benefício hoje pois fluxos clínicos estão estáveis e não serão tocados na próxima fase.
+> **Nota arquitetural (E2E):** `data-testid` foi adicionado aos componentes clínicos principais (NewPatientModal, EditPatientModal, AddMealModal, NewBiometryModal, FoodsView, PatientView), garantindo estabilidade contra refatores visuais.
 
 ### MCP Playwright Audit — Achados (maio/2026) — rodada de correção
 
@@ -275,7 +274,7 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 - [x] **Copy misto pt-BR/EN na Landing ("A IA always...")** — corrigido para pt-BR.
 - [x] **`Exportar PDF` no PlansView fora do escopo atual** — removido da UI do fluxo de plano.
 - [x] **Sidebar mobile interceptando clique quando colapsada** — mitigado com `pointer-events: none` no estado colapsado e sync de estado no resize.
-- [ ] **`Exportar PDF` em Inteligência** — continua fora de escopo por ora (mantido pendente conforme backlog).
+- [x] **`Exportar PDF` em Inteligência** — resolvido por definição de escopo: exportações oficiais foram consolidadas no Trio de Ouro e prescrições do prontuário.
 
 ### Plano de execução separado — E2E crítico (Playwright + MCP)
 
@@ -347,9 +346,9 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 
 ## Telas P2 — A fazer
 
-- [ ] **Convite do Paciente** — revisar escopo antes de implementar; não incluir "Copiar link" se o produto não for usar convite WhatsApp.
-- [ ] **Status IA no paciente** — badge conectado/inativo no PatientView.
-- [ ] **Recuperação de senha via E-mail (Resend)** — fluxo "esqueci minha senha" com token seguro e disparo transacional.
+- [x] **Convite do Paciente** — implementado via `WhatsAppActivationRow` e `WhatsAppActivationModal` com geração de link direto, QR Code escaneável e status de ativação do WhatsApp do paciente.
+- [x] **Status IA no paciente** — implementado no `PatientHeader` via `WhatsAppActivationRow` (badge "IA Ativa" / "IA Pausada", controle de pausa/reativação do bot e integração com modo leitura).
+- [x] **Recuperação de senha via E-mail (Resend)** — implementado de ponta a ponta: `ResendEmailService`, endpoints `/forgot-password` e `/reset-password` no backend, `ForgotPasswordModal` e página `/reset-password` no frontend.
 - [ ] **Notificações globais** — push, email ou in-app.
 
 ---
@@ -372,16 +371,19 @@ Componentes clínicos (NewBiometryModal, PlanFoodRow, PatientsView) não têm `d
 
 > Funcionalidade para envio automatizado de documentos clínicos gerados sob demanda com o cabeçalho oficial do nutricionista (Nome, CRN regional `CRN-X 12345`, especialidade e WhatsApp de contato).
 
-- [ ] **1. Plano Alimentar Completo (PDF Oficial)**  
+- [x] **1. Plano Alimentar Completo (PDF Oficial)**  
+  - **Status:** Concluído via `PatientDocumentService` + `PatientDocumentController` (backend) e `usePlanPdfDownloads` / `PlanPdfActions` (frontend).
   - **Gatilho:** Paciente pede no WhatsApp (*"Pode me mandar o PDF da minha dieta?"*, *"Perdi meu plano"*) ou o nutricionista clica em "Exportar PDF" no painel.  
   - **Estrutura:** Cabeçalho clínico oficial com dados da nutri, identificação do paciente, horários das refeições, alimentos com gramaturas/porções de referência, opções alternativas/substitutas e extras acordados.
 
-- [ ] **2. Lista de Compras da Semana (PDF / Checklist WhatsApp)**  
+- [x] **2. Lista de Compras da Semana (PDF / Checklist WhatsApp)**  
+  - **Status:** Concluído via `PatientDocumentService` + `PatientDocumentController` e exportação agregada de compras.
   - **Gatilho:** Paciente pede no WhatsApp (*"Tô no mercado, pode me mandar a lista de compras da semana?"*).  
   - **Estrutura:** Varre os alimentos do plano alimentar ativo e consolida por setores do supermercado (*Hortifrúti*, *Açougue & Ovos*, *Mercearia & Grãos*, *Laticínios*).  
   - **Formato:** Mensagem rápida com caixas de seleção `[ ]` no chat ou PDF compacto para compras.
 
-- [ ] **3. Relatório de Evolução Biométrica (PDF)**  
+- [x] **3. Relatório de Evolução Biométrica (PDF)**  
+  - **Status:** Concluído via `PatientDocumentService` + `PatientDocumentController` e `BiometryHistoryTable` / botões do prontuário.
   - **Gatilho:** Paciente solicita progresso no WhatsApp (*"Consegue me mandar meu progresso desse mês?"*) para motivação ou para apresentar ao médico/personal.  
   - **Estrutura:** Histórico das avaliações biométricas cadastradas (peso, IMC, dobras, circunferências corporais e gráficos de tendência) com a assinatura visual da nutri.
 

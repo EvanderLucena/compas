@@ -119,8 +119,9 @@ function getTasksData() {
         if (/^\s*-\s*\[\s*\]\s*\*\*(.+?)\*\*/.test(line)) {
           const m = line.match(/^\s*-\s*\[\s*\]\s*\*\*(.+?)\*\*/);
           if (m) {
-            const t = m[1].trim();
-            if (!t.toLowerCase().includes('out of scope') && t !== activeTask && pendingTasks.length < 5) {
+            const t = m[1].replace(/[:\s]+$/, '').trim();
+            const isSameAsActive = activeTask && (t.toLowerCase() === activeTask.toLowerCase() || activeTask.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(activeTask.toLowerCase()));
+            if (!t.toLowerCase().includes('out of scope') && !line.toLowerCase().includes('out of scope') && !isSameAsActive && pendingTasks.length < 5) {
               pendingTasks.push(t);
             }
           }
