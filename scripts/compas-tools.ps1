@@ -81,8 +81,9 @@ function Get-CompasTasksData {
                 $activeTask = $matches[1].Trim().Trim('*')
             }
             if ($line -match "^\s*-\s*\[\s*\]\s*\*\*(.+?)\*\*") {
-                $tName = $matches[1].Trim()
-                if ($tName -notmatch "Out of scope" -and $tName -ne $activeTask) {
+                $tName = $matches[1].Trim().Trim(':')
+                $isSameAsActive = $activeTask -and ($tName -eq $activeTask -or $activeTask.Contains($tName) -or $tName.Contains($activeTask))
+                if ($tName -notmatch "Out of scope" -and $line -notmatch "out of scope" -and !$isSameAsActive) {
                     $pendingTasks.Add($tName)
                     if ($pendingTasks.Count -ge 5) { break }
                 }
