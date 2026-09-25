@@ -122,10 +122,23 @@ function Get-CompasAiStats {
 function compas-status {
     <#
     .SYNOPSIS
-    Exibe o dashboard unificado do Compas: Serviços, Git, Task Board e AI Harness.
+    Inicia o App Dashboard Interativo do Compas em tempo real ou imprime snapshot.
     #>
+    param(
+        [switch]$Plain,
+        [switch]$Web
+    )
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $root = Get-CompasProjectRoot
+    $dashboardScript = Join-Path $root "scripts\compas-dashboard.cjs"
+
+    if (Test-Path $dashboardScript) {
+        $nodeArgs = @("--no-warnings", $dashboardScript)
+        if ($Web) { $nodeArgs += "--web" }
+        elseif ($Plain) { $nodeArgs += "--plain" }
+        & node $nodeArgs
+        return
+    }
 
     Write-Host ""
     Write-Host "╔════════════════════════════════════════════════════════════════════════════╗" -ForegroundColor DarkCyan
