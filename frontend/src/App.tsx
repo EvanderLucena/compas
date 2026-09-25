@@ -58,6 +58,8 @@ function isAdminSubdomain(): boolean {
   return window.location.hostname.startsWith('admin.');
 }
 
+const isClosedBeta = import.meta.env.VITE_CLOSED_BETA === 'true';
+
 function AdminAuthGuard({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isInitializing = useAuthStore((s) => s.isInitializing);
@@ -107,7 +109,7 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   if (!isAuthenticated || !user) {
     if (isAdminSubdomain()) return <Navigate to="/admin/login" replace />;
-    return <Navigate to="/" replace />;
+    return <Navigate to={isClosedBeta ? '/login' : '/'} replace />;
   }
 
   if (user.role === 'ADMIN') {
@@ -154,7 +156,7 @@ function LogoutView() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    void logout().finally(() => navigate('/', { replace: true }));
+    void logout().finally(() => navigate(isClosedBeta ? '/login' : '/', { replace: true }));
   }, [logout, navigate]);
 
   return null;
@@ -184,7 +186,7 @@ const router = createBrowserRouter([
         path: '/',
         element: (
           <RedirectIfAuthenticated>
-            <LandingView />
+            {isClosedBeta ? <Navigate to="/login" replace /> : <LandingView />}
           </RedirectIfAuthenticated>
         ),
       },
@@ -200,7 +202,7 @@ const router = createBrowserRouter([
         path: '/signup',
         element: (
           <RedirectIfAuthenticated>
-            <SignupView />
+            {isClosedBeta ? <Navigate to="/login" replace /> : <SignupView />}
           </RedirectIfAuthenticated>
         ),
       },

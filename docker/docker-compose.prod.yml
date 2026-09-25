@@ -1,0 +1,121 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: compas-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${COMPAS_DB:-compas}
+      POSTGRES_USER: ${COMPAS_USER:-compas}
+      POSTGRES_PASSWORD: ${COMPAS_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - compas-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COMPAS_USER:-compas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - compas
+
+  redis:
+    image: redis:7-alpine
+    container_name: compas-redis
+    restart: always
+    command: ["redis-server", "--requirepass", "${COMPAS_REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - compas-redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=${COMPAS_REDIS_PASSWORD} redis-cli ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - compas
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: compas-backend
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${COMPAS_DB:-compas}
+      SPRING_DATASOURCE_USERNAME: ${COMPAS_USER:-compas}
+      SPRING_DATASOURCE_PASSWORD: ${COMPAS_PASSWORD}
+      COMPAS_JWT_SECRET: ${COMPAS_JWT_SECRET}
+      NUTRIAI_JWT_SECRET: ${COMPAS_JWT_SECRET}
+      COMPAS_SEED_ADMIN_ENABLED: ${COMPAS_SEED_ADMIN_ENABLED:-false}
+      COMPAS_SEED_ADMIN_PASSWORD: ${COMPAS_SEED_ADMIN_PASSWORD}
+      NUTRIAI_SEED_ADMIN_PASSWORD: ${COMPAS_SEED_ADMIN_PASSWORD}
+      COMPAS_SEED_ADMIN_NAME: ${COMPAS_SEED_ADMIN_NAME:-Nutricionista Compas}
+      COMPAS_SEED_ADMIN_EMAIL: ${COMPAS_SEED_ADMIN_EMAIL:-admin@compas.app}
+      COMPAS_LLM_API_KEY: ${COMPAS_LLM_API_KEY:-${OLLAMA_API_KEY:-}}
+      COMPAS_LLM_BASE_URL: ${COMPAS_LLM_BASE_URL:-https://api.ollama.com/v1}
+      COMPAS_LLM_MODEL: ${COMPAS_LLM_MODEL:-deepseek-v4.1-flash}
+      PUBLIC_SIGNUP_ENABLED: ${PUBLIC_SIGNUP_ENABLED:-false}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_API_URL: http://evolution-go:8080
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${COMPAS_REDIS_PASSWORD}
+      SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - compas
+
+  evolution-go:
+    image: evoapicloud/evolution-go:latest
+    container_name: compas-evolution
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8080
+      CLIENT_NAME: compas
+      GLOBAL_API_KEY: ${EVOLUTION_API_KEY}
+      POSTGRES_AUTH_DB: postgresql://${COMPAS_USER:-compas}:${COMPAS_PASSWORD}@postgres:5432/${COMPAS_DB:-compas}_evogo_auth?sslmode=disable
+      POSTGRES_USERS_DB: postgresql://${COMPAS_USER:-compas}:${COMPAS_PASSWORD}@postgres:5432/${COMPAS_DB:-compas}_evogo_users?sslmode=disable
+      DATABASE_SAVE_MESSAGES: "false"
+      WADEBUG: INFO
+      LOGTYPE: console
+      WEBHOOK_URL: http://backend:8080/api/v1/webhooks/whatsapp
+      WEBHOOK_FILES: "false"
+      TZ: America/Sao_Paulo
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - compas-evolution-data:/evolution-instance
+    networks:
+      - compas
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_CLOSED_BETA: "${VITE_CLOSED_BETA:-true}"
+    container_name: compas-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - compas
+
+volumes:
+  compas-pgdata:
+  compas-redisdata:
+  compas-evolution-data:
+
+networks:
+  compas:
+    driver: bridge
